@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Mapping
+from typing import Any, Iterable, Mapping
 
 
 UNEXPLAINED_MOVE_THRESHOLD = 0.08
@@ -84,4 +84,54 @@ def build_reconstruction_delta(
         "change_reasons": reasons or ["no_material_input_change"],
         "unexplained_repricing": unsupported_move,
         "reconstruction_health_failure": hard_failure,
+    }
+
+
+def summarize_reconstruction_health(states: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
+    """Summarize reconstruction integrity across the current card universe.
+
+    The input should contain the latest persisted state for each card. The summary
+    is deliberately fail-closed: any hard reconstruction failure makes universe
+    health ``failed``; non-hard unexplained repricing degrades health and surfaces
+    the affected cards for review.
+    """
+    rows = list(states)
+    total_cards = len(rows)
+    with_previous = 0
+    unexplained_cards: list[str] = []
+    hard_failure_cards: list[str] = []
+
+    for state in rows:
+        card_id = str(state.get("card_id") or "").strip() or "unknown"
+        reconstruction = state.get("reconstruction") or {}
+        if reconstruction.get("has_previous"):
+            with_previous += 1
+        if reconstruction.get("unexplained_repricing"):
+            unexplained_cards.append(card_id)
+        if reconstruction.get("reconstruction_health_failure"):
+            hard_failure_cards.append(card_id)
+
+    unexplained_cards = sorted(set(unexplained_cards))
+    hard_failure_cards = sorted(set(hard_failure_cards))
+    review_cards = sorted(set(unexplained_cards) | set(hard_failure_cards))
+
+    if hard_failure_cards:
+        status = "failed"
+    elif unexplained_cards:
+        status = "degraded"
+    else:
+        status = "healthy"
+
+    denominator = with_previous or 1
+    return {
+        "status": status,
+        "total_cards": total_cards,
+        "cards_with_previous": with_previous,
+        "initial_observations": total_cards - with_previous,
+        "unexplained_repricing_count": len(unexplained_cards),
+        "hard_failure_count": len(hard_failure_cards),
+        "unexplained_repricing_rate": len(unexplained_cards) / denominator,
+        "hard_failure_rate": len(hard_failure_cards) / denominator,
+        "cards_requiring_review": review_cards,
+        "hard_failure_cards": hard_failure_cards,
     }
