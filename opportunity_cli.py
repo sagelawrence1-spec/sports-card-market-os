@@ -6,7 +6,7 @@ import argparse
 import json
 
 from opportunity_contract import build_opportunity_radar
-from opportunity_engine import OpportunityEngine, OpportunityStore, SignalType
+from opportunity_engine import OpportunityEngine, OpportunityStore, OpportunityType, SignalType
 
 
 def main() -> None:
@@ -19,6 +19,7 @@ def main() -> None:
     spark.add_argument("--sport", required=True)
     spark.add_argument("--observation", required=True)
     spark.add_argument("--signal-type", choices=[x.value for x in SignalType], default="USER_SPARK")
+    spark.add_argument("--type", choices=[x.value for x in OpportunityType], default=None)
     spark.add_argument("--market-repricing-pct", type=float, default=0.0)
 
     sub.add_parser("radar", help="Print active Opportunity Radar JSON")
@@ -36,6 +37,7 @@ def main() -> None:
             sport=args.sport,
             observation=args.observation,
             signal_type=SignalType(args.signal_type),
+            opportunity_type=OpportunityType(args.type) if args.type else None,
             market_repricing_pct=args.market_repricing_pct,
         )
         print(json.dumps(thesis.to_dict(), indent=2, sort_keys=True))
