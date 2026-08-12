@@ -55,6 +55,29 @@ class ActiveFixture:
         return ProviderResult(records,query,self.provider_name)
 
 
+class PolicyFilteredSoldFixture:
+    provider_name="licensed_sold_fixture"
+
+    def search_sold(self,query,**kwargs):
+        record=EvidenceRecord(
+            provider=self.provider_name,
+            record_type="sold",
+            source_item_id="unconfirmed-1",
+            title=TITLE,
+            price=5000,
+            event_date="2026-08-11",
+            currency="USD",
+            policy_eligible=False,
+            policy_reason="price_not_confirmed",
+        )
+        return ProviderResult([record],query,self.provider_name)
+
+
+class CappedSoldFixture(SoldFixture):
+    provider_name="public_sold_fixture"
+    evidence_grade_cap="B"
+
+
 def test_pipeline_routes_evidence_and_publishes_only_gated_value(tmp_path):
     store=EvidenceStore(tmp_path/"evidence.sqlite")
     result=ScheduledMarketPipeline(
@@ -83,6 +106,29 @@ def test_pipeline_fails_closed_without_authoritative_sold_source(tmp_path):
     assert item["fair_value"] is None
     assert item["action"] is None
     assert item["engine_classification"]=="NOT_ENOUGH_EVIDENCE"
+
+
+def test_pipeline_persists_but_excludes_provider_policy_failures(tmp_path):
+    store=EvidenceStore(tmp_path/"evidence.sqlite")
+    result=ScheduledMarketPipeline(store,sold_provider=PolicyFilteredSoldFixture()).run(
+        [ASSET],as_of="2026-08-12T12:00:00Z"
+    )
+    item=result.contract["items"][0]
+    assert result.status=="complete"
+    assert item["fair_value"] is None
+    assert item["excluded_count"]==1
+    assert store.review_queue("rejected")[0]["match_reason"]=="provider_policy:price_not_confirmed"
+
+
+def test_public_sold_result_source_cannot_claim_grade_a(tmp_path):
+    result=ScheduledMarketPipeline(
+        EvidenceStore(tmp_path/"evidence.sqlite"),sold_provider=CappedSoldFixture()
+    ).run([ASSET],as_of="2026-08-12T12:00:00Z")
+    item=result.contract["items"][0]
+    assert item["fair_value"] is not None
+    assert item["evidence_grade"]=="B"
+    assert any("capped at evidence grade B" in blocker for blocker in item["blockers"])
+    assert result.contract["source"]["provenance"]["evidence_grade_cap"]=="B"
 
 
 def test_marketplace_insights_parser_preserves_sold_provenance():

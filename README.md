@@ -10,12 +10,12 @@ Release progression and evidence gates are defined in [ROADMAP.md](ROADMAP.md).
 The product direction is a continuously operating market-intelligence system:
 market evidence → card identity → valuation → opportunity → capital decision →
 realized outcome → calibration. The current interface demonstrates that workflow,
-but its visible market state is explicitly illustrative until authoritative data
+but its visible market state is explicitly illustrative until verified data
 ingestion and forward validation are live.
 
 ## Priorities
 
-1. Continuously ingest authoritative sold evidence and reject corrupt comps.
+1. Continuously ingest verified sold evidence and reject corrupt comps.
 2. Resolve every observation through a canonical card registry and hierarchy.
 3. Persist market history, evidence grades, deltas, and material alerts.
 4. Journal recommendations before outcomes and measure forward performance.
@@ -39,15 +39,24 @@ into public BUY / ACCUMULATE / HOLD / TRIM / SELL actions.
 
 ## Automatic evidence run
 
-The authoritative sold provider uses eBay Marketplace Insights. eBay must first
-approve the application for its Limited Release API. Configure the values in
-`.env.example`, enable `EBAY_MARKETPLACE_INSIGHTS_ENABLED`, and run:
+The sold-data boundary supports three replaceable providers. The zero-cost
+private-alpha path uses SoldComps' public eBay sold-result API. It groups the
+monitored universe into player/year/grade searches, rotates those groups through
+a bounded daily request budget, and excludes Best Offers because eBay does not
+expose the negotiated price. Missing shipping, non-USD transactions, malformed
+totals, ambiguous identity, lots, and reprints are also rejected. This source is
+capped at evidence grade B until an independent realized-sale source agrees.
+
+The Card API paid feed and official eBay Marketplace Insights remain optional
+upgrades behind the same provider boundary.
+
+Configure a free SoldComps key using `.env.example`, then run:
 
 ```bash
 python market_runner.py
 ```
 
-Without approved sold access the runner refuses to replace the product payload.
+Without a configured sold source the runner refuses to replace the product payload.
 For local inspection of the explicit blocked state only:
 
 ```bash
@@ -55,10 +64,15 @@ python market_runner.py --allow-blocked --database /tmp/market-os.sqlite --outpu
 ```
 
 `.github/workflows/market-scan.yml` provides the gated daily/dispatch job. It is
-disabled until the repository variable `MARKET_SCAN_ENABLED=true` and the eBay
-application secrets are configured. Its generated contract is retained as a run
-artifact for inspection; automated product publication is intentionally deferred
-until the authoritative source is activated.
+disabled until the repository variable `MARKET_SCAN_ENABLED=true` and the
+selected provider's secret and variables are configured. Its generated contract is
+retained as a run artifact for inspection; automated product publication is
+intentionally deferred until the confirmed source is activated.
+
+SoldComps is treated as public-result evidence rather than authoritative eBay
+transaction data. The API key remains a user-owned secret and is never committed
+or exposed to the browser. Best Offer rows remain in the audit store as rejected
+evidence and can never affect valuation.
 
 ## Validate
 

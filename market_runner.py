@@ -13,6 +13,11 @@ from market_pipeline import ScheduledMarketPipeline
 from providers.ebay_auth import EbayOAuthClient
 from providers.ebay_browse import EbayBrowseProvider
 from providers.ebay_marketplace_insights import EbayMarketplaceInsightsProvider
+from providers.sold_comps import SoldCompsProvider
+from providers.the_card_api import TheCardApiSoldProvider
+
+
+PAID_CARD_API_PLANS={"starter","builder","pro","enterprise"}
 
 
 def load_registry(path):
@@ -37,14 +42,56 @@ def write_contract(path,contract):
     temporary.replace(destination)
 
 
+def configured_sold_provider(oauth,marketplace):
+    requested=(os.getenv("MARKET_SOLD_PROVIDER") or "auto").strip().lower()
+    sold_comps_key=os.getenv("SOLD_COMPS_API_KEY","").strip()
+    card_api_key=os.getenv("THE_CARD_API_KEY","").strip()
+    card_api_plan=os.getenv("THE_CARD_API_PLAN","").strip().lower()
+    insights_enabled=os.getenv("EBAY_MARKETPLACE_INSIGHTS_ENABLED","").lower() in {"1","true","yes"}
+
+    use_sold_comps=requested=="sold_comps" or (requested=="auto" and bool(sold_comps_key))
+    if use_sold_comps:
+        if not sold_comps_key:
+            raise RuntimeError("SOLD_COMPS_API_KEY is required when MARKET_SOLD_PROVIDER=sold_comps.")
+        return SoldCompsProvider(
+            sold_comps_key,
+            ebay_site=os.getenv("SOLD_COMPS_EBAY_SITE") or "ebay.com",
+            max_queries_per_run=int(os.getenv("SOLD_COMPS_MAX_QUERIES_PER_RUN") or "3"),
+        )
+
+    use_card_api=requested=="the_card_api" or (requested=="auto" and bool(card_api_key))
+    if use_card_api:
+        if not card_api_key:
+            raise RuntimeError("THE_CARD_API_KEY is required when MARKET_SOLD_PROVIDER=the_card_api.")
+        if card_api_plan not in PAID_CARD_API_PLANS:
+            raise RuntimeError(
+                "Persistent evidence ingestion requires a paid The Card API plan. "
+                "Set THE_CARD_API_PLAN to starter, builder, pro, or enterprise only after the license is active."
+            )
+        platforms=tuple(
+            value.strip() for value in (os.getenv("THE_CARD_API_PLATFORMS") or "ebay").split(",") if value.strip()
+        )
+        premium=os.getenv("THE_CARD_API_GOLDIN_BUYER_PREMIUM","").strip()
+        return TheCardApiSoldProvider(
+            card_api_key,
+            platforms=platforms,
+            goldin_buyer_premium=float(premium) if premium else None,
+        )
+
+    if requested not in {"auto","ebay_marketplace_insights"}:
+        raise ValueError(f"Unknown MARKET_SOLD_PROVIDER: {requested}")
+    if oauth.configured() and insights_enabled:
+        return EbayMarketplaceInsightsProvider(oauth,marketplace)
+    return None
+
+
 def run(args):
     assets=load_registry(args.registry)
     oauth=EbayOAuthClient()
     configured=oauth.configured()
     marketplace=os.getenv("EBAY_MARKETPLACE_ID","EBAY_US")
     listing_provider=EbayBrowseProvider(oauth,marketplace) if configured else None
-    insights_enabled=os.getenv("EBAY_MARKETPLACE_INSIGHTS_ENABLED","").lower() in {"1","true","yes"}
-    sold_provider=EbayMarketplaceInsightsProvider(oauth,marketplace) if configured and insights_enabled else None
+    sold_provider=configured_sold_provider(oauth,marketplace)
     result=ScheduledMarketPipeline(
         EvidenceStore(args.database),
         sold_provider=sold_provider,
@@ -52,8 +99,8 @@ def run(args):
     ).run(assets,as_of=args.as_of)
     if result.status!="complete" and not args.allow_blocked:
         raise RuntimeError(
-            "The scheduled scan did not publish because authoritative sold-data access is unavailable. "
-            "Enable an eBay-approved Marketplace Insights application before retrying."
+            "The scheduled scan did not publish because sold-data access is unavailable. "
+            "Configure a supported sold-evidence provider before retrying."
         )
     write_contract(args.output,result.contract)
     return result

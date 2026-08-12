@@ -84,7 +84,10 @@ class EvidenceStore:
     def save(self,record,card_id,query,decision,run_id=None):
         raw=json.dumps(record.payload,sort_keys=True,default=str)
         source_item_id=str(record.source_item_id or "").strip()
-        if record.provider.startswith("ebay_") and source_item_id and not source_item_id.startswith("row-"):
+        source_platform=str((record.payload or {}).get("source_platform") or "").strip().lower()
+        if source_platform=="ebay" and source_item_id.lower().startswith(("ebay:","ebay-")):
+            source_item_id=source_item_id[5:]
+        if (record.provider.startswith("ebay_") or source_platform=="ebay") and source_item_id and not source_item_id.startswith("row-"):
             base=f"ebay|{record.record_type}|{source_item_id}"
         else:
             base=f"{record.provider}|{record.record_type}|{source_item_id}|{record.event_date}|{record.title}|{record.price}"

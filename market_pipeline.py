@@ -25,6 +25,13 @@ def _day(value: str) -> date:
     return datetime.fromisoformat(str(value)[:10]).date()
 
 
+def _cap_grade(grade: str, cap: str | None) -> str:
+    order={"A":0,"B":1,"C":2,"D":3,"F":4}
+    if cap in order and grade in order and order[grade] < order[cap]:
+        return cap
+    return grade
+
+
 class ScheduledMarketPipeline:
     """Turn approved provider evidence into the contract consumed by the product."""
 
@@ -51,7 +58,12 @@ class ScheduledMarketPipeline:
                 reverse=True,
             )
             decision,asset=ranked[0]
-            if len(ranked)>1 and decision.accepted and ranked[1][0].score >= decision.score-3:
+            if not getattr(record,"policy_eligible",True):
+                decision=MatchDecision(False,0.0,f"provider_policy:{record.policy_reason or 'ineligible'}",{
+                    "provider":record.provider,
+                    "policy_reason":record.policy_reason or "ineligible",
+                })
+            elif len(ranked)>1 and decision.accepted and ranked[1][0].score >= decision.score-3:
                 decision=MatchDecision(False,decision.score,"manual_review",{
                     **decision.diagnostics,
                     "ambiguous_candidates":[asset["card_id"],ranked[1][1]["card_id"]],
@@ -80,26 +92,44 @@ class ScheduledMarketPipeline:
         accepted_active={asset["card_id"]:[] for asset in assets}
         run_counts={asset["card_id"]:{"review":0,"rejected":0} for asset in assets}
 
-        for asset in assets:
-            query=build_ebay_query(asset)
-            category_id=str(asset.get("ebay_category_id") or "261328")
-            for kind,provider in (("sold",self.sold_provider),("active",self.listing_provider)):
-                if provider is None:
-                    continue
+        if self.sold_provider is not None:
+            planner=getattr(self.sold_provider,"plan_queries",None)
+            plans=(planner(assets,as_of=as_of) if planner else [{
+                "query":build_ebay_query(asset),
+                "assets":[asset],
+                "category_id":str(asset.get("ebay_category_id") or "261328"),
+            } for asset in assets])
+            for plan in plans:
+                query=plan["query"]
+                plan_assets=plan.get("assets") or assets
                 try:
-                    if kind=="sold":
-                        result=provider.search_sold(query,category_id=category_id)
-                    else:
-                        result=provider.search_active(query,category_id=category_id)
+                    result=self.sold_provider.search_sold(
+                        query,
+                        category_id=plan.get("category_id"),
+                        asset=plan_assets[0],
+                    )
                     accepted,counts=self._route(result.records,assets,query,run_id)
-                    if kind=="active":
-                        for card_id,records in accepted.items():
-                            accepted_active[card_id].extend(records)
                     for card_id,values in counts.items():
                         run_counts[card_id]["review"]+=values["review"]
                         run_counts[card_id]["rejected"]+=values["rejected"]
                 except Exception as exc:
-                    errors.append(f"{kind}:{asset['card_id']}:{type(exc).__name__}:{exc}")
+                    group=",".join(asset["card_id"] for asset in plan_assets)
+                    errors.append(f"sold:{group}:{type(exc).__name__}:{exc}")
+
+        if self.listing_provider is not None:
+            for asset in assets:
+                query=build_ebay_query(asset)
+                category_id=str(asset.get("ebay_category_id") or "261328")
+                try:
+                    result=self.listing_provider.search_active(query,category_id=category_id)
+                    accepted,counts=self._route(result.records,assets,query,run_id)
+                    for card_id,records in accepted.items():
+                        accepted_active[card_id].extend(records)
+                    for card_id,values in counts.items():
+                        run_counts[card_id]["review"]+=values["review"]
+                        run_counts[card_id]["rejected"]+=values["rejected"]
+                except Exception as exc:
+                    errors.append(f"active:{asset['card_id']}:{type(exc).__name__}:{exc}")
 
         states=[]
         sold_source_available=self.sold_provider is not None and not any(error.startswith("sold:") for error in errors)
@@ -124,7 +154,9 @@ class ScheduledMarketPipeline:
                     if latest_sale is None or sold > latest_sale:
                         latest_sale=sold
             estimate=estimate_market(card_id,recent,cutoff.isoformat())
-            display_ready=estimate.evidence_grade in {"A","B"} and estimate.sample_size >= 8
+            grade_cap=getattr(self.sold_provider,"evidence_grade_cap",None)
+            evidence_grade=_cap_grade(estimate.evidence_grade,grade_cap)
+            display_ready=evidence_grade in {"A","B"} and estimate.sample_size >= 8
             fair_value=estimate.fair_value if display_ready else None
             dispersion=estimate.dispersion if estimate.dispersion is not None else None
             spread=max(0.05,dispersion or 0) if display_ready else None
@@ -138,9 +170,13 @@ class ScheduledMarketPipeline:
             liquidity=min(100,round(accepted_sales_30d*5+len(active_prices)*1.5,1))
             blockers=[]
             if not sold_source_available:
-                blockers.append("Authoritative sold-data source is unavailable")
+                blockers.append("Confirmed sold-data source is unavailable")
             if not display_ready:
                 blockers.append("Accepted sold evidence has not cleared the valuation gate")
+            if grade_cap:
+                blockers.append(
+                    f"This sold-result source is capped at evidence grade {grade_cap} until an independent source agrees"
+                )
             blockers.append("Forward calibration has not cleared the action gate")
             state={
                 "observation_id":asset.get("observation_id") or f"registry:{card_id}",
@@ -152,7 +188,7 @@ class ScheduledMarketPipeline:
                 "engine_classification":"EVIDENCE_READY" if display_ready else "NOT_ENOUGH_EVIDENCE",
                 "alerts":[],
                 "confidence":estimate.confidence,
-                "evidence_grade":estimate.evidence_grade,
+                "evidence_grade":evidence_grade,
                 "fair_value":fair_value,
                 "evidence_range":evidence_range,
                 "move_30d":None,
@@ -172,7 +208,7 @@ class ScheduledMarketPipeline:
                     "Not enough accepted sold evidence exists to publish a trustworthy fair value."
                 ),
                 "evidence_explanation":(
-                    f"{estimate.sample_size} accepted USD sales; dispersion {estimate.dispersion:.1%}."
+                    f"{estimate.sample_size} accepted USD sales; dispersion {estimate.dispersion:.1%}; source ceiling {grade_cap or 'none'}."
                     if estimate.dispersion is not None else
                     "No accepted USD sold observations are available."
                 ),
@@ -182,10 +218,11 @@ class ScheduledMarketPipeline:
             states.append(state)
 
         status="complete" if sold_source_available else "blocked_sold_source"
+        provider_label=getattr(self.sold_provider,"source_label",None)
         label=(
-            "Scheduled authoritative eBay evidence"
+            f"Scheduled {provider_label or 'confirmed sold evidence'}"
             if status=="complete" else
-            "Automatic evidence pipeline — authoritative sold access pending"
+            "Automatic evidence pipeline — confirmed sold access pending"
         )
         contract=build_evidence_market_scan(
             states,
@@ -197,6 +234,7 @@ class ScheduledMarketPipeline:
                 "run_id":run_id,
                 "sold_provider":getattr(self.sold_provider,"provider_name",None),
                 "listing_provider":getattr(self.listing_provider,"provider_name",None),
+                "evidence_grade_cap":getattr(self.sold_provider,"evidence_grade_cap",None),
                 "sold_source_available":sold_source_available,
                 "listing_source_available":listing_source_available,
                 "errors":errors,

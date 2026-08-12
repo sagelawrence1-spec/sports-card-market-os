@@ -12,6 +12,8 @@ class EvidenceRecord:
     url: Optional[str] = None
     currency: str = "USD"
     payload: Dict[str, Any] = field(default_factory=dict)
+    policy_eligible: bool = True
+    policy_reason: Optional[str] = None
 
 @dataclass
 class ProviderResult:

@@ -13,10 +13,17 @@ jobs:
     if: ${{ vars.MARKET_SCAN_ENABLED == 'true' }}
     runs-on: ubuntu-latest
     env:
+      MARKET_SOLD_PROVIDER: ${{ vars.MARKET_SOLD_PROVIDER || 'sold_comps' }}
+      SOLD_COMPS_API_KEY: ${{ secrets.SOLD_COMPS_API_KEY }}
+      SOLD_COMPS_EBAY_SITE: ${{ vars.SOLD_COMPS_EBAY_SITE || 'ebay.com' }}
+      SOLD_COMPS_MAX_QUERIES_PER_RUN: ${{ vars.SOLD_COMPS_MAX_QUERIES_PER_RUN || '3' }}
+      THE_CARD_API_KEY: ${{ secrets.THE_CARD_API_KEY }}
+      THE_CARD_API_PLAN: ${{ vars.THE_CARD_API_PLAN }}
+      THE_CARD_API_PLATFORMS: ${{ vars.THE_CARD_API_PLATFORMS }}
       EBAY_CLIENT_ID: ${{ secrets.EBAY_CLIENT_ID }}
       EBAY_CLIENT_SECRET: ${{ secrets.EBAY_CLIENT_SECRET }}
       EBAY_MARKETPLACE_ID: EBAY_US
-      EBAY_MARKETPLACE_INSIGHTS_ENABLED: "true"
+      EBAY_MARKETPLACE_INSIGHTS_ENABLED: ${{ vars.EBAY_MARKETPLACE_INSIGHTS_ENABLED || 'false' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

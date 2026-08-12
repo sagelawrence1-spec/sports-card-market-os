@@ -34,7 +34,7 @@ test("server-renders the private engine alpha", async () => {
   assert.match(html, /Market Scan/);
   assert.match(html, /Highest-conviction changes/);
   assert.match(html, /ACCUMULATE/);
-  assert.match(html, /ILLUSTRATIVE ALPHA DATA/);
+  assert.match(html, /DEMO — NO LIVE DATA/);
 });
 
 test("ships evidence-first product language without starter artifacts", async () => {
@@ -46,13 +46,17 @@ test("ships evidence-first product language without starter artifacts", async ()
   assert.match(page, /Opportunity Feed/);
   assert.match(page, /Player Market/);
   assert.match(page, /CAPITAL ALLOCATOR/);
-  assert.match(page, /Research Desk/);
+  assert.match(page, /Evidence Desk/);
   assert.match(page, /market-scan\.json/);
   assert.match(page, /Not enough evidence/);
   assert.match(page, /selectedCardId/);
   assert.match(page, /accepted_sales_total/);
   assert.match(page, /Before capital can move/);
   assert.match(page, /No opportunity clears the evidence and calibration gates/);
+  assert.match(page, /setQuery/);
+  assert.match(page, /No capital action is authorized/);
+  assert.match(page, /free sold-results adapter/);
+  assert.match(page, /only remaining input/);
   assert.doesNotMatch(page, /const signals=\[/);
   assert.match(layout, /Sports Card Intelligence/);
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
