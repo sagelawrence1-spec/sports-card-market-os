@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import marketScan from "../public/data/market-scan.json";
 
-type View = "scan" | "opportunities" | "card" | "player" | "portfolio" | "research";
+type View = "today" | "market" | "card" | "health";
 type EvidenceRange = { low: number; high: number } | null;
 type MarketItem = {
   observation_id: string;
@@ -41,26 +41,26 @@ type MarketItem = {
 type MarketPayload = {
   generated_at: string;
   source: {
-    kind: "illustrative_alpha" | "scheduled_evidence" | "blocked_evidence" | string;
+    kind: string;
     label: string;
-    provenance?: { sold_source_available?: boolean; listing_source_available?: boolean };
+    provenance?: {
+      sold_source_available?: boolean;
+      listing_source_available?: boolean;
+      evidence_grade_cap?: string;
+      sold_provider?: string;
+      errors?: string[];
+    };
   };
   universe_size: number;
   items: MarketItem[];
 };
 
 const marketData = marketScan as unknown as MarketPayload;
-const isLiveEvidence = marketData.source.kind === "scheduled_evidence";
-const isIllustrative = marketData.source.kind === "illustrative_alpha";
-const nav: [View, string][] = [
-  ["scan", "Market Scan"],
-  ["opportunities", "Opportunities"],
-  ["card", "Card Intelligence"],
-  ["player", "Player Market"],
-  ["portfolio", "Portfolio"],
-  ["research", "Research"],
-];
-const money = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
+const money = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+  maximumFractionDigits: 0,
+});
 const scanTime = new Intl.DateTimeFormat("en-US", {
   month: "short",
   day: "numeric",
@@ -69,108 +69,222 @@ const scanTime = new Intl.DateTimeFormat("en-US", {
   timeZone: "America/Phoenix",
   timeZoneName: "short",
 }).format(new Date(marketData.generated_at));
-
-const sourceBadge = marketData.source.kind === "illustrative_alpha"
-  ? "DEMO — NO LIVE DATA"
-  : marketData.source.kind === "scheduled_evidence"
-    ? "LIVE EVIDENCE"
-    : "LIVE DATA NOT CONNECTED";
+const navigation: { id: View; label: string; short: string }[] = [
+  { id: "today", label: "Today", short: "Today" },
+  { id: "market", label: "Market", short: "Market" },
+  { id: "card", label: "Card Intelligence", short: "Card" },
+  { id: "health", label: "Data Health", short: "Health" },
+];
 
 const formatPrice = (value?: number | null) => value == null ? "—" : money.format(value);
-const formatMove = (value: number | null) => value == null ? "—" : `${value >= 0 ? "+" : ""}${(value * 100).toFixed(1)}%`;
-const formatDate = (value?: string | null) => value ? new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(new Date(`${value.slice(0, 10)}T12:00:00Z`)) : "—";
+const formatDate = (value?: string | null) => value
+  ? new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" })
+    .format(new Date(`${value.slice(0, 10)}T12:00:00Z`))
+  : "—";
+const gradeLabel = (grade: string) => ({
+  A: "Strong",
+  B: "Usable",
+  C: "Developing",
+  D: "Weak",
+  F: "Insufficient",
+}[grade] ?? "Unknown");
+const dispersion = (item: MarketItem) => {
+  const match = item.evidence_explanation?.match(/dispersion\s+([\d.]+)%/i);
+  return match ? Number(match[1]) : null;
+};
+const statusLabel = (item: MarketItem) => {
+  if (item.action) return item.action;
+  if (item.scanned_this_run === false) return "ROTATES NEXT";
+  if (item.fair_value != null) return "VALUE READY";
+  return "EVIDENCE BUILDING";
+};
+const attentionReason = (item: MarketItem) => {
+  if (item.scanned_this_run === false) return "Waiting for the next automatic scan rotation.";
+  if ((item.review_count ?? 0) > (item.accepted_sales_total ?? 0)) {
+    return `${item.review_count ?? 0} questionable matches are being kept out of the valuation.`;
+  }
+  if ((dispersion(item) ?? 0) >= 30) return "Accepted sales disagree too widely to support a price.";
+  if ((item.accepted_sales_total ?? 0) < 8) return "More verified sales are needed before publishing a price.";
+  return "Evidence is improving, but it has not cleared every trust gate.";
+};
+const plainBlocker = (blocker: string) => {
+  if (blocker.includes("free-plan rotation")) return "This card will be collected on a later automatic scan.";
+  if (blocker.includes("valuation gate")) return "More consistent verified sales are required.";
+  if (blocker.includes("capped at evidence grade")) return "This public source can reach grade B at best until a second source agrees.";
+  if (blocker.includes("Forward calibration")) return "Future sales have not yet verified the model's estimate.";
+  if (blocker.includes("unavailable")) return "Confirmed sold evidence is currently unavailable.";
+  return blocker;
+};
 
-const signals = marketData.items.map((item) => ({
-  raw: item,
-  signal: item.action ?? "MONITOR",
-  tag: item.alerts[0] ?? (item.engine_classification === "EVIDENCE_READY" ? "EVIDENCE READY" : "EVIDENCE GATED"),
-  sport: item.sport,
-  card: item.card,
-  price: item.fair_value == null ? "Not enough evidence" : money.format(item.fair_value),
-  move: formatMove(item.move_30d),
-  evidence: item.evidence_grade,
-  confidence: item.confidence,
-  why: item.thesis,
-  actionable: Boolean(item.action),
-}));
+function Grade({ value }: { value: string }) {
+  return <span className={`grade grade-${value.toLowerCase()}`}><b>{value}</b>{gradeLabel(value)}</span>;
+}
 
 export default function Home() {
-  const [view, setView] = useState<View>("scan");
-  const [sport, setSport] = useState("All sports");
-  const [signalFilter, setSignalFilter] = useState("All signals");
+  const [view, setView] = useState<View>("today");
   const [query, setQuery] = useState("");
-  const [showEvidenceStatus, setShowEvidenceStatus] = useState(false);
+  const [sport, setSport] = useState("All");
   const [selectedCardId, setSelectedCardId] = useState(marketData.items[0]?.card_id ?? "");
+
   const selected = marketData.items.find((item) => item.card_id === selectedCardId) ?? marketData.items[0];
-  const actionable = isLiveEvidence ? signals.filter((signal) => signal.actionable) : [];
-  const valuedCount = marketData.items.filter((item) => item.fair_value != null && ["A", "B"].includes(item.evidence_grade)).length;
-  const visibleSignals = useMemo(() => {
+  const totalAccepted = marketData.items.reduce((sum, item) => sum + (item.accepted_sales_total ?? 0), 0);
+  const totalReviews = marketData.items.reduce((sum, item) => sum + (item.review_count ?? 0), 0);
+  const totalExcluded = marketData.items.reduce((sum, item) => sum + (item.excluded_count ?? 0), 0);
+  const scannedCount = marketData.items.filter((item) => item.scanned_this_run).length;
+  const actionable = marketData.items.filter((item) => item.action);
+  const valued = marketData.items.filter((item) => item.fair_value != null);
+  const priority = [...marketData.items].sort((left, right) => (
+    (right.review_count ?? 0) - (left.review_count ?? 0)
+    || right.confidence - left.confidence
+  ));
+  const visibleItems = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    return signals.filter((signal) => (
-      (sport === "All sports" || signal.sport === sport)
-      && (signalFilter === "All signals" || signal.signal === signalFilter)
-      && (!needle || [signal.card, signal.raw.player, signal.sport, signal.raw.card_id]
+    return marketData.items.filter((item) => (
+      (sport === "All" || item.sport === sport)
+      && (!needle || [item.player, item.card, item.card_id, item.sport]
         .some((value) => value.toLowerCase().includes(needle)))
     ));
-  }, [sport, signalFilter, query]);
-  const playerCards = marketData.items.filter((item) => item.player === selected?.player);
+  }, [query, sport]);
 
   const openCard = (cardId: string) => {
     setSelectedCardId(cardId);
     setView("card");
   };
 
-  return <div className="shell">
-    <aside>
-      <div className="logo"><span>OS</span><div><b>Market OS</b><small>SPORTS CARD INTELLIGENCE</small></div></div>
-      <div className="nav-label">COMMAND CENTER</div>
-      {nav.map(([id, label]) => <button key={id} onClick={() => setView(id)} className={view === id ? "active" : ""}><i>{id === "scan" ? "⌁" : id === "opportunities" ? "⚡" : id === "card" ? "▣" : id === "player" ? "◎" : id === "portfolio" ? "◫" : "≡"}</i>{label}</button>)}
-      <div className="system"><span className={!isLiveEvidence ? "blocked" : ""}></span><div><b>{isLiveEvidence ? "LIVE EVIDENCE" : isIllustrative ? "DEMO MODE" : "DATA NOT CONNECTED"}</b><small>{marketData.source.label}</small></div></div>
-    </aside>
-    <main>
-      <header>
-        <div className="search">⌕ <input aria-label="Search cards or players" placeholder="Search any card, player, set…" value={query} onChange={(event) => { setQuery(event.target.value); setView("scan"); }} />{query ? <button aria-label="Clear search" onClick={() => setQuery("")}>×</button> : null}</div>
-        <div className={`data-state ${marketData.source.kind}`} title={marketData.source.label}>{sourceBadge}</div>
-        <button className="scan-btn" aria-expanded={showEvidenceStatus} onClick={() => setShowEvidenceStatus((visible) => !visible)}>Evidence status</button><div className="avatar">SL</div>
-      </header>
-      {showEvidenceStatus ? <section className="evidence-status">
-        <div><span>DATA CONNECTION</span><b>{isLiveEvidence ? "Confirmed sales are connected" : "Live sales are not connected yet"}</b></div>
-        <p>{isIllustrative ? "This screen demonstrates the product experience with clearly labeled sample data. No sample valuation or action is presented as live market intelligence." : marketData.source.label}</p>
-        <button onClick={() => setShowEvidenceStatus(false)}>Close</button>
-      </section> : null}
+  return <div className="product-shell">
+    <header className="topbar">
+      <button className="brand" onClick={() => setView("today")} aria-label="Open today's brief">
+        <span>MO</span>
+        <strong>Market OS<small>SPORTS CARD INTELLIGENCE</small></strong>
+      </button>
+      <nav className="desktop-nav" aria-label="Primary navigation">
+        {navigation.map((item) => <button key={item.id} className={view === item.id ? "active" : ""} onClick={() => setView(item.id)}>{item.label}</button>)}
+      </nav>
+      <div className="connection"><i></i><span>LIVE EVIDENCE<small>Updated {scanTime}</small></span></div>
+    </header>
 
-      {view === "scan" && <>
-        <div className="page-head"><div><span className="kicker">MARKET COMMAND CENTER</span><h1>Market Scan</h1><p>Material changes across the monitored universe. Noise removed.</p></div><div className="asof">AS OF {scanTime.toUpperCase()}<br /><b>{marketData.universe_size} cards monitored</b></div></div>
-        <div className="tape">
-          <div><span>MARKET PULSE</span><b>{isIllustrative ? "Demo only" : marketData.source.kind === "blocked_evidence" ? "Sold evidence blocked" : actionable.length ? "Selective strength" : "Evidence building"}</b></div>
-          <div><span>ACTIONS CLEARING GATES</span><b className={actionable.length ? "green" : ""}>{actionable.length} actionable</b></div>
-          <div><span>EVIDENCE HEALTH</span><b>{valuedCount} / {marketData.items.length} valued</b></div>
-          <div><span>CAPITAL POSTURE</span><b>{actionable.length ? "Selective" : "Calibration gated"}</b></div>
-        </div>
-        <div className="toolbar"><div>{["All signals", "BUY", "ACCUMULATE", "HOLD", "TRIM", "SELL", "MONITOR"].map((filter) => <button onClick={() => setSignalFilter(filter)} className={signalFilter === filter ? "on" : ""} key={filter}>{filter}</button>)}</div><select value={sport} onChange={(event) => setSport(event.target.value)}><option>All sports</option><option>NBA</option><option>MLB</option><option>NFL</option></select></div>
-        <section className="signal-table"><div className="table-title"><b>{query ? `Search results for “${query}”` : "Highest-conviction changes"}</b><span>{visibleSignals.length} of {marketData.items.length} cards</span></div><div className="thead"><span>SIGNAL</span><span>ASSET</span><span>FAIR VALUE</span><span>30D</span><span>EVIDENCE</span><span>CONF.</span></div>{visibleSignals.map((signal) => <button className="row" key={signal.raw.card_id} onClick={() => openCard(signal.raw.card_id)}><span><b className={`pill ${signal.signal.toLowerCase()}`}>{isIllustrative ? `DEMO ${signal.signal}` : signal.signal}</b><small>{signal.tag}</small></span><span><b>{signal.card}</b><small>{signal.sport} · {signal.raw.accepted_sales_total ?? 0} accepted sales{signal.raw.scanned_this_run === false ? " · rotates next run" : ""}</small></span><b>{signal.price}</b><b className={signal.move.startsWith("+") ? "green" : signal.move === "—" ? "muted" : "red"}>{signal.move}</b><b className="evidence">{signal.evidence}</b><b>{signal.confidence}%</b></button>)}{visibleSignals.length === 0 ? <div className="no-results"><b>No monitored card matches “{query}”.</b><span>Try a player, year, set, card number, or sport.</span><button onClick={() => setQuery("")}>Clear search</button></div> : null}</section>
+    <main>
+      {view === "today" && <>
+        <section className="brief-hero">
+          <div>
+            <span className="eyebrow">TODAY&apos;S CAPITAL BRIEF · {scanTime.toUpperCase()}</span>
+            <h1>{actionable.length ? `${actionable.length} action${actionable.length === 1 ? "" : "s"} cleared.` : "Today, capital stays still."}</h1>
+            <p>{actionable.length
+              ? "Only evidence-backed actions are shown. Open a card to inspect the full case."
+              : "No monitored card has enough verified evidence to justify a price or trade. The system is showing exactly what must improve instead of manufacturing conviction."}</p>
+          </div>
+          <div className="decision-badge"><small>CAPITAL POSTURE</small><b>{actionable.length ? "SELECTIVE" : "NO ACTION"}</b><span>{actionable.length ? "Review cleared ideas" : "Cash is a valid position"}</span></div>
+        </section>
+
+        <section className="pulse-grid" aria-label="Market evidence summary">
+          <article><small>AUTOMATIC SCAN</small><b>{scannedCount} of {marketData.items.length}</b><span>cards refreshed today</span></article>
+          <article><small>VERIFIED SALES</small><b>{totalAccepted}</b><span>accepted into evidence</span></article>
+          <article className="attention"><small>NEEDS ATTENTION</small><b>{totalReviews}</b><span>questionable matches isolated</span></article>
+          <article><small>PRICES CLEARED</small><b>{valued.length}</b><span>trustworthy fair values</span></article>
+        </section>
+
+        <section className="brief-layout">
+          <div className="priority-panel">
+            <div className="section-heading"><div><span>PRIORITY QUEUE</span><h2>What needs attention</h2></div><button onClick={() => setView("market")}>View full market</button></div>
+            {priority.map((item, index) => <button className="priority-row" key={item.card_id} onClick={() => openCard(item.card_id)}>
+              <span className="priority-number">{String(index + 1).padStart(2, "0")}</span>
+              <span className="asset"><b>{item.player}</b><small>{item.card.replace(item.player, "").trim()}</small></span>
+              <span className="reason"><b>{statusLabel(item)}</b><small>{attentionReason(item)}</small></span>
+              <Grade value={item.evidence_grade} />
+              <span className="arrow">→</span>
+            </button>)}
+          </div>
+
+          <aside className="trust-panel">
+            <span className="eyebrow">WHY NOTHING FIRED</span>
+            <h2>The restraint is the product.</h2>
+            <p>Wrong comps create false prices. False prices create bad trades. Market OS is keeping weak, conflicting, and unverified evidence out of every capital decision.</p>
+            <dl>
+              <div><dt>{totalExcluded}</dt><dd>listings excluded</dd></div>
+              <div><dt>{totalReviews}</dt><dd>matches held for review</dd></div>
+              <div><dt>{actionable.length}</dt><dd>unsupported actions shown</dd></div>
+            </dl>
+            <button onClick={() => setView("health")}>See how evidence is graded</button>
+          </aside>
+        </section>
       </>}
 
-      {view === "opportunities" && <>
-        <div className="page-head"><div><span className="kicker">PROACTIVE DISCOVERY</span><h1>Opportunity Feed</h1><p>Only opportunities that clear evidence and calibration gates.</p></div></div>
-        {actionable.length ? <div className="op-grid">{actionable.slice(0, 3).map((signal, index) => <article className="op" key={signal.raw.card_id}><div className="op-top"><b>{signal.tag} · {signal.sport}</b><span>{signal.confidence}% confidence</span></div><h2>{index === 0 ? "Potential grail compression" : index === 1 ? "Premium rookie dislocation" : "Supply expansion warning"}</h2><h3>{signal.card}</h3><div className="drivers"><span><small>ACCEPTED SALES</small><b>{signal.raw.accepted_sales_total ?? 0}</b></span><span><small>ACTIVE LISTINGS</small><b>{signal.raw.accepted_active_count ?? 0}</b></span><span><small>EVIDENCE</small><b>{signal.evidence}</b></span></div><p>{signal.why}</p><div className="action"><span>ACTION</span><b>{signal.signal}{signal.raw.ideal_entry ? ` below ${formatPrice(signal.raw.ideal_entry)}` : ""}</b></div></article>)}</div> : <div className="evidence-empty"><span>EVIDENCE GATE ACTIVE</span><h2>No opportunity clears the evidence and calibration gates.</h2><p>The system is monitoring the market and will not manufacture an action from weak or unavailable evidence.</p></div>}
+      {view === "market" && <>
+        <section className="page-title">
+          <div><span className="eyebrow">MONITORED UNIVERSE</span><h1>Market</h1><p>Every card is shown with its current evidence state. No speculative prices.</p></div>
+          <div className="market-controls">
+            <label><span className="sr-only">Search cards or players</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search player, card, set…" /></label>
+            <select aria-label="Filter by sport" value={sport} onChange={(event) => setSport(event.target.value)}><option>All</option><option>NBA</option><option>MLB</option><option>NFL</option></select>
+          </div>
+        </section>
+        <section className="market-list">
+          <div className="market-head"><span>ASSET</span><span>STATUS</span><span>FAIR VALUE</span><span>EVIDENCE</span><span>SALES</span><span></span></div>
+          {visibleItems.map((item) => <button className="market-row" key={item.card_id} onClick={() => openCard(item.card_id)}>
+            <span className="asset"><b>{item.player}</b><small>{item.card.replace(item.player, "").trim()}</small></span>
+            <span className={`status ${item.scanned_this_run === false ? "waiting" : ""}`}>{statusLabel(item)}</span>
+            <span className="market-value"><b>{item.fair_value == null ? "Not enough evidence" : formatPrice(item.fair_value)}</b><small>{item.evidence_range ? `${formatPrice(item.evidence_range.low)}–${formatPrice(item.evidence_range.high)}` : attentionReason(item)}</small></span>
+            <Grade value={item.evidence_grade} />
+            <span className="sales"><b>{item.accepted_sales_total ?? 0}</b><small>{item.valuation_sample_size ?? 0} usable</small></span>
+            <span className="arrow">→</span>
+          </button>)}
+          {!visibleItems.length && <div className="empty"><b>No monitored card matches that search.</b><button onClick={() => { setQuery(""); setSport("All"); }}>Clear filters</button></div>}
+        </section>
       </>}
 
       {view === "card" && selected && <>
-        <div className="crumb">Market Scan / {selected.sport} / {selected.player}</div>
-        <div className="card-hero"><div><span className="kicker">CARD INTELLIGENCE</span><h1>{selected.card}</h1><p>{selected.card_id}</p></div><div><b className={`pill ${(selected.action ?? "monitor").toLowerCase()}`}>{isIllustrative ? `DEMO ${selected.action ?? "EVIDENCE GATED"}` : selected.action ?? "EVIDENCE GATED"}</b><small>{selected.confidence}% confidence · Evidence {selected.evidence_grade}</small></div></div>
-        <div className="metric-groups">
-          <div><span><small>Fair value</small><b>{selected.fair_value == null ? "Not enough evidence" : formatPrice(selected.fair_value)}</b></span><span><small>30 days</small><b className={(selected.move_30d ?? 0) > 0 ? "green" : ""}>{formatMove(selected.move_30d)}</b></span><span><small>Evidence range</small><b>{selected.evidence_range ? `${formatPrice(selected.evidence_range.low)}–${formatPrice(selected.evidence_range.high)}` : "—"}</b></span></div>
-          <div><span><small>Accepted sales</small><b>{selected.accepted_sales_total ?? 0}</b></span><span><small>Used in valuation</small><b>{selected.valuation_sample_size ?? selected.accepted_sales_total ?? 0}</b></span><span><small>Evidence</small><b>{selected.evidence_grade}</b></span></div>
-          <div><span><small>Liquidity</small><b>{selected.liquidity_score} / 100</b></span><span><small>Needs review</small><b>{selected.review_count ?? 0}</b></span><span><small>Latest sale</small><b>{formatDate(selected.latest_sale_date)}</b></span></div>
-        </div>
-        <div className="levels"><div><small>IDEAL ENTRY</small><b>{formatPrice(selected.ideal_entry)}</b></div><div><small>DO NOT CHASE</small><b>{formatPrice(selected.do_not_chase)}</b></div><div><small>LOWEST / MEDIAN ASK</small><b>{formatPrice(selected.lowest_ask)} / {formatPrice(selected.median_ask)}</b></div></div>
-        <section className="thesis"><div><h2>Why this evidence should—or should not—be trusted</h2><p>{selected.thesis}</p><h3>Evidence state</h3><p>{selected.evidence_explanation ?? "No evidence explanation is available."}</p>{selected.blockers?.length ? <div className="blockers"><strong>Before capital can move</strong>{selected.blockers.map((blocker) => <span key={blocker}>{blocker}</span>)}</div> : null}</div><aside><span>{selected.accepted_sales_total ?? 0} accepted sales</span><span>{selected.valuation_sample_size ?? selected.accepted_sales_total ?? 0} used in valuation</span><span>{selected.accepted_active_count ?? 0} active listings</span><span>{selected.excluded_count ?? 0} excluded comps</span><span>{selected.review_count ?? 0} awaiting review</span><span>{selected.scanned_this_run == null ? "Scan status unavailable" : selected.scanned_this_run ? "Scanned this run" : "Rotates on a later scan"}</span><span>Updated {formatDate(selected.last_updated)}</span></aside></section>
+        <section className="card-title">
+          <button className="back" onClick={() => setView("market")}>← Market</button>
+          <div className="card-title-row"><div><span className="eyebrow">CARD INTELLIGENCE · {selected.sport}</span><h1>{selected.card}</h1><p>Updated {scanTime}</p></div><div className="card-status"><span className={`status ${selected.scanned_this_run === false ? "waiting" : ""}`}>{statusLabel(selected)}</span><Grade value={selected.evidence_grade} /></div></div>
+        </section>
+
+        <section className="valuation-hero">
+          <div className="locked-value"><small>FAIR VALUE</small><b>{selected.fair_value == null ? "Not enough evidence" : formatPrice(selected.fair_value)}</b><p>{selected.fair_value == null ? "A price will appear only after the evidence clears every trust gate." : selected.thesis}</p></div>
+          <div className="confidence-ring" style={{ "--score": `${selected.confidence * 3.6}deg` } as React.CSSProperties}><span><b>{selected.confidence}%</b><small>confidence</small></span></div>
+        </section>
+
+        <section className="evidence-chain">
+          <article><small>01 · ACCEPTED</small><b>{selected.accepted_sales_total ?? 0} sales</b><p>Matched to the canonical card and eligible for consideration.</p></article>
+          <i>→</i>
+          <article><small>02 · VALUATION SAMPLE</small><b>{selected.valuation_sample_size ?? 0} sales</b><p>Remaining after robust outlier filtering.</p></article>
+          <i>→</i>
+          <article className={selected.fair_value == null ? "locked" : "cleared"}><small>03 · DISPLAY GATE</small><b>{selected.fair_value == null ? "Locked" : "Cleared"}</b><p>{selected.fair_value == null ? "The evidence is not strong enough to publish a price." : "A fair value can be shown."}</p></article>
+        </section>
+
+        <section className="card-grid">
+          <div className="why-panel">
+            <span className="eyebrow">THE EVIDENCE CASE</span>
+            <h2>Why this card should—or should not—be trusted</h2>
+            <p>{selected.evidence_explanation ?? selected.thesis}</p>
+            <div className="blocker-list"><b>What must change</b>{(selected.blockers ?? []).map((blocker) => <span key={blocker}>{plainBlocker(blocker)}</span>)}</div>
+          </div>
+          <aside className="facts-panel">
+            <h3>Evidence facts</h3>
+            <dl>
+              <div><dt>Latest verified sale</dt><dd>{formatDate(selected.latest_sale_date)}</dd></div>
+              <div><dt>Sales in 30 days</dt><dd>{selected.accepted_sales_30d}</dd></div>
+              <div><dt>Needs review</dt><dd>{selected.review_count ?? 0}</dd></div>
+              <div><dt>Excluded listings</dt><dd>{selected.excluded_count ?? 0}</dd></div>
+              <div><dt>Dispersion</dt><dd>{dispersion(selected) == null ? "—" : `${dispersion(selected)}%`}</dd></div>
+              <div><dt>Scan state</dt><dd>{selected.scanned_this_run ? "Complete" : "Scheduled later"}</dd></div>
+            </dl>
+            <label>Switch card<select value={selected.card_id} onChange={(event) => setSelectedCardId(event.target.value)}>{marketData.items.map((item) => <option key={item.card_id} value={item.card_id}>{item.player} · {item.card.split("·").at(-1)?.trim()}</option>)}</select></label>
+          </aside>
+        </section>
       </>}
 
-      {view === "player" && selected && <><div className="page-head"><div><span className="kicker">PLAYER MARKET</span><h1>{selected.player}</h1><p>Evidence health across this player&apos;s monitored card hierarchy.</p></div></div><div className="player-summary"><div><small>MONITORED CARDS</small><b>{playerCards.length}</b><span>canonical registry</span></div><div><small>VALUATION READY</small><b>{playerCards.filter((item) => item.fair_value != null && ["A", "B"].includes(item.evidence_grade)).length}</b><span>A/B evidence</span></div><div><small>UNRESOLVED REVIEWS</small><b>{playerCards.reduce((sum, item) => sum + (item.review_count ?? 0), 0)}</b><span>identity decisions</span></div></div><section className="hierarchy"><h2>Monitored hierarchy</h2>{playerCards.map((item, index) => <button className="hierarchy-row" key={item.card_id} onClick={() => openCard(item.card_id)}><b>#{index + 1}</b><span><strong>{item.card}</strong><small>{item.accepted_sales_total ?? 0} accepted sales · Evidence {item.evidence_grade}</small></span><span className={item.action ? "green" : "muted"}>{isLiveEvidence ? item.action ?? "MONITOR" : "DEMO"}</span><strong>{formatPrice(item.fair_value)}</strong></button>)}</section></>}
-      {view === "portfolio" && <><div className="page-head"><div><span className="kicker">CAPITAL ALLOCATOR</span><h1>Capital stays gated</h1><p>The system will not manufacture a deployment plan from sample or uncalibrated evidence.</p></div></div><div className="allocation">{actionable.length ? actionable.slice(0, 3).map((signal, index) => <article key={signal.raw.card_id}><span className="rank">{String(index + 1).padStart(2, "0")}</span><div><b>{signal.signal} {signal.raw.player}</b><p>{signal.card}</p></div><strong>{signal.confidence}% confidence</strong></article>) : <div className="no-action"><b>No capital action is authorized</b><p>Connect confirmed sold evidence, mature the forward calibration window, and clear the evidence gates first. Preserving cash is the correct action today.</p></div>}</div></>}
-      {view === "research" && <><div className="page-head"><div><span className="kicker">MARKET INTELLIGENCE</span><h1>Evidence Desk</h1><p>What the system can prove now, before it attempts to explain why markets moved.</p></div></div><div className="research-grid">{[["SOURCE HEALTH", isLiveEvidence ? "Confirmed sales connected" : "Live sales connection pending", marketData.source.label], ["IDENTITY QUALITY", `${marketData.items.reduce((sum, item) => sum + (item.review_count ?? 0), 0)} comps need review`, "Questionable card matches remain outside valuation until resolved."], ["VALUATION COVERAGE", `${valuedCount} of ${marketData.items.length} cards clear the display gate`, "Cards without sufficient accepted sales show Not enough evidence."], ["ACTION GATE", actionable.length ? `${actionable.length} actions cleared` : "No live action cleared", "Recommendations require confirmed evidence and leakage-safe forward calibration."]].map(([tag, title, body]) => <article key={title}><span>{tag}</span><h2>{title}</h2><p>{body}</p></article>)}</div></>}
+      {view === "health" && <>
+        <section className="page-title"><div><span className="eyebrow">SYSTEM TRANSPARENCY</span><h1>Data Health</h1><p>What ran, what was trusted, and what was kept out.</p></div><div className="health-state"><i></i><span>CONNECTED<b>Automatic sold evidence is running</b></span></div></section>
+        <section className="health-grid">
+          <article className="source-card"><span className="eyebrow">EVIDENCE SOURCE</span><h2>Public eBay sold results</h2><p>Market OS collects evidence automatically. You do not need to upload exports or manage raw files.</p><dl><div><dt>Cadence</dt><dd>Daily automatic scan</dd></div><div><dt>Currency</dt><dd>USD only</dd></div><div><dt>Best Offers</dt><dd>Excluded</dd></div><div><dt>Maximum grade</dt><dd>B until independently confirmed</dd></div></dl></article>
+          <article className="run-card"><span className="eyebrow">LATEST RUN</span><h2>{scannedCount} of {marketData.items.length} cards scanned</h2><p>One card was deferred by the free-source rotation. It is labeled as deferred—not mistaken for a market with no sales.</p><div className="run-meter"><i style={{ width: `${(scannedCount / marketData.items.length) * 100}%` }}></i></div><small>Last completed {scanTime}</small></article>
+          <article className="guardrail-card"><span className="eyebrow">GUARDRAILS</span><h2>Weak evidence cannot become a trade.</h2><ul><li>Questionable identity matches stay outside valuation.</li><li>Extreme prices are removed from the valuation sample.</li><li>Insufficient evidence displays “Not enough evidence.”</li><li>Capital actions require forward calibration.</li></ul></article>
+        </section>
+        <section className="grade-guide"><div><span className="eyebrow">EVIDENCE GRADES</span><h2>How to read the market</h2></div>{[["A", "Strong", "Deep, recent, consistent evidence."], ["B", "Usable", "Good evidence with controlled limitations."], ["C", "Developing", "Useful context, not ready for capital."], ["D", "Weak", "Sparse or inconsistent evidence."], ["F", "Insufficient", "No trustworthy valuation can be shown."]].map(([grade, title, description]) => <article key={grade}><Grade value={grade} /><b>{title}</b><p>{description}</p></article>)}</section>
+      </>}
     </main>
+
+    <nav className="mobile-nav" aria-label="Mobile navigation">
+      {navigation.map((item) => <button key={item.id} className={view === item.id ? "active" : ""} onClick={() => setView(item.id)}>{item.short}</button>)}
+    </nav>
   </div>;
 }
