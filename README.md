@@ -3,9 +3,10 @@
 Sports-card market intelligence built around auditable sold evidence, strict card
 identity, robust valuation, and measurable forward outcomes.
 
-Current maturity: **private engine alpha**. The v0.7.4 code is a reconstructed
-engine baseline, not a finished application. See [RECOVERY.md](RECOVERY.md).
-Release progression and evidence gates are defined in [ROADMAP.md](ROADMAP.md).
+Current maturity: **private engine alpha**. The v0.7.5 code is a reconstructed
+engine baseline with an experimental Opportunity Engine MVP, not a finished
+application. See [RECOVERY.md](RECOVERY.md). Release progression and evidence gates
+are defined in [ROADMAP.md](ROADMAP.md).
 
 The product direction is a continuously operating market-intelligence system:
 market evidence → card identity → valuation → opportunity → capital decision →
@@ -20,6 +21,61 @@ ingestion and forward validation are live.
 3. Persist market history, evidence grades, deltas, and material alerts.
 4. Journal recommendations before outcomes and measure forward performance.
 5. Allocate capital only when evidence and calibration gates pass.
+
+## Opportunity Engine MVP
+
+`opportunity_engine.py` adds a separate player-level hypothesis layer for situations
+where the real-world story may be moving before the card market has fully repriced.
+It is deliberately distinct from the existing card-level quant engine.
+
+The MVP supports three thesis types (`EDGE`, `CATALYST`, `QUANT`) and an explicit
+opportunity lifecycle:
+
+`PRE_CATALYST → ENTRY → ACCELERATION → CONSENSUS`
+
+A thesis can also move to `BROKEN`. Lifecycle stages are monotonic so later evidence
+cannot silently rewrite an earlier call.
+
+The key design constraint is that **evidence confidence and edge conviction are not
+the same score**. A weak-signal idea can have low evidence maturity but still be
+worth journaling when hobby lag, narrative potential, collectibility, and upside
+asymmetry are unusually strong. Every create/update action is persisted to an
+append-only thesis ledger before the outcome is known.
+
+### Spark
+
+The first user-facing entry point is the Spark CLI. It turns a human observation
+into a persistent thesis instead of a disposable chat response:
+
+```bash
+python opportunity_cli.py --db opportunity.sqlite spark "Munetaka Murakami" \
+  --sport MLB \
+  --signal-type SIGNING \
+  --observation "Major-league signing creates a concrete entry catalyst before breakout confirmation."
+```
+
+Inspect the active radar:
+
+```bash
+python opportunity_cli.py --db opportunity.sqlite radar
+```
+
+Inspect one thesis, including its signal history and timestamped ledger:
+
+```bash
+python opportunity_cli.py --db opportunity.sqlite show <thesis_id>
+```
+
+`opportunity_contract.py` emits the versioned `opportunity-radar.v1` payload for a
+future Radar surface. The first acceptance tests encode the two canonical product
+requirements discussed during design: a Murakami-style signing should be able to
+surface an ENTRY opportunity before breakout confirmation, and a Westbrook-style
+retirement-risk setup should be able to surface before an actual retirement
+announcement.
+
+This experimental subsystem does **not** bypass the repository's evidence gates.
+It exists to journal and test pre-consensus hypotheses so the system can prove or
+disprove whether early calls have measurable value rather than relying on hindsight.
 
 ## Engine-to-interface contract
 
@@ -41,11 +97,11 @@ into public BUY / ACCUMULATE / HOLD / TRIM / SELL actions.
 
 The sold-data boundary supports three replaceable providers. The zero-cost
 private-alpha path uses SoldComps' public eBay sold-result API. It groups the
-monitored universe into player/year/grade searches, rotates those groups through
-a bounded daily request budget, and excludes Best Offers because eBay does not
-expose the negotiated price. Missing shipping, non-USD transactions, malformed
-totals, ambiguous identity, lots, and reprints are also rejected. This source is
-capped at evidence grade B until an independent realized-sale source agrees.
+monitored universe into player/year/grade searches, rotates those groups through a
+bounded daily request budget, and excludes Best Offers because eBay does not expose
+the negotiated price. Missing shipping, non-USD transactions, malformed totals,
+ambiguous identity, lots, and reprints are also rejected. This source is capped at
+evidence grade B until an independent realized-sale source agrees.
 
 The Card API paid feed and official eBay Marketplace Insights remain optional
 upgrades behind the same provider boundary.
