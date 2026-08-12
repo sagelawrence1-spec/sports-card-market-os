@@ -78,6 +78,29 @@ class CappedSoldFixture(SoldFixture):
     evidence_grade_cap="B"
 
 
+class OutlierSoldFixture:
+    provider_name="outlier_sold_fixture"
+
+    def search_sold(self,query,**kwargs):
+        prices=[4800,4810,4820,4830,4840,4850,4860,4870,25000]
+        records=[EvidenceRecord(
+            provider=self.provider_name,
+            record_type="sold",
+            source_item_id=f"outlier-{index}",
+            title=TITLE,
+            price=price,
+            event_date=(date(2026,8,12)-timedelta(days=index)).isoformat(),
+            currency="USD",
+        ) for index,price in enumerate(prices)]
+        return ProviderResult(records,query,self.provider_name)
+
+
+class RotatingSoldFixture(SoldFixture):
+    def plan_queries(self,assets,**kwargs):
+        first=dict(list(assets)[0])
+        return [{"query":"first card only","assets":[first],"category_id":"261328"}]
+
+
 def test_pipeline_routes_evidence_and_publishes_only_gated_value(tmp_path):
     store=EvidenceStore(tmp_path/"evidence.sqlite")
     result=ScheduledMarketPipeline(
@@ -129,6 +152,29 @@ def test_public_sold_result_source_cannot_claim_grade_a(tmp_path):
     assert item["evidence_grade"]=="B"
     assert any("capped at evidence grade B" in blocker for blocker in item["blockers"])
     assert result.contract["source"]["provenance"]["evidence_grade_cap"]=="B"
+
+
+def test_pipeline_distinguishes_accepted_sales_from_filtered_valuation_sample(tmp_path):
+    result=ScheduledMarketPipeline(
+        EvidenceStore(tmp_path/"evidence.sqlite"),sold_provider=OutlierSoldFixture()
+    ).run([ASSET],as_of="2026-08-12T12:00:00Z")
+    item=result.contract["items"][0]
+    assert item["accepted_sales_total"]==9
+    assert item["valuation_sample_size"]==8
+    assert "9 accepted USD sales; 8 used after robust outlier filtering" in item["evidence_explanation"]
+
+
+def test_pipeline_marks_cards_deferred_by_free_plan_rotation(tmp_path):
+    second={**ASSET,"card_id":"SECOND-CARD","observation_id":"REGISTRY-0002","player":"Second Player"}
+    result=ScheduledMarketPipeline(
+        EvidenceStore(tmp_path/"evidence.sqlite"),sold_provider=RotatingSoldFixture()
+    ).run([ASSET,second],as_of="2026-08-12T12:00:00Z")
+    items={item["card_id"]:item for item in result.contract["items"]}
+    assert items[ASSET["card_id"]]["scanned_this_run"] is True
+    assert items[ASSET["card_id"]]["scan_state"]=="complete"
+    assert items["SECOND-CARD"]["scanned_this_run"] is False
+    assert items["SECOND-CARD"]["scan_state"]=="deferred_rotation"
+    assert any("later free-plan rotation" in blocker for blocker in items["SECOND-CARD"]["blockers"])
 
 
 def test_marketplace_insights_parser_preserves_sold_provenance():

@@ -135,10 +135,14 @@ def build_evidence_market_scan(
         state.setdefault("move_30d",None)
         state.setdefault("liquidity_score",0)
         state.setdefault("accepted_sales_30d",0)
+        state.setdefault("accepted_sales_total",0)
+        state.setdefault("valuation_sample_size",0)
         state.setdefault("accepted_active_count",0)
         state.setdefault("review_count",0)
         state.setdefault("excluded_count",0)
         state.setdefault("blockers",[])
+        state.setdefault("scanned_this_run",False)
+        state.setdefault("scan_state","unknown")
         items.append(state)
     return {
         "schema_version":SCHEMA_VERSION,
