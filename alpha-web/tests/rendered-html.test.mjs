@@ -24,42 +24,45 @@ async function render() {
   );
 }
 
-test("server-renders the first confirmed evidence scan", async () => {
+test("server-renders the usable daily capital brief", async () => {
   const response = await render();
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
 
   const html = await response.text();
-  assert.match(html, /<title>Market OS — Sports Card Intelligence<\/title>/i);
-  assert.match(html, /Market Scan/);
-  assert.match(html, /Highest-conviction changes/);
+  assert.match(html, /<title>Market OS — Know When the Evidence Is Ready<\/title>/i);
+  assert.match(html, /Today, capital stays still/);
+  assert.match(html, /What needs attention/);
   assert.match(html, /Shohei Ohtani/);
   assert.match(html, /LIVE EVIDENCE/);
-  assert.match(html, /Not enough evidence/);
+  assert.match(html, /The restraint is the product/);
 });
 
-test("ships evidence-first product language without starter artifacts", async () => {
+test("ships only working product surfaces without speculative features", async () => {
   const [page, layout, packageJson] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
     readFile(new URL("../package.json", import.meta.url), "utf8"),
   ]);
-  assert.match(page, /Opportunity Feed/);
-  assert.match(page, /Player Market/);
-  assert.match(page, /CAPITAL ALLOCATOR/);
-  assert.match(page, /Evidence Desk/);
+  assert.match(page, /Today/);
+  assert.match(page, /Market/);
+  assert.match(page, /Card Intelligence/);
+  assert.match(page, /Data Health/);
   assert.match(page, /market-scan\.json/);
   assert.match(page, /Not enough evidence/);
   assert.match(page, /selectedCardId/);
   assert.match(page, /accepted_sales_total/);
   assert.match(page, /valuation_sample_size/);
-  assert.match(page, /rotates next run/);
-  assert.match(page, /Before capital can move/);
-  assert.match(page, /No opportunity clears the evidence and calibration gates/);
+  assert.match(page, /ROTATES NEXT/);
+  assert.match(page, /What must change/);
+  assert.match(page, /You do not need to upload exports/);
   assert.match(page, /setQuery/);
-  assert.match(page, /No capital action is authorized/);
+  assert.match(page, /Cash is a valid position/);
+  assert.doesNotMatch(page, /Opportunity Feed/);
+  assert.doesNotMatch(page, /Portfolio/);
+  assert.doesNotMatch(page, /Player Market/);
   assert.doesNotMatch(page, /only remaining input/);
   assert.doesNotMatch(page, /const signals=\[/);
-  assert.match(layout, /Sports Card Intelligence/);
+  assert.match(layout, /Know When the Evidence Is Ready/);
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
 });
