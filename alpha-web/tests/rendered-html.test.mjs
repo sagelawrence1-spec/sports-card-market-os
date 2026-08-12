@@ -48,6 +48,11 @@ test("ships evidence-first product language without starter artifacts", async ()
   assert.match(page, /CAPITAL ALLOCATOR/);
   assert.match(page, /Research Desk/);
   assert.match(page, /market-scan\.json/);
+  assert.match(page, /Not enough evidence/);
+  assert.match(page, /selectedCardId/);
+  assert.match(page, /accepted_sales_total/);
+  assert.match(page, /Before capital can move/);
+  assert.match(page, /No opportunity clears the evidence and calibration gates/);
   assert.doesNotMatch(page, /const signals=\[/);
   assert.match(layout, /Sports Card Intelligence/);
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);

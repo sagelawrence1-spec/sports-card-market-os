@@ -3,7 +3,13 @@
   "generated_at": "2026-08-12T15:42:00Z",
   "source": {
     "kind": "illustrative_alpha",
-    "label": "Illustrative market state — not live recommendations"
+    "label": "Illustrative market state — not live recommendations",
+    "provenance": {
+      "sold_provider": null,
+      "listing_provider": null,
+      "sold_source_available": false,
+      "listing_source_available": false
+    }
   },
   "universe_size": 428,
   "items": [
@@ -19,10 +25,23 @@
       "confidence": 86,
       "evidence_grade": "A",
       "fair_value": 4820,
+      "evidence_range": {"low": 4525, "high": 5115},
       "move_30d": 0.084,
       "liquidity_score": 81,
       "accepted_sales_30d": 12,
-      "thesis": "Premium rookie velocity is accelerating while available supply contracts."
+      "accepted_sales_total": 12,
+      "accepted_active_count": 8,
+      "review_count": 1,
+      "excluded_count": 2,
+      "lowest_ask": 4650,
+      "median_ask": 4990,
+      "latest_sale_date": "2026-08-09",
+      "last_updated": "2026-08-12T15:42:00Z",
+      "ideal_entry": 4650,
+      "do_not_chase": 5200,
+      "thesis": "Premium rookie velocity is accelerating while available supply contracts.",
+      "evidence_explanation": "12 illustrative accepted sales with 6.1% dispersion.",
+      "blockers": []
     },
     {
       "observation_id": "ALPHA-OBS-002",
@@ -36,10 +55,23 @@
       "confidence": 82,
       "evidence_grade": "A",
       "fair_value": 3140,
+      "evidence_range": {"low": 2960, "high": 3320},
       "move_30d": 0.031,
       "liquidity_score": 78,
       "accepted_sales_30d": 15,
-      "thesis": "Accepted sales remain below the player's adjacent premium rookie hierarchy."
+      "accepted_sales_total": 15,
+      "accepted_active_count": 11,
+      "review_count": 1,
+      "excluded_count": 3,
+      "lowest_ask": 3050,
+      "median_ask": 3275,
+      "latest_sale_date": "2026-08-08",
+      "last_updated": "2026-08-12T15:42:00Z",
+      "ideal_entry": 3050,
+      "do_not_chase": 3400,
+      "thesis": "Accepted sales remain below the player's adjacent premium rookie hierarchy.",
+      "evidence_explanation": "15 illustrative accepted sales across a liquid 30-day window.",
+      "blockers": []
     },
     {
       "observation_id": "ALPHA-OBS-003",
@@ -53,10 +85,23 @@
       "confidence": 74,
       "evidence_grade": "B",
       "fair_value": 1090,
+      "evidence_range": {"low": 980, "high": 1200},
       "move_30d": -0.067,
       "liquidity_score": 66,
       "accepted_sales_30d": 8,
-      "thesis": "Listings expanded 29% while buyer absorption and peer momentum weakened."
+      "accepted_sales_total": 8,
+      "accepted_active_count": 14,
+      "review_count": 2,
+      "excluded_count": 4,
+      "lowest_ask": 1025,
+      "median_ask": 1140,
+      "latest_sale_date": "2026-08-06",
+      "last_updated": "2026-08-12T15:42:00Z",
+      "ideal_entry": null,
+      "do_not_chase": null,
+      "thesis": "Listings expanded 29% while buyer absorption and peer momentum weakened.",
+      "evidence_explanation": "8 illustrative accepted sales; expanding supply weakens the evidence state.",
+      "blockers": []
     },
     {
       "observation_id": "ALPHA-OBS-004",
@@ -70,10 +115,23 @@
       "confidence": 69,
       "evidence_grade": "B",
       "fair_value": 1425,
+      "evidence_range": {"low": 1320, "high": 1530},
       "move_30d": 0.012,
       "liquidity_score": 73,
       "accepted_sales_30d": 7,
-      "thesis": "Demand is healthy, but current price already reflects most near-term upside."
+      "accepted_sales_total": 7,
+      "accepted_active_count": 16,
+      "review_count": 3,
+      "excluded_count": 5,
+      "lowest_ask": 1375,
+      "median_ask": 1495,
+      "latest_sale_date": "2026-08-07",
+      "last_updated": "2026-08-12T15:42:00Z",
+      "ideal_entry": null,
+      "do_not_chase": 1550,
+      "thesis": "Demand is healthy, but current price already reflects most near-term upside.",
+      "evidence_explanation": "7 illustrative accepted sales; the valuation remains more dispersed than the A-grade tier.",
+      "blockers": []
     }
   ]
 }

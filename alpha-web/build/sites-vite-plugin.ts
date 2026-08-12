@@ -1,1 +1,45 @@
-ýK®Ïæ‰Æ¦¦Æ {üé®‡â•íg¢Ëœ…ø¥zŠÝŠ·œ¶ŠòþŠmþ&yºÞÃöâŸöë{Ô±êìþhœjjlj¿Îšè~)^Úz,¹È_ŠW¨­Ø«yËh¯/è¦ßá¢g›­ì?n)ÿn·°ýK®Ïæ‰Æ¦¦Æ {üé®‡â•íç¢Ëœ…ø¥zŠÝŠ·œ¶ŠòþŠmþ&yºÞÃöâŸöë{–×÷'B²66W72Â7ÂÖ¶F—"Â&ÒÒg&öÒ&æöFS¦g2÷&öÖ—6W2#°¦–×÷'B²&W6öÇfRÒg&öÒ&æöFS§F‚#°¦–×÷'BG—R²ÇVv–âÒg&öÒ'f—FR#° ¦7–æ2gVæ7F–öâW†—7G2‡Fƒ¢7G&–ær“¢&öÖ—6SÆ&ööÆVãâ°¢G'’°¢v—B66W72‡F‚“°¢&WGW&âG'VS°¢Ò6F6‚†W'&÷"’°¢–b‚†W'&÷"2æöFT¥2äW'&æôW†6WF–öâ’æ6öFRÓÓÒ$TäôTåB"’°¢&WGW&âfÇ6S°¢Ð¢F‡&÷rW'&÷#°¢Ð§Ð ¢òò6¶vW26—FW2ÖWFFFæBÖ–w&F–öç2gFW"f—FRf–æ—6†W26ö×–Æ–ærà¦W‡÷'BgVæ7F–öâ6—FW2‚“¢ÇVv–â°¢ÆWB&ö÷BÒ&ö6W72æ7vB‚“° ¢&WGW&â°¢æÖS¢'6—FW2"À¢Ç“¢&'V–ÆB"À¢6öæf–u&W6öÇfVB†6öæf–r’°¢&ö÷BÒ6öæf–rç&ö÷C°¢ÒÀ¢7–æ26Æ÷6T'VæFÆR‚’°¢6öç7B÷WGWDF—&V7F÷'’Ò&W6öÇfR‡&ö÷BÂ&F—7B"Â"æ÷Væ’"“°¢6öç7B†÷7F–æt6öæf–rÒ&W6öÇfR‡&ö÷BÂ"æ÷Væ’"Â&†÷7F–æræ§6öâ"“°¢6öç7BG&—§¦ÆU6÷W&6RÒ&W6öÇfR‡&ö÷BÂ&G&—§¦ÆR"“° ¢v—B&Ò†÷WGWDF—&V7F÷'’Â²&V7W'6—fS¢G'VRÂf÷&6S¢G'VRÒ“°¢v—BÖ¶F—"†÷WGWDF—&V7F÷'’Â²&V7W'6—fS¢G'VRÒ“° ¢–b†v—BW†—7G2††÷7F–æt6öæf–r’’°¢v—B7††÷7F–æt6öæf–rÂ&W6öÇfR†÷WGWDF—&V7F÷'’Â&†÷7F–æræ§6öâ"’“°¢Ð¢–b†v—BW†—7G2†G&—§¦ÆU6÷W&6R’’°¢v—B7†G&—§¦ÆU6÷W&6RÂ&W6öÇfR†÷WGWDF—&V7F÷'’Â&G&—§¦ÆR"’Â°¢&V7W'6—fS¢G'VRÀ¢Ò“°¢Ð¢ÒÀ¢Ó°§Ð
+import { access, cp, mkdir, rm } from "node:fs/promises";
+import { resolve } from "node:path";
+import type { Plugin } from "vite";
+
+async function exists(path: string): Promise<boolean> {
+  try {
+    await access(path);
+    return true;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      return false;
+    }
+    throw error;
+  }
+}
+
+// Packages Sites metadata and migrations after Vite finishes compiling.
+export function sites(): Plugin {
+  let root = process.cwd();
+
+  return {
+    name: "sites",
+    apply: "build",
+    configResolved(config) {
+      root = config.root;
+    },
+    async closeBundle() {
+      const outputDirectory = resolve(root, "dist", ".openai");
+      const hostingConfig = resolve(root, ".openai", "hosting.json");
+      const drizzleSource = resolve(root, "drizzle");
+
+      await rm(outputDirectory, { recursive: true, force: true });
+      await mkdir(outputDirectory, { recursive: true });
+
+      if (await exists(hostingConfig)) {
+        await cp(hostingConfig, resolve(outputDirectory, "hosting.json"));
+      }
+      if (await exists(drizzleSource)) {
+        await cp(drizzleSource, resolve(outputDirectory, "drizzle"), {
+          recursive: true,
+        });
+      }
+    },
+  };
+}

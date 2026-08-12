@@ -1,0 +1,206 @@
+"""Scheduled evidence ingestion and fail-closed market-state reconstruction."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from datetime import date, datetime, timezone
+import statistics
+from typing import Any, Iterable, Mapping
+
+from entity_matcher import MatchDecision, SportsCardEntityMatcher, build_ebay_query
+from evidence_store import EvidenceStore
+from market_contract import build_evidence_market_scan, card_title
+from market_engine import estimate_market
+
+
+@dataclass(frozen=True)
+class PipelineResult:
+    run_id: str
+    contract: dict[str, Any]
+    status: str
+    errors: tuple[str, ...]
+
+
+def _day(value: str) -> date:
+    return datetime.fromisoformat(str(value)[:10]).date()
+
+
+class ScheduledMarketPipeline:
+    """Turn approved provider evidence into the contract consumed by the product."""
+
+    def __init__(
+        self,
+        store: EvidenceStore,
+        *,
+        sold_provider=None,
+        listing_provider=None,
+        matcher: SportsCardEntityMatcher | None=None,
+    ):
+        self.store=store
+        self.sold_provider=sold_provider
+        self.listing_provider=listing_provider
+        self.matcher=matcher or SportsCardEntityMatcher()
+
+    def _route(self, records, assets, query, run_id):
+        accepted={asset["card_id"]:[] for asset in assets}
+        per_card={asset["card_id"]:{"review":0,"rejected":0} for asset in assets}
+        for record in records:
+            ranked=sorted(
+                ((self.matcher.match(asset,record.title),asset) for asset in assets),
+                key=lambda pair:pair[0].score,
+                reverse=True,
+            )
+            decision,asset=ranked[0]
+            if len(ranked)>1 and decision.accepted and ranked[1][0].score >= decision.score-3:
+                decision=MatchDecision(False,decision.score,"manual_review",{
+                    **decision.diagnostics,
+                    "ambiguous_candidates":[asset["card_id"],ranked[1][1]["card_id"]],
+                })
+            self.store.save(record,asset["card_id"],query,decision,run_id=run_id)
+            if decision.accepted:
+                accepted[asset["card_id"]].append(record)
+            elif decision.reason=="manual_review":
+                per_card[asset["card_id"]]["review"]+=1
+            else:
+                per_card[asset["card_id"]]["rejected"]+=1
+        return accepted,per_card
+
+    def run(self, assets: Iterable[Mapping[str, Any]], *, as_of: str | None=None) -> PipelineResult:
+        assets=[dict(asset) for asset in assets]
+        if not assets:
+            raise ValueError("The monitored card registry is empty.")
+        as_of=as_of or datetime.now(timezone.utc).isoformat()
+        cutoff=_day(as_of)
+        source="scheduled_market_evidence"
+        run_id=self.store.start_market_run(as_of,source,{
+            "sold_provider":getattr(self.sold_provider,"provider_name",None),
+            "listing_provider":getattr(self.listing_provider,"provider_name",None),
+        })
+        errors=[]
+        accepted_active={asset["card_id"]:[] for asset in assets}
+        run_counts={asset["card_id"]:{"review":0,"rejected":0} for asset in assets}
+
+        for asset in assets:
+            query=build_ebay_query(asset)
+            category_id=str(asset.get("ebay_category_id") or "261328")
+            for kind,provider in (("sold",self.sold_provider),("active",self.listing_provider)):
+                if provider is None:
+                    continue
+                try:
+                    if kind=="sold":
+                        result=provider.search_sold(query,category_id=category_id)
+                    else:
+                        result=provider.search_active(query,category_id=category_id)
+                    accepted,counts=self._route(result.records,assets,query,run_id)
+                    if kind=="active":
+                        for card_id,records in accepted.items():
+                            accepted_active[card_id].extend(records)
+                    for card_id,values in counts.items():
+                        run_counts[card_id]["review"]+=values["review"]
+                        run_counts[card_id]["rejected"]+=values["rejected"]
+                except Exception as exc:
+                    errors.append(f"{kind}:{asset['card_id']}:{type(exc).__name__}:{exc}")
+
+        states=[]
+        sold_source_available=self.sold_provider is not None and not any(error.startswith("sold:") for error in errors)
+        listing_source_available=self.listing_provider is not None and not any(error.startswith("active:") for error in errors)
+        for asset in assets:
+            card_id=asset["card_id"]
+            accepted_rows=self.store.accepted_sales(card_id)
+            recent=[]
+            latest_sale=None
+            for row in accepted_rows:
+                try:
+                    sold=_day(row["event_date"])
+                except Exception:
+                    continue
+                age=(cutoff-sold).days
+                if 0 <= age <= 180:
+                    recent.append({
+                        "sale_date":row["event_date"],
+                        "sale_price":row["price"],
+                        "currency":row["currency"],
+                    })
+                    if latest_sale is None or sold > latest_sale:
+                        latest_sale=sold
+            estimate=estimate_market(card_id,recent,cutoff.isoformat())
+            display_ready=estimate.evidence_grade in {"A","B"} and estimate.sample_size >= 8
+            fair_value=estimate.fair_value if display_ready else None
+            dispersion=estimate.dispersion if estimate.dispersion is not None else None
+            spread=max(0.05,dispersion or 0) if display_ready else None
+            evidence_range={
+                "low":round(fair_value*(1-spread),2),
+                "high":round(fair_value*(1+spread),2),
+            } if fair_value is not None else None
+            active=list({record.source_item_id:record for record in accepted_active[card_id]}.values())
+            active_prices=[record.price for record in active if record.currency.upper()=="USD" and record.price>0]
+            accepted_sales_30d=sum(1 for sale in recent if (cutoff-_day(sale["sale_date"])).days <= 30)
+            liquidity=min(100,round(accepted_sales_30d*5+len(active_prices)*1.5,1))
+            blockers=[]
+            if not sold_source_available:
+                blockers.append("Authoritative sold-data source is unavailable")
+            if not display_ready:
+                blockers.append("Accepted sold evidence has not cleared the valuation gate")
+            blockers.append("Forward calibration has not cleared the action gate")
+            state={
+                "observation_id":asset.get("observation_id") or f"registry:{card_id}",
+                "card_id":card_id,
+                "sport":asset.get("league") or asset.get("sport") or "",
+                "player":asset.get("player") or "",
+                "card":card_title(asset,card_id),
+                "action":None,
+                "engine_classification":"EVIDENCE_READY" if display_ready else "NOT_ENOUGH_EVIDENCE",
+                "alerts":[],
+                "confidence":estimate.confidence,
+                "evidence_grade":estimate.evidence_grade,
+                "fair_value":fair_value,
+                "evidence_range":evidence_range,
+                "move_30d":None,
+                "liquidity_score":liquidity,
+                "accepted_sales_30d":accepted_sales_30d,
+                "accepted_sales_total":estimate.sample_size,
+                "accepted_active_count":len(active_prices),
+                "review_count":run_counts[card_id]["review"],
+                "excluded_count":run_counts[card_id]["rejected"],
+                "lowest_ask":round(min(active_prices),2) if active_prices else None,
+                "median_ask":round(statistics.median(active_prices),2) if active_prices else None,
+                "latest_sale_date":latest_sale.isoformat() if latest_sale else None,
+                "last_updated":as_of,
+                "thesis":(
+                    "Accepted sold evidence supports a valuation, but the system is withholding a capital action until forward calibration passes."
+                    if display_ready else
+                    "Not enough accepted sold evidence exists to publish a trustworthy fair value."
+                ),
+                "evidence_explanation":(
+                    f"{estimate.sample_size} accepted USD sales; dispersion {estimate.dispersion:.1%}."
+                    if estimate.dispersion is not None else
+                    "No accepted USD sold observations are available."
+                ),
+                "blockers":blockers,
+            }
+            self.store.save_market_state(run_id,state)
+            states.append(state)
+
+        status="complete" if sold_source_available else "blocked_sold_source"
+        label=(
+            "Scheduled authoritative eBay evidence"
+            if status=="complete" else
+            "Automatic evidence pipeline — authoritative sold access pending"
+        )
+        contract=build_evidence_market_scan(
+            states,
+            source_kind="scheduled_evidence" if status=="complete" else "blocked_evidence",
+            source_label=label,
+            generated_at=as_of,
+            universe_size=len(assets),
+            provenance={
+                "run_id":run_id,
+                "sold_provider":getattr(self.sold_provider,"provider_name",None),
+                "listing_provider":getattr(self.listing_provider,"provider_name",None),
+                "sold_source_available":sold_source_available,
+                "listing_source_available":listing_source_available,
+                "errors":errors,
+            },
+        )
+        self.store.finish_market_run(run_id,status,{"errors":errors,"cards":len(assets)})
+        return PipelineResult(run_id,contract,status,tuple(errors))

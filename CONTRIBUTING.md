@@ -1,1 +1,12 @@
-ıK®Ïæ‰Æ¦¦Æ {üé®‡â•íg¢Ëœ…ø¥zŠİŠ·œ¶ŠòşŠmş&yºŞÃöâŸöë{Ô±êìşhœjjlj¿Îšè~)^Úz,¹È_ŠW¨­Ø«yËh¯/è¦ßá¢g›­ì?n)ÿn·°ıK®Ïæ‰Æ¦¦Æ {üé®‡â•íç¢Ëœ…ø¥zŠİŠ·œ¶ŠòşŠmş&yºŞÃöâŸöë{2FWfVÆ÷ÖVçBv÷&¶fÆ÷p ¦Ö–æ—2F†RöæÇ’ÆöærÖÆ—fVB'&æ6‚æBF†R6÷W&6RöbG'WF‚à £â7&VFR6†÷'BÖÆ—fVBvVçBóÆfö7W6VB×66÷Sæ'&æ6‚g&öÒÖ–æà£"â¶VWöæR6ö†W&VçB&öGV7B–æ7&VÖVçBW"VÆÂ&WVW7Bà£2â÷VâF†RVÆÂ&WVW7Bv–ç7BÖ–æ2G&gBà£Bâ&WV—&R&÷F‚Væv–æRæBÇ†×vV"4’¦ö'2Fò72à£RâÖ&²&VG’Â7V6‚ÖÖW&vRÂæBFVÆWFRF†RfVGW&R'&æ6‚à ¤Fòæ÷BF&vWBFWfVÆ÷²—B—2&WF–æVBöæÇ’2†—7F÷&–6Â'&æ6‚7FFRVçF–Â—@¦6â&R&VÖ÷fVB6fVÇ’âfö–BGWÆ–6FR&öFÖ—77VW3¢W‡FVæB3(	23R–ç7FVBà
+# Development workflow
+
+`main` is the only long-lived branch and the source of truth.
+
+1. Create a short-lived `agent/<focused-scope>` branch from `main`.
+2. Keep one coherent product increment per pull request.
+3. Open the pull request against `main` as a draft.
+4. Require both engine and alpha-web CI jobs to pass.
+5. Mark ready, squash-merge, and delete the feature branch.
+
+Do not target `develop`; it is retained only as historical branch state until it
+can be removed safely. Avoid duplicate roadmap issues: extend #1â€“#5 instead.

@@ -1,1 +1,44 @@
-ıK®Ïæ‰Æ¦¦Æ {üé®‡â•íg¢Ëœ…ø¥zŠİŠ·œ¶ŠòşŠmş&yºŞÃöâŸöë{Ô±êìşhœjjlj¿Îšè~)^Úz,¹È_ŠW¨­Ø«yËh¯/è¦ßá¢g›­ì?n)ÿn·°ıK®Ïæ‰Æ¦¦Æ {üé®‡â•íç¢Ëœ…ø¥zŠİŠ·œ¶ŠòşŠmş&yºŞÃöâŸöë{–×÷'BG—R²ÖWFFFÒg&öÒ&æW‡B#°¦–×÷'B²vV—7BÂvV—7EôÖöæòÒg&öÒ&æW‡BöföçBövöövÆR#°¦–×÷'B"âövÆö&Ç2æ772#° ¦6öç7BvV—7E6ç2ÒvV—7B‡°¢f&–&ÆS¢"ÒÖföçBÖvV—7B×6ç2"À¢7V'6WG3¢²&ÆF–â%ÒÀ§Ò“° ¦6öç7BvV—7DÖöæòÒvV—7EôÖöæò‡°¢f&–&ÆS¢"ÒÖföçBÖvV—7BÖÖöæò"À¢7V'6WG3¢²&ÆF–â%ÒÀ§Ò“° ¦W‡÷'B6öç7BÖWFFF¢ÖWFFFÒ°¢F—FÆS¢$Ö&¶WBõ2(	B7÷'G26&B–çFVÆÆ–vVæ6R"À¢FW67&—F–öã¢$Ö&¶WB–çFVÆÆ–vVæ6RæB6—FÂÆÆö6F–öâf÷"7÷'G26&G2â"À¢–6öç3¢°¢–6öã¢"öff–6öâç7fr"À¢6†÷'F7WC¢"öff–6öâç7fr"À¢ÒÀ§Ó° ¦W‡÷'BFVfVÇBgVæ7F–öâ&ö÷DÆ–÷WB‡°¢6†–ÆG&VâÀ§Ó¢&VFöæÇ“Ç°¢6†–ÆG&Vã¢&V7Bå&V7DæöFS°§Óâ’°¢&WGW&â€¢Æ‡FÖÂÆæsÒ&Vâ#à¢Æ&öG’6Æ74æÖS×¶G¶vV—7E6ç2çf&–&ÆWÒG¶vV—7DÖöæòçf&–&ÆWÖÓà¢¶6†–ÆG&VçĞ¢Âö&öG“à¢Âö‡FÖÃà¢“°§Ğ
+import type { Metadata } from "next";
+import { Geist, Geist_Mono } from "next/font/google";
+import { headers } from "next/headers";
+import "./globals.css";
+
+const geistSans = Geist({
+  variable: "--font-geist-sans",
+  subsets: ["latin"],
+});
+
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
+  subsets: ["latin"],
+});
+
+export async function generateMetadata(): Promise<Metadata> {
+  const requestHeaders = await headers();
+  const host = (requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host") ?? "localhost:3000").split(",")[0].trim();
+  const protocol = (requestHeaders.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https")).split(",")[0].trim();
+  const imageUrl = new URL("/og.png", `${protocol}://${host}`).toString();
+  const title = "Market OS â€” Sports Card Intelligence";
+  const description = "Evidence-first market intelligence and capital allocation for sports cards.";
+  return {
+    title,
+    description,
+    icons: { icon: "/favicon.svg", shortcut: "/favicon.svg" },
+    openGraph: { title, description, type: "website", images: [{ url: imageUrl, width: 1731, height: 909, alt: "Market OS sports-card market intelligence" }] },
+    twitter: { card: "summary_large_image", title, description, images: [imageUrl] },
+  };
+}
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  return (
+    <html lang="en">
+      <body className={`${geistSans.variable} ${geistMono.variable}`}>
+        {children}
+      </body>
+    </html>
+  );
+}

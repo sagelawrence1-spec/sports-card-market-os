@@ -1,1 +1,44 @@
-ýK®Ïæ‰Æ¦¦Æ {üé®‡â•íg¢Ëœ…ø¥zŠÝŠ·œ¶ŠòþŠmþ&yºÞÃöâŸöë{Ô±êìþhœjjlj¿Îšè~)^Úz,¹È_ŠW¨­Ø«yËh¯/è¦ßá¢g›­ì?n)ÿn·°ýK®Ïæ‰Æ¦¦Æ {üé®‡â•íç¢Ëœ…ø¥zŠÝŠ·œ¶ŠòþŠmþ&yºÞÃöâŸöë{°¢&æÖR#¢'7÷'G2Ö6&BÖÖ&¶WBÖ÷2ÖÇ†"À¢'fW'6–öâ#¢#ãã"À¢'&—fFR#¢G'VRÀ¢&Væv–æW2#¢°¢&æöFR#¢#ãÓ#"ã2ã ¢ÒÀ¢'67&—G2#¢°¢&FWb#¢%u$ätÄU%ôÄôuõDƒÒçw&ævÆW"÷w&ævÆW"æÆörf–æW‡BFWb"À¢&'V–ÆB#¢%u$ätÄU%ôÄôuõDƒÒçw&ævÆW"÷w&ævÆW"æÆörf–æW‡B'V–ÆB"À¢'7F'B#¢%u$ätÄU%ôÄôuõDƒÒçw&ævÆW"÷w&ævÆW"æÆörf–æW‡B7F'B"À¢'FW7B#¢&çÒ'Vâ'V–ÆBbbæöFRÒ×FW7BFW7G2÷&VæFW&VBÖ‡FÖÂçFW7BæÖ§2"À¢&Æ–çB#¢&W6Æ–çBâÒÖ–væ÷&R×GFW&âF—7BÒÖ–væ÷&R×GFW&âææW‡B"À¢&F#¦vVæW&FR#¢&V6†òtæòW'6—7FVçBFF&6R—26öæf–wW&VBf÷"F†—2Ç†âr ¢ÒÀ¢&FWVæFVæ6–W2#¢°¢'&V7B#¢#’ã"ãb"À¢'&V7BÖFöÒ#¢#’ã"ãb ¢ÒÀ¢&FWdFWVæFVæ6–W2#¢°¢$6Æ÷VFfÆ&R÷f—FR×ÇVv–â#¢#ã3rã"À¢$W6Æ–çBö§2#¢#’ã3’ãB"À¢$æW‡BöW6Æ–çB×ÇVv–âÖæW‡B#¢#bã"ãb"À¢$F–Çv–æF772÷÷7F772#¢#Bã"ã"À¢$G—W2öæöFR#¢##"ã’ã’"À¢$G—W2÷&V7B#¢#’ã"ãB"À¢$G—W2÷&V7BÖFöÒ#¢#’ã"ã2"À¢$f—FV§2÷ÇVv–â×&V7B#¢#bãã""À¢$f—FV§2÷ÇVv–â×'62#¢#ãRã#b"À¢&W6Æ–çB#¢#’ã3’ãB"À¢&W6Æ–çB×ÇVv–âÖ§7‚Ö’#¢#bãã""À¢&W6Æ–çB×ÇVv–â×&V7B#¢#rã3rãR"À¢&W6Æ–çB×ÇVv–â×&V7BÖ†öö·2#¢#rãã"À¢&vÆö&Ç2#¢#bãBã"À¢'&V7B×6W'fW"ÖFöÒ×vV'6²#¢#’ã"ãb"À¢'F–Çv–æF772#¢#Bã"ã"À¢'G—W67&—B#¢#Rã’ã2"À¢'G—W67&—BÖW6Æ–çB#¢#‚ãS’ã2"À¢'f–æW‡B#¢#ããÖ&WFã""À¢'f—FR#¢#‚ãã2"À¢'w&ævÆW"#¢#Bã“"ã ¢ÒÀ¢'G—R#¢&ÖöGVÆR §Ð
+{
+  "name": "sports-card-market-os-alpha",
+  "version": "0.1.0",
+  "private": true,
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "dev": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext dev",
+    "build": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext build",
+    "start": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext start",
+    "test": "npm run build && node --test tests/rendered-html.test.mjs",
+    "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
+    "db:generate": "echo 'No persistent database is configured for this alpha.'"
+  },
+  "dependencies": {
+    "react": "19.2.6",
+    "react-dom": "19.2.6"
+  },
+  "devDependencies": {
+    "@cloudflare/vite-plugin": "1.37.1",
+    "@eslint/js": "9.39.4",
+    "@next/eslint-plugin-next": "16.2.6",
+    "@tailwindcss/postcss": "4.2.1",
+    "@types/node": "22.19.19",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "@vitejs/plugin-react": "6.0.2",
+    "@vitejs/plugin-rsc": "0.5.26",
+    "eslint": "9.39.4",
+    "eslint-plugin-jsx-a11y": "6.10.2",
+    "eslint-plugin-react": "7.37.5",
+    "eslint-plugin-react-hooks": "7.1.1",
+    "globals": "16.4.0",
+    "react-server-dom-webpack": "19.2.6",
+    "tailwindcss": "4.2.1",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.59.3",
+    "vinext": "1.0.0-beta.2",
+    "vite": "8.0.13",
+    "wrangler": "4.92.0"
+  },
+  "type": "module"
+}

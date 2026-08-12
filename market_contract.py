@@ -24,9 +24,9 @@ def evidence_grade(diagnostics: Mapping[str, float]) -> str:
     return "C"
 
 
-def _card_title(signal: Signal, asset: Mapping[str, Any] | None) -> str:
+def card_title(asset: Mapping[str, Any] | None, fallback: str="Unknown card") -> str:
     if not asset:
-        return signal.player
+        return fallback
 
     identity = " ".join(
         str(asset.get(key, "")).strip()
@@ -44,6 +44,20 @@ def _card_title(signal: Signal, asset: Mapping[str, Any] | None) -> str:
     if grade_company and grade:
         identity += f" · {grade_company} {grade}"
     return identity
+
+
+def _sort_items(items):
+    priority = {"BUY": 5, "SELL": 5, "ACCUMULATE": 4, "TRIM": 4, "HOLD": 2}
+    items.sort(
+        key=lambda item: (
+            item["action"] is not None,
+            "AOA" in item["alerts"],
+            priority.get(item["action"], 0),
+            item["confidence"],
+        ),
+        reverse=True,
+    )
+    return items
 
 
 def build_market_scan(
@@ -74,7 +88,7 @@ def build_market_scan(
                 "card_id": signal.card_id,
                 "sport": signal.sport,
                 "player": signal.player,
-                "card": _card_title(signal, lookup.get(signal.card_id)),
+                "card": card_title(lookup.get(signal.card_id),signal.player),
                 "action": action,
                 "engine_classification": signal.signal,
                 "alerts": signal.alerts,
@@ -88,21 +102,48 @@ def build_market_scan(
             }
         )
 
-    priority = {"BUY": 5, "SELL": 5, "ACCUMULATE": 4, "TRIM": 4, "HOLD": 2}
-    items.sort(
-        key=lambda item: (
-            item["action"] is not None,
-            "AOA" in item["alerts"],
-            priority.get(item["action"], 0),
-            item["confidence"],
-        ),
-        reverse=True,
-    )
-
     return {
         "schema_version": SCHEMA_VERSION,
         "generated_at": generated_at,
         "source": {"kind": source_kind, "label": source_label},
         "universe_size": universe_size,
-        "items": items,
+        "items": _sort_items(items),
+    }
+
+
+def build_evidence_market_scan(
+    states: Iterable[Mapping[str, Any]],
+    *,
+    source_kind: str,
+    source_label: str,
+    generated_at: str,
+    universe_size: int,
+    provenance: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Build the UI payload from persisted, identity-routed evidence states."""
+    items=[]
+    for raw in states:
+        state=dict(raw)
+        action=state.get("action")
+        if action not in PUBLIC_ACTIONS:
+            action=None
+        state["action"]=action
+        state.setdefault("engine_classification","EVIDENCE_READY" if state.get("fair_value") else "NOT_ENOUGH_EVIDENCE")
+        state.setdefault("alerts",[])
+        state.setdefault("confidence",0)
+        state.setdefault("evidence_grade","F")
+        state.setdefault("move_30d",None)
+        state.setdefault("liquidity_score",0)
+        state.setdefault("accepted_sales_30d",0)
+        state.setdefault("accepted_active_count",0)
+        state.setdefault("review_count",0)
+        state.setdefault("excluded_count",0)
+        state.setdefault("blockers",[])
+        items.append(state)
+    return {
+        "schema_version":SCHEMA_VERSION,
+        "generated_at":generated_at,
+        "source":{"kind":source_kind,"label":source_label,"provenance":dict(provenance)},
+        "universe_size":universe_size,
+        "items":_sort_items(items),
     }

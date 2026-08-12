@@ -1,1 +1,5 @@
-ıK®Ïæ‰Æ¦¦Æ {üé®‡â•íg¢Ëœ…ø¥zŠİŠ·œ¶ŠòşŠmş&yºŞÃöâŸöë{Ô±êìşhœjjlj¿Îšè~)^Úz,¹È_ŠW¨­Ø«yËh¯/è¦ßá¢g›­ì?n)ÿn·°ıK®Ïæ‰Æ¦¦Æ {üé®‡â•íç¢Ëœ…ø¥zŠİŠ·œ¶ŠòşŠmş&yºŞÃöâŸöë{–×÷'B'f–æW‡B÷G—W2#°¦–×÷'B"âòææW‡B÷G—W2÷&÷WFW2æBçG2#° ¢òòäõDS¢F†—2f–ÆR6†÷VÆBæ÷B&RVF—FV@¢òò6VR‡GG3¢òöæW‡F§2æ÷&röFö72öö’×&VfW&Væ6Rö6öæf–r÷G—W67&—Bf÷"Ö÷&R–æf÷&ÖF–öâà
+import "vinext/types";
+import "./.next/types/routes.d.ts";
+
+// NOTE: This file should not be edited
+// see https://nextjs.org/docs/app/api-reference/config/typescript for more information.

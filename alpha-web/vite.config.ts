@@ -1,1 +1,59 @@
-ýK®Ïæ‰Æ¦¦Æ {üé®‡â•íg¢Ëœ…ø¥zŠÝŠ·œ¶ŠòþŠmþ&yºÞÃöâŸöë{Ô±êìþhœjjlj¿Îšè~)^Úz,¹È_ŠW¨­Ø«yËh¯/è¦ßá¢g›­ì?n)ÿn·°ýK®Ïæ‰Æ¦¦Æ {üé®‡â•íç¢Ëœ…ø¥zŠÝŠ·œ¶ŠòþŠmþ&yºÞÃöâŸöë{–×÷'Bf–æW‡Bg&öÒ'f–æW‡B#°¦–×÷'B²FVf–æT6öæf–rÒg&öÒ'f—FR#°¦–×÷'B†÷7F–æt6öæf–rg&öÒ"âòæ÷Væ’ö†÷7F–æræ§6öâ#°¦–×÷'B²6—FW2Òg&öÒ"âö'V–ÆB÷6—FW2×f—FR×ÇVv–â#° ¦6öç7B4•DUô5$TDõ%õÄ4T„ôÄDU%ôDD$4Uô”BÐ¢#ÓÓCÓƒÓ#° ¦6öç7B²CÂ#"ÒÒ†÷7F–æt6öæf–s° ¢òòÖ4õ26VF&VÇB&Æö6·2e4WfVçG2Â6ò6öFW‚&Wf–Ww2æVVBöÆÆ–ærf÷"„Õ"à¦6öç7B—46öFW…6VF&VÇE6æF&÷‚Ò&ö6W72æVçbä4ôDU…õ4äD$õ‚ÓÓÒ'6VF&VÇB#° ¦6öç7BÆö6Ä&–æF–æt6öæf–rÒ°¢Ö–ã¢"â÷v÷&¶W"ö–æFW‚çG2"À¢6ö×F–&–Æ—G•öfÆw3¢²&æöFV§5ö6ö×B%ÒÀ¢CöFF&6W3¢C¢ò°¢°¢&–æF–æs¢CÀ¢FF&6UöæÖS¢'6—FRÖ7&VF÷"ÖC"À¢FF&6Uö–C¢4•DUô5$TDõ%õÄ4T„ôÄDU%ôDD$4Uô”BÀ¢ÒÀ¢Ð¢¢µÒÀ¢#%ö'V6¶WG3¢# ¢ò°¢°¢&–æF–æs¢#"À¢'V6¶WEöæÖS¢'6—FRÖ7&VF÷"×#""À¢ÒÀ¢Ð¢¢µÒÀ§Ó° ¦W‡÷'BFVfVÇBFVf–æT6öæf–r†7–æ2‚’Óâ°¢òò¶VWw&ævÆW"æBÖ–æ–fÆ&R7FFR&ö¦V7BÖÆö6ÂâF†W6R&Ræöâ×6V7&WBFööÀ¢òò6WGF–æw3²Æ–6F–öâVçf—&öæÖVçB&VÆöæw2–â–væ÷&VBæVçb¦f–ÆW2à¢&ö6W72æVçbåu$ätÄU%õu$•DUôÄôu2óóÒ&fÇ6R#°¢&ö6W72æVçbåu$ätÄU%ôÄôuõD‚óóÒ"çw&ævÆW"öÆöw2#°¢&ö6W72æVçbäÔ”ä”dÄ$Uõ$Tt•5E%•õD‚óóÒ"çw&ævÆW"÷&Vv—7G'’#° ¢òòw&ævÆW"6æ6†÷G2—G2ÆörF‚v†–ÆRF†R6Æ÷VFfÆ&RÇVv–â—2–×÷'FVBà¢6öç7B²6Æ÷VFfÆ&RÒÒv—B–×÷'B‚$6Æ÷VFfÆ&R÷f—FR×ÇVv–â"“° ¢&WGW&â°¢6W'fW#¢—46öFW…6VF&VÇE6æF&÷€¢ò²vF6ƒ¢²W6Tg4WfVçG3¢fÇ6RÂW6UöÆÆ–æs¢G'VRÒÐ¢¢VæFVf–æVBÀ¢ÇVv–ç3¢°¢f–æW‡B‚’À¢6—FW2‚’À¢6Æ÷VFfÆ&R‡°¢f—FTVçf—&öæÖVçC¢²æÖS¢''62"Â6†–ÆDVçf—&öæÖVçG3¢²'77"%ÒÒÀ¢6öæf–s¢Æö6Ä&–æF–æt6öæf–rÀ¢Ò’À¢ÒÀ¢Ó°§Ò“°
+import vinext from "vinext";
+import { defineConfig } from "vite";
+import hostingConfig from "./.openai/hosting.json";
+import { sites } from "./build/sites-vite-plugin";
+
+const SITE_CREATOR_PLACEHOLDER_DATABASE_ID =
+  "00000000-0000-4000-8000-000000000000";
+
+const { d1, r2 } = hostingConfig;
+
+// macOS Seatbelt blocks FSEvents, so Codex previews need polling for HMR.
+const isCodexSeatbeltSandbox = process.env.CODEX_SANDBOX === "seatbelt";
+
+const localBindingConfig = {
+  main: "./worker/index.ts",
+  compatibility_flags: ["nodejs_compat"],
+  d1_databases: d1
+    ? [
+        {
+          binding: d1,
+          database_name: "site-creator-d1",
+          database_id: SITE_CREATOR_PLACEHOLDER_DATABASE_ID,
+        },
+      ]
+    : [],
+  r2_buckets: r2
+    ? [
+        {
+          binding: r2,
+          bucket_name: "site-creator-r2",
+        },
+      ]
+    : [],
+};
+
+export default defineConfig(async () => {
+  // Keep Wrangler and Miniflare state project-local. These are non-secret tool
+  // settings; application environment belongs in ignored `.env*` files.
+  process.env.WRANGLER_WRITE_LOGS ??= "false";
+  process.env.WRANGLER_LOG_PATH ??= ".wrangler/logs";
+  process.env.MINIFLARE_REGISTRY_PATH ??= ".wrangler/registry";
+
+  // Wrangler snapshots its log path while the Cloudflare plugin is imported.
+  const { cloudflare } = await import("@cloudflare/vite-plugin");
+
+  return {
+    server: isCodexSeatbeltSandbox
+      ? { watch: { useFsEvents: false, usePolling: true } }
+      : undefined,
+    plugins: [
+      vinext(),
+      sites(),
+      cloudflare({
+        viteEnvironment: { name: "rsc", childEnvironments: ["ssr"] },
+        config: localBindingConfig,
+      }),
+    ],
+  };
+});

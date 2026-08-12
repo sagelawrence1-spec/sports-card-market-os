@@ -24,10 +24,41 @@ ingestion and forward validation are live.
 ## Engine-to-interface contract
 
 `market_contract.py` emits the versioned `market-scan.v1` payload consumed by the
-Market Scan. The checked-in alpha payload is labeled `illustrative_alpha`; it is
-not live evidence or an investment recommendation. Internal `WATCH` and `AVOID`
-states remain available for diagnostics but cannot be promoted into public
-BUY / ACCUMULATE / HOLD / TRIM / SELL actions.
+Market Scan and Card Intelligence surfaces. The interface renders three source
+states without hiding provenance: illustrative alpha, scheduled evidence, and a
+blocked sold-data state. A valuation is displayed only after the accepted sold
+sample clears its evidence gate; otherwise the product says **Not enough
+evidence**.
+
+`market_runner.py` drives the automatic loop: it loads the monitored canonical
+registry, queries the configured sold and active-listing providers, resolves each
+observation, persists the evidence and market history, and atomically emits the
+product contract. Capital actions remain withheld until both evidence and forward
+calibration gates pass. Internal `WATCH` and `AVOID` states cannot be promoted
+into public BUY / ACCUMULATE / HOLD / TRIM / SELL actions.
+
+## Automatic evidence run
+
+The authoritative sold provider uses eBay Marketplace Insights. eBay must first
+approve the application for its Limited Release API. Configure the values in
+`.env.example`, enable `EBAY_MARKETPLACE_INSIGHTS_ENABLED`, and run:
+
+```bash
+python market_runner.py
+```
+
+Without approved sold access the runner refuses to replace the product payload.
+For local inspection of the explicit blocked state only:
+
+```bash
+python market_runner.py --allow-blocked --database /tmp/market-os.sqlite --output /tmp/market-scan.json
+```
+
+`.github/workflows/market-scan.yml` provides the gated daily/dispatch job. It is
+disabled until the repository variable `MARKET_SCAN_ENABLED=true` and the eBay
+application secrets are configured. Its generated contract is retained as a run
+artifact for inspection; automated product publication is intentionally deferred
+until the authoritative source is activated.
 
 ## Validate
 

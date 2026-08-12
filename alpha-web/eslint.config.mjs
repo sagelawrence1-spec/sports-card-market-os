@@ -1,1 +1,41 @@
-ıK®Ïæ‰Æ¦¦Æ {üé®‡â•íg¢Ëœ…ø¥zŠİŠ·œ¶ŠòşŠmş&yºŞÃöâŸöë{Ô±êìşhœjjlj¿Îšè~)^Úz,¹È_ŠW¨­Ø«yËh¯/è¦ßá¢g›­ì?n)ÿn·°ıK®Ïæ‰Æ¦¦Æ {üé®‡â•íç¢Ëœ…ø¥zŠİŠ·œ¶ŠòşŠmş&yºŞÃöâŸöë{–×÷'B²FVf–æT6öæf–rÂvÆö&Ä–væ÷&W2Òg&öÒ&W6Æ–çBö6öæf–r#°¦–×÷'BW6Æ–çBg&öÒ$W6Æ–çBö§2#°¦–×÷'BæW‡Bg&öÒ$æW‡BöW6Æ–çB×ÇVv–âÖæW‡B#°¦–×÷'B§7„’g&öÒ&W6Æ–çB×ÇVv–âÖ§7‚Ö’#°¦–×÷'B&V7Bg&öÒ&W6Æ–çB×ÇVv–â×&V7B#°¦–×÷'B&V7D†öö·2g&öÒ&W6Æ–çB×ÇVv–â×&V7BÖ†öö·2#°¦–×÷'BvÆö&Ç2g&öÒ&vÆö&Ç2#°¦–×÷'BG6W6Æ–çBg&öÒ'G—W67&—BÖW6Æ–çB#° ¦6öç7BW6Æ–çD6öæf–rÒFVf–æT6öæf–r…°¢vÆö&Ä–væ÷&W2…°¢"ææW‡Bò¢¢"À¢&F—7Bò¢¢"À¢&÷WBò¢¢"À¢&'V–ÆBò¢¢"À¢&æW‡BÖVçbæBçG2"À¢Ò’À¢W6Æ–çBæ6öæf–w2ç&V6öÖÖVæFVBÀ¢ââçG6W6Æ–çBæ6öæf–w2ç&V6öÖÖVæFVBÀ¢&V7Bæ6öæf–w2æfÆBç&V6öÖÖVæFVBÀ¢&V7Bæ6öæf–w2æfÆE²&§7‚×'VçF–ÖR%ÒÀ¢&V7D†öö·2æ6öæf–w2æfÆE²'&V6öÖÖVæFVBÖÆFW7B%ÒÀ¢§7„’æfÆD6öæf–w2ç&V6öÖÖVæFVBÀ¢æW‡Bæ6öæf–w5²&6÷&R×vV"×f—FÇ2%ÒÀ¢°¢ÆæwVvT÷F–öç3¢°¢vÆö&Ç3¢°¢ââævÆö&Ç2æ'&÷w6W"À¢ââævÆö&Ç2ææöFRÀ¢ââævÆö&Ç2ç6W'f–6Wv÷&¶W"À¢ÒÀ¢ÒÀ¢6WGF–æw3¢°¢&V7C¢°¢fW'6–öã¢&FWFV7B"À¢ÒÀ¢ÒÀ¢ÒÀ¥Ò“° ¦W‡÷'BFVfVÇBW6Æ–çD6öæf–s° 
+import { defineConfig, globalIgnores } from "eslint/config";
+import eslint from "@eslint/js";
+import next from "@next/eslint-plugin-next";
+import jsxA11y from "eslint-plugin-jsx-a11y";
+import react from "eslint-plugin-react";
+import reactHooks from "eslint-plugin-react-hooks";
+import globals from "globals";
+import tseslint from "typescript-eslint";
+
+const eslintConfig = defineConfig([
+  globalIgnores([
+    ".next/**",
+    "dist/**",
+    "out/**",
+    "build/**",
+    "next-env.d.ts",
+  ]),
+  eslint.configs.recommended,
+  ...tseslint.configs.recommended,
+  react.configs.flat.recommended,
+  react.configs.flat["jsx-runtime"],
+  reactHooks.configs.flat["recommended-latest"],
+  jsxA11y.flatConfigs.recommended,
+  next.configs["core-web-vitals"],
+  {
+    languageOptions: {
+      globals: {
+        ...globals.browser,
+        ...globals.node,
+        ...globals.serviceworker,
+      },
+    },
+    settings: {
+      react: {
+        version: "detect",
+      },
+    },
+  },
+]);
+
+export default eslintConfig;
