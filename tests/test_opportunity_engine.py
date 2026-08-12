@@ -176,6 +176,7 @@ def test_murakami_acceptance_path_signing_then_first_homer(tmp_path):
         },
     )
     assert signing.stage == OpportunityStage.ENTRY
+    assert signing.opportunity_type.value == "CATALYST"
     assert signing.recommended_action == OpportunityAction.START_POSITION
 
     first_homer = engine.apply_signal(
@@ -224,6 +225,18 @@ def test_westbrook_acceptance_retirement_risk_can_surface_before_retirement(tmp_
         },
     )
     assert thesis.stage == OpportunityStage.ENTRY
-    assert thesis.opportunity_type.value == "EDGE"
+    assert thesis.opportunity_type.value == "CATALYST"
     assert thesis.edge_conviction > thesis.evidence_confidence
     assert thesis.recommended_action == OpportunityAction.START_POSITION
+
+
+def test_market_only_signal_is_classified_as_quant(tmp_path):
+    store = OpportunityStore(tmp_path / "opportunity.sqlite")
+    engine = OpportunityEngine(store)
+    thesis = engine.spark(
+        player="Market Player",
+        sport="NBA",
+        observation="Card sales volume moved before price.",
+        signal_type=SignalType.CARD_VOLUME_SPIKE,
+    )
+    assert thesis.opportunity_type.value == "QUANT"
