@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+*.sqlite
+*.sqlite-*
+.pytest_cache/
+.venv/
+.env
+work/
+outputs/
+*.zip
+*.egg-info/
+*_metrics*.txt
+*scan_v0_2*.txt
+raw_test_data/

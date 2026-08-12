@@ -1,0 +1,59 @@
+from __future__ import annotations
+from dataclasses import dataclass
+from datetime import date, datetime
+import math
+import statistics
+
+@dataclass(frozen=True)
+class MarketEstimate:
+    card_id: str
+    as_of: str
+    fair_value: float | None
+    sample_size: int
+    effective_sample_size: float
+    dispersion: float | None
+    confidence: float
+    evidence_grade: str
+
+def _day(value):
+    if isinstance(value,date): return value
+    return datetime.fromisoformat(str(value)[:10]).date()
+
+def estimate_market(card_id, sales, as_of=None, half_life_days=45, currency="USD"):
+    cutoff=_day(as_of or date.today())
+    clean=[]
+    for row in sales:
+        if str(row.get("currency","USD")).upper()!=currency: continue
+        sold=_day(row["sale_date"])
+        if sold > cutoff: continue
+        price=float(row["sale_price"])
+        if price <= 0: continue
+        clean.append((sold,price))
+    if not clean:
+        return MarketEstimate(card_id,cutoff.isoformat(),None,0,0,None,0,"F")
+    prices=[p for _,p in clean]
+    median=statistics.median(prices)
+    deviations=[abs(p-median) for p in prices]
+    mad=statistics.median(deviations) if len(prices)>1 else 0
+    if mad:
+        clean=[x for x in clean if abs(x[1]-median)/(1.4826*mad) <= 3.5]
+    weighted=[]
+    for sold,price in clean:
+        weight=.5 ** ((cutoff-sold).days/half_life_days)
+        weighted.append((price,weight))
+    fair=sum(p*w for p,w in weighted)/sum(w for _,w in weighted)
+    ess=sum(w for _,w in weighted)**2/sum(w*w for _,w in weighted)
+    dispersion=(statistics.pstdev([p for p,_ in weighted])/fair) if len(weighted)>1 and fair else 0
+    confidence=max(0,min(100,18+min(ess,12)*5.2-max(0,dispersion-.08)*85))
+    grade="A" if confidence>=80 else "B" if confidence>=65 else "C" if confidence>=50 else "D" if confidence>=35 else "F"
+    return MarketEstimate(card_id,cutoff.isoformat(),round(fair,2),len(weighted),round(ess,2),round(dispersion,4),round(confidence,1),grade)
+
+def calibration_metrics(predictions, min_samples=8):
+    graded=[]
+    for p in predictions:
+        predicted=float(p["predicted_value"]); realized=float(p["realized_value"])
+        if predicted>0: graded.append((realized-predicted)/predicted)
+    if len(graded)<min_samples:
+        return {"calibrated":False,"samples":len(graded),"reason":"insufficient_samples"}
+    return {"calibrated":True,"samples":len(graded),"mean_return":round(statistics.mean(graded),4),
+            "median_return":round(statistics.median(graded),4),"hit_rate":round(sum(x>0 for x in graded)/len(graded),4)}
