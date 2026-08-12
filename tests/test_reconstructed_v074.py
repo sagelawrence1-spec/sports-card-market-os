@@ -4,7 +4,7 @@ from datetime import date, timedelta
 from bulk_ingest import ingest_product_research
 from entity_matcher import SportsCardEntityMatcher
 from evidence_store import EvidenceStore
-from market_engine import calibration_metrics, estimate_market
+from market_engine import calibration_metrics, estimate_market, realized_outcome_report
 from providers.ebay_product_research import EbayProductResearchProvider
 
 ASSET={"card_id":"ohtani-hmt1","player":"Shohei Ohtani","year":2018,"manufacturer":"Topps",
@@ -55,3 +55,20 @@ def test_bulk_import_is_idempotent(tmp_path):
     path=tmp_path/"sold.csv"; write_bulk(path); db=tmp_path/"evidence.sqlite"
     first=ingest_product_research(path,[ASSET],db,dry_run=False); second=ingest_product_research(path,[ASSET],db,dry_run=False)
     assert first["written"]==1 and second["duplicate"] and second["written"]==0
+
+def outcome(**updates):
+    row={"prediction_date":"2026-07-01","realized_date":"2026-08-01","predicted_value":100,
+         "realized_value":110,"currency":"USD","evidence_grade":"A"}
+    row.update(updates); return row
+
+def test_realized_report_blocks_temporal_leakage():
+    report=realized_outcome_report([outcome(realized_date="2026-06-30")],min_samples=1)
+    assert report["samples"]==0
+
+def test_realized_report_blocks_non_usd():
+    report=realized_outcome_report([outcome(currency="EUR")],min_samples=1)
+    assert report["samples"]==0
+
+def test_realized_report_segments_evidence_quality():
+    report=realized_outcome_report([outcome(),outcome(evidence_grade="B",realized_value=90)],min_samples=2)
+    assert report["calibrated"] and set(report["by_evidence_grade"])=={"A","B"}

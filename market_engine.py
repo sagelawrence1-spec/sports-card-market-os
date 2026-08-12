@@ -57,3 +57,24 @@ def calibration_metrics(predictions, min_samples=8):
         return {"calibrated":False,"samples":len(graded),"reason":"insufficient_samples"}
     return {"calibrated":True,"samples":len(graded),"mean_return":round(statistics.mean(graded),4),
             "median_return":round(statistics.median(graded),4),"hit_rate":round(sum(x>0 for x in graded)/len(graded),4)}
+
+def realized_outcome_report(predictions, min_samples=8):
+    """Grade estimates only when the realized sale occurs after the prediction."""
+    valid=[]
+    for row in predictions:
+        if str(row.get("currency","USD")).upper() != "USD": continue
+        if _day(row["realized_date"]) <= _day(row["prediction_date"]): continue
+        predicted=float(row["predicted_value"]); realized=float(row["realized_value"])
+        if predicted <= 0 or realized <= 0: continue
+        error=(realized-predicted)/predicted
+        valid.append({"grade":row.get("evidence_grade","unknown"),"error":error})
+    overall=calibration_metrics([
+        {"predicted_value":1,"realized_value":1+x["error"]} for x in valid
+    ],min_samples=min_samples)
+    buckets={}
+    for grade in sorted({x["grade"] for x in valid}):
+        errors=[x["error"] for x in valid if x["grade"]==grade]
+        buckets[grade]={"samples":len(errors),"mape":round(statistics.mean(abs(x) for x in errors),4),
+                        "bias":round(statistics.mean(errors),4)}
+    overall["by_evidence_grade"]=buckets
+    return overall
