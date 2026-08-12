@@ -22,6 +22,7 @@ type MarketItem = {
   liquidity_score: number;
   accepted_sales_30d: number;
   accepted_sales_total?: number;
+  valuation_sample_size?: number;
   accepted_active_count?: number;
   review_count?: number;
   excluded_count?: number;
@@ -29,6 +30,8 @@ type MarketItem = {
   median_ask?: number | null;
   latest_sale_date?: string | null;
   last_updated?: string;
+  scanned_this_run?: boolean;
+  scan_state?: "complete" | "deferred_rotation" | "failed" | "unavailable" | "unknown";
   ideal_entry?: number | null;
   do_not_chase?: number | null;
   thesis: string;
@@ -132,7 +135,7 @@ export default function Home() {
       </header>
       {showEvidenceStatus ? <section className="evidence-status">
         <div><span>DATA CONNECTION</span><b>{isLiveEvidence ? "Confirmed sales are connected" : "Live sales are not connected yet"}</b></div>
-        <p>{isIllustrative ? "This screen demonstrates the product experience with clearly labeled sample data. The free sold-results adapter is ready; a user-owned API key is the only remaining input before the system can collect and grade real evidence." : marketData.source.label}</p>
+        <p>{isIllustrative ? "This screen demonstrates the product experience with clearly labeled sample data. No sample valuation or action is presented as live market intelligence." : marketData.source.label}</p>
         <button onClick={() => setShowEvidenceStatus(false)}>Close</button>
       </section> : null}
 
@@ -145,7 +148,7 @@ export default function Home() {
           <div><span>CAPITAL POSTURE</span><b>{actionable.length ? "Selective" : "Calibration gated"}</b></div>
         </div>
         <div className="toolbar"><div>{["All signals", "BUY", "ACCUMULATE", "HOLD", "TRIM", "SELL", "MONITOR"].map((filter) => <button onClick={() => setSignalFilter(filter)} className={signalFilter === filter ? "on" : ""} key={filter}>{filter}</button>)}</div><select value={sport} onChange={(event) => setSport(event.target.value)}><option>All sports</option><option>NBA</option><option>MLB</option><option>NFL</option></select></div>
-        <section className="signal-table"><div className="table-title"><b>{query ? `Search results for “${query}”` : "Highest-conviction changes"}</b><span>{visibleSignals.length} of {marketData.items.length} cards</span></div><div className="thead"><span>SIGNAL</span><span>ASSET</span><span>FAIR VALUE</span><span>30D</span><span>EVIDENCE</span><span>CONF.</span></div>{visibleSignals.map((signal) => <button className="row" key={signal.raw.card_id} onClick={() => openCard(signal.raw.card_id)}><span><b className={`pill ${signal.signal.toLowerCase()}`}>{isIllustrative ? `DEMO ${signal.signal}` : signal.signal}</b><small>{signal.tag}</small></span><span><b>{signal.card}</b><small>{signal.sport} · {signal.raw.accepted_sales_total ?? 0} accepted sales</small></span><b>{signal.price}</b><b className={signal.move.startsWith("+") ? "green" : signal.move === "—" ? "muted" : "red"}>{signal.move}</b><b className="evidence">{signal.evidence}</b><b>{signal.confidence}%</b></button>)}{visibleSignals.length === 0 ? <div className="no-results"><b>No monitored card matches “{query}”.</b><span>Try a player, year, set, card number, or sport.</span><button onClick={() => setQuery("")}>Clear search</button></div> : null}</section>
+        <section className="signal-table"><div className="table-title"><b>{query ? `Search results for “${query}”` : "Highest-conviction changes"}</b><span>{visibleSignals.length} of {marketData.items.length} cards</span></div><div className="thead"><span>SIGNAL</span><span>ASSET</span><span>FAIR VALUE</span><span>30D</span><span>EVIDENCE</span><span>CONF.</span></div>{visibleSignals.map((signal) => <button className="row" key={signal.raw.card_id} onClick={() => openCard(signal.raw.card_id)}><span><b className={`pill ${signal.signal.toLowerCase()}`}>{isIllustrative ? `DEMO ${signal.signal}` : signal.signal}</b><small>{signal.tag}</small></span><span><b>{signal.card}</b><small>{signal.sport} · {signal.raw.accepted_sales_total ?? 0} accepted sales{signal.raw.scanned_this_run === false ? " · rotates next run" : ""}</small></span><b>{signal.price}</b><b className={signal.move.startsWith("+") ? "green" : signal.move === "—" ? "muted" : "red"}>{signal.move}</b><b className="evidence">{signal.evidence}</b><b>{signal.confidence}%</b></button>)}{visibleSignals.length === 0 ? <div className="no-results"><b>No monitored card matches “{query}”.</b><span>Try a player, year, set, card number, or sport.</span><button onClick={() => setQuery("")}>Clear search</button></div> : null}</section>
       </>}
 
       {view === "opportunities" && <>
@@ -158,11 +161,11 @@ export default function Home() {
         <div className="card-hero"><div><span className="kicker">CARD INTELLIGENCE</span><h1>{selected.card}</h1><p>{selected.card_id}</p></div><div><b className={`pill ${(selected.action ?? "monitor").toLowerCase()}`}>{isIllustrative ? `DEMO ${selected.action ?? "EVIDENCE GATED"}` : selected.action ?? "EVIDENCE GATED"}</b><small>{selected.confidence}% confidence · Evidence {selected.evidence_grade}</small></div></div>
         <div className="metric-groups">
           <div><span><small>Fair value</small><b>{selected.fair_value == null ? "Not enough evidence" : formatPrice(selected.fair_value)}</b></span><span><small>30 days</small><b className={(selected.move_30d ?? 0) > 0 ? "green" : ""}>{formatMove(selected.move_30d)}</b></span><span><small>Evidence range</small><b>{selected.evidence_range ? `${formatPrice(selected.evidence_range.low)}–${formatPrice(selected.evidence_range.high)}` : "—"}</b></span></div>
-          <div><span><small>Accepted sales</small><b>{selected.accepted_sales_total ?? 0}</b></span><span><small>Liquidity</small><b>{selected.liquidity_score} / 100</b></span><span><small>Evidence</small><b>{selected.evidence_grade}</b></span></div>
-          <div><span><small>Active listings</small><b>{selected.accepted_active_count ?? 0}</b></span><span><small>Needs review</small><b>{selected.review_count ?? 0}</b></span><span><small>Latest sale</small><b>{formatDate(selected.latest_sale_date)}</b></span></div>
+          <div><span><small>Accepted sales</small><b>{selected.accepted_sales_total ?? 0}</b></span><span><small>Used in valuation</small><b>{selected.valuation_sample_size ?? selected.accepted_sales_total ?? 0}</b></span><span><small>Evidence</small><b>{selected.evidence_grade}</b></span></div>
+          <div><span><small>Liquidity</small><b>{selected.liquidity_score} / 100</b></span><span><small>Needs review</small><b>{selected.review_count ?? 0}</b></span><span><small>Latest sale</small><b>{formatDate(selected.latest_sale_date)}</b></span></div>
         </div>
         <div className="levels"><div><small>IDEAL ENTRY</small><b>{formatPrice(selected.ideal_entry)}</b></div><div><small>DO NOT CHASE</small><b>{formatPrice(selected.do_not_chase)}</b></div><div><small>LOWEST / MEDIAN ASK</small><b>{formatPrice(selected.lowest_ask)} / {formatPrice(selected.median_ask)}</b></div></div>
-        <section className="thesis"><div><h2>Why this evidence should—or should not—be trusted</h2><p>{selected.thesis}</p><h3>Evidence state</h3><p>{selected.evidence_explanation ?? "No evidence explanation is available."}</p>{selected.blockers?.length ? <div className="blockers"><strong>Before capital can move</strong>{selected.blockers.map((blocker) => <span key={blocker}>{blocker}</span>)}</div> : null}</div><aside><span>{selected.accepted_sales_total ?? 0} accepted sales</span><span>{selected.excluded_count ?? 0} excluded comps</span><span>{selected.review_count ?? 0} awaiting review</span><span>Updated {formatDate(selected.last_updated)}</span></aside></section>
+        <section className="thesis"><div><h2>Why this evidence should—or should not—be trusted</h2><p>{selected.thesis}</p><h3>Evidence state</h3><p>{selected.evidence_explanation ?? "No evidence explanation is available."}</p>{selected.blockers?.length ? <div className="blockers"><strong>Before capital can move</strong>{selected.blockers.map((blocker) => <span key={blocker}>{blocker}</span>)}</div> : null}</div><aside><span>{selected.accepted_sales_total ?? 0} accepted sales</span><span>{selected.valuation_sample_size ?? selected.accepted_sales_total ?? 0} used in valuation</span><span>{selected.accepted_active_count ?? 0} active listings</span><span>{selected.excluded_count ?? 0} excluded comps</span><span>{selected.review_count ?? 0} awaiting review</span><span>{selected.scanned_this_run == null ? "Scan status unavailable" : selected.scanned_this_run ? "Scanned this run" : "Rotates on a later scan"}</span><span>Updated {formatDate(selected.last_updated)}</span></aside></section>
       </>}
 
       {view === "player" && selected && <><div className="page-head"><div><span className="kicker">PLAYER MARKET</span><h1>{selected.player}</h1><p>Evidence health across this player&apos;s monitored card hierarchy.</p></div></div><div className="player-summary"><div><small>MONITORED CARDS</small><b>{playerCards.length}</b><span>canonical registry</span></div><div><small>VALUATION READY</small><b>{playerCards.filter((item) => item.fair_value != null && ["A", "B"].includes(item.evidence_grade)).length}</b><span>A/B evidence</span></div><div><small>UNRESOLVED REVIEWS</small><b>{playerCards.reduce((sum, item) => sum + (item.review_count ?? 0), 0)}</b><span>identity decisions</span></div></div><section className="hierarchy"><h2>Monitored hierarchy</h2>{playerCards.map((item, index) => <button className="hierarchy-row" key={item.card_id} onClick={() => openCard(item.card_id)}><b>#{index + 1}</b><span><strong>{item.card}</strong><small>{item.accepted_sales_total ?? 0} accepted sales · Evidence {item.evidence_grade}</small></span><span className={item.action ? "green" : "muted"}>{isLiveEvidence ? item.action ?? "MONITOR" : "DEMO"}</span><strong>{formatPrice(item.fair_value)}</strong></button>)}</section></>}

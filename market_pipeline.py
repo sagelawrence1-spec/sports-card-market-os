@@ -91,6 +91,8 @@ class ScheduledMarketPipeline:
         errors=[]
         accepted_active={asset["card_id"]:[] for asset in assets}
         run_counts={asset["card_id"]:{"review":0,"rejected":0} for asset in assets}
+        sold_queries_attempted=set()
+        sold_queries_completed=set()
 
         if self.sold_provider is not None:
             planner=getattr(self.sold_provider,"plan_queries",None)
@@ -102,12 +104,15 @@ class ScheduledMarketPipeline:
             for plan in plans:
                 query=plan["query"]
                 plan_assets=plan.get("assets") or assets
+                plan_card_ids={asset["card_id"] for asset in plan_assets}
+                sold_queries_attempted.update(plan_card_ids)
                 try:
                     result=self.sold_provider.search_sold(
                         query,
                         category_id=plan.get("category_id"),
                         asset=plan_assets[0],
                     )
+                    sold_queries_completed.update(plan_card_ids)
                     accepted,counts=self._route(result.records,assets,query,run_id)
                     for card_id,values in counts.items():
                         run_counts[card_id]["review"]+=values["review"]
@@ -136,6 +141,15 @@ class ScheduledMarketPipeline:
         listing_source_available=self.listing_provider is not None and not any(error.startswith("active:") for error in errors)
         for asset in assets:
             card_id=asset["card_id"]
+            scanned_this_run=card_id in sold_queries_completed
+            if self.sold_provider is None:
+                scan_state="unavailable"
+            elif scanned_this_run:
+                scan_state="complete"
+            elif card_id in sold_queries_attempted:
+                scan_state="failed"
+            else:
+                scan_state="deferred_rotation"
             accepted_rows=self.store.accepted_sales(card_id)
             recent=[]
             latest_sale=None
@@ -167,10 +181,13 @@ class ScheduledMarketPipeline:
             active=list({record.source_item_id:record for record in accepted_active[card_id]}.values())
             active_prices=[record.price for record in active if record.currency.upper()=="USD" and record.price>0]
             accepted_sales_30d=sum(1 for sale in recent if (cutoff-_day(sale["sale_date"])).days <= 30)
+            accepted_sales_label=f"{len(recent)} accepted USD {'sale' if len(recent)==1 else 'sales'}"
             liquidity=min(100,round(accepted_sales_30d*5+len(active_prices)*1.5,1))
             blockers=[]
             if not sold_source_available:
                 blockers.append("Confirmed sold-data source is unavailable")
+            if scan_state=="deferred_rotation":
+                blockers.append("Scheduled for a later free-plan rotation; no sold query ran for this card today")
             if not display_ready:
                 blockers.append("Accepted sold evidence has not cleared the valuation gate")
             if grade_cap:
@@ -194,7 +211,8 @@ class ScheduledMarketPipeline:
                 "move_30d":None,
                 "liquidity_score":liquidity,
                 "accepted_sales_30d":accepted_sales_30d,
-                "accepted_sales_total":estimate.sample_size,
+                "accepted_sales_total":len(recent),
+                "valuation_sample_size":estimate.sample_size,
                 "accepted_active_count":len(active_prices),
                 "review_count":run_counts[card_id]["review"],
                 "excluded_count":run_counts[card_id]["rejected"],
@@ -202,15 +220,21 @@ class ScheduledMarketPipeline:
                 "median_ask":round(statistics.median(active_prices),2) if active_prices else None,
                 "latest_sale_date":latest_sale.isoformat() if latest_sale else None,
                 "last_updated":as_of,
+                "scanned_this_run":scanned_this_run,
+                "scan_state":scan_state,
                 "thesis":(
                     "Accepted sold evidence supports a valuation, but the system is withholding a capital action until forward calibration passes."
                     if display_ready else
                     "Not enough accepted sold evidence exists to publish a trustworthy fair value."
                 ),
                 "evidence_explanation":(
-                    f"{estimate.sample_size} accepted USD sales; dispersion {estimate.dispersion:.1%}; source ceiling {grade_cap or 'none'}."
+                    f"{accepted_sales_label}; {estimate.sample_size} used after robust outlier filtering; dispersion {estimate.dispersion:.1%}; source ceiling {grade_cap or 'none'}."
                     if estimate.dispersion is not None else
-                    "No accepted USD sold observations are available."
+                    (
+                        f"{accepted_sales_label}; {estimate.sample_size} used after robust outlier filtering."
+                        if recent else
+                        "No accepted USD sold observations are available."
+                    )
                 ),
                 "blockers":blockers,
             }
@@ -237,6 +261,8 @@ class ScheduledMarketPipeline:
                 "evidence_grade_cap":getattr(self.sold_provider,"evidence_grade_cap",None),
                 "sold_source_available":sold_source_available,
                 "listing_source_available":listing_source_available,
+                "sold_queries_attempted":sorted(sold_queries_attempted),
+                "sold_queries_completed":sorted(sold_queries_completed),
                 "errors":errors,
             },
         )
