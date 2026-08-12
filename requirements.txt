@@ -1,0 +1,7 @@
+fastapi>=0.110
+uvicorn>=0.29
+python-multipart>=0.0.9
+requests>=2.31
+python-dateutil>=2.9
+pydantic>=2.6
+pytest>=8.0
