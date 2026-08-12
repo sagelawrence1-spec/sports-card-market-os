@@ -155,3 +155,75 @@ def test_radar_prioritizes_entry_before_consensus(tmp_path):
     radar = build_opportunity_radar([consensus, entry])
     assert radar["schema_version"] == "opportunity-radar.v1"
     assert radar["items"][0]["player"] == "Entry Player"
+
+
+def test_murakami_acceptance_path_signing_then_first_homer(tmp_path):
+    store = OpportunityStore(tmp_path / "opportunity.sqlite")
+    engine = OpportunityEngine(store)
+    signing = engine.spark(
+        player="Munetaka Murakami",
+        sport="MLB",
+        observation="Major-league signing creates a concrete entry catalyst before breakout confirmation.",
+        signal_type=SignalType.SIGNING,
+        factors={
+            "situation_change": 92,
+            "narrative_potential": 88,
+            "collectibility": 86,
+            "hobby_lag": 94,
+            "attention_velocity": 48,
+            "evidence_maturity": 38,
+            "upside_asymmetry": 90,
+        },
+    )
+    assert signing.stage == OpportunityStage.ENTRY
+    assert signing.recommended_action == OpportunityAction.START_POSITION
+
+    first_homer = engine.apply_signal(
+        signing.thesis_id,
+        PlayerSignal(
+            player_id=signing.player_id,
+            player=signing.player,
+            sport=signing.sport,
+            signal_type=SignalType.FIRST_MAJOR_EVENT,
+            source="game_feed",
+            description="First home run confirms part of the thesis while repricing remains limited.",
+            importance=88,
+            potential_market_impact=92,
+        ),
+        factors={
+            "situation_change": 92,
+            "narrative_potential": 94,
+            "collectibility": 88,
+            "hobby_lag": 91,
+            "attention_velocity": 82,
+            "evidence_maturity": 58,
+            "upside_asymmetry": 90,
+        },
+        market_repricing_pct=9,
+    )
+    assert first_homer.stage == OpportunityStage.ACCELERATION
+    assert first_homer.recommended_action == OpportunityAction.ADD
+
+
+def test_westbrook_acceptance_retirement_risk_can_surface_before_retirement(tmp_path):
+    store = OpportunityStore(tmp_path / "opportunity.sqlite")
+    engine = OpportunityEngine(store)
+    thesis = engine.spark(
+        player="Russell Westbrook",
+        sport="NBA",
+        observation="Late-career uncertainty raises retirement-catalyst probability before an announcement.",
+        signal_type=SignalType.RETIREMENT_RISK,
+        factors={
+            "situation_change": 78,
+            "narrative_potential": 90,
+            "collectibility": 92,
+            "hobby_lag": 84,
+            "attention_velocity": 42,
+            "evidence_maturity": 45,
+            "upside_asymmetry": 82,
+        },
+    )
+    assert thesis.stage == OpportunityStage.ENTRY
+    assert thesis.opportunity_type.value == "EDGE"
+    assert thesis.edge_conviction > thesis.evidence_confidence
+    assert thesis.recommended_action == OpportunityAction.START_POSITION
