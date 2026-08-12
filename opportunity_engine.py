@@ -205,16 +205,15 @@ class OpportunityThesis:
 
     @classmethod
     def from_dict(cls, raw: Mapping[str, Any]) -> "OpportunityThesis":
-        targets = tuple(
-            CardTarget(
-                **{
-                    **dict(item),
-                    "set_name": item.get("set_name", item.get("set", "")),
-                    "priority": TargetPriority(item.get("priority", "PRIMARY")),
-                }
-            )
-            for item in raw.get("card_targets", [])
-        )
+        targets = []
+        for item in raw.get("card_targets", []):
+            target = dict(item)
+            if "set_name" not in target:
+                target["set_name"] = target.get("set", "")
+            target.pop("set", None)
+            target["priority"] = TargetPriority(target.get("priority", "PRIMARY"))
+            targets.append(CardTarget(**target))
+        targets = tuple(targets)
         return cls(
             thesis_id=str(raw["thesis_id"]),
             player_id=str(raw["player_id"]),
@@ -313,6 +312,22 @@ _STAGE_ORDER = {
     OpportunityStage.CONSENSUS: 3,
     OpportunityStage.BROKEN: 99,
 }
+
+
+def infer_opportunity_type(signal_type: SignalType) -> OpportunityType:
+    if signal_type in {
+        SignalType.SIGNING,
+        SignalType.TRADE,
+        SignalType.CALL_UP,
+        SignalType.DEBUT,
+        SignalType.MILESTONE_APPROACH,
+        SignalType.RETIREMENT_RISK,
+        SignalType.HOF_CATALYST,
+    }:
+        return OpportunityType.CATALYST
+    if signal_type in {SignalType.CARD_VOLUME_SPIKE, SignalType.CARD_PRICE_MOVE}:
+        return OpportunityType.QUANT
+    return OpportunityType.EDGE
 
 
 def infer_stage(signal_type: SignalType) -> OpportunityStage:
@@ -570,7 +585,7 @@ class OpportunityEngine:
         player_id: str | None = None,
         signal_type: SignalType = SignalType.USER_SPARK,
         factors: Mapping[str, float] | None = None,
-        opportunity_type: OpportunityType = OpportunityType.EDGE,
+        opportunity_type: OpportunityType | None = None,
         market_repricing_pct: float = 0.0,
         source: str = "user_spark",
         card_targets: Iterable[CardTarget] = (),
@@ -599,6 +614,7 @@ class OpportunityEngine:
             )
 
         stage = infer_stage(signal_type)
+        opportunity_type = opportunity_type or infer_opportunity_type(signal_type)
         action = recommend_action(stage, scores, market_repricing_pct=market_repricing_pct)
         now = utc_now()
         thesis_id = str(uuid4())
@@ -686,6 +702,8 @@ class OpportunityEngine:
         current = self.store.get_thesis(thesis_id)
         if current is None:
             raise KeyError(f"Unknown thesis_id: {thesis_id}")
+        if current.stage == OpportunityStage.BROKEN:
+            raise ValueError("Broken theses are immutable; create a new thesis for a new setup.")
         now = utc_now()
         updated = replace(
             current,
