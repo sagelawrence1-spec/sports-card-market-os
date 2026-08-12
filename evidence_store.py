@@ -2,6 +2,7 @@ import sqlite3, json, hashlib, uuid
 from datetime import datetime
 
 from entity_matcher import norm
+from reconstruction import build_reconstruction_delta
 
 SCHEMA=r'''
 CREATE TABLE IF NOT EXISTS source_evidence(
@@ -226,6 +227,18 @@ class EvidenceStore:
         self.conn.commit()
 
     def save_market_state(self,run_id,state):
+        previous=self.previous_market_state(state["card_id"])
+        reconstruction=build_reconstruction_delta(previous,state)
+        state["reconstruction"]=reconstruction
+        if reconstruction["unexplained_repricing"]:
+            blockers=state.setdefault("blockers",[])
+            blockers.append("Unexplained scan-to-scan repricing requires review")
+        if reconstruction["reconstruction_health_failure"]:
+            state["action"]=None
+            state["engine_classification"]="RECONSTRUCTION_HEALTH_FAILURE"
+            blockers=state.setdefault("blockers",[])
+            blockers.append("Reconstruction health failed: large valuation move lacks material evidence change")
+
         evidence_range=state.get("evidence_range") or {}
         self.conn.execute('''INSERT OR REPLACE INTO card_market_history(
           run_id,card_id,as_of,fair_value,range_low,range_high,evidence_grade,confidence,
