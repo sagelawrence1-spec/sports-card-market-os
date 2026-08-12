@@ -1,6 +1,6 @@
 [project]
 name = "sports-card-market-os"
-version = "0.7.4"
+version = "0.7.5"
 requires-python = ">=3.11"
 dependencies = [
   "python-dateutil>=2.8",
@@ -15,7 +15,7 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-py-modules = ["bulk_ingest", "data_provider", "delta_engine", "detectors", "ebay_ingest", "engine", "entity_matcher", "evidence_store", "evidence_to_warehouse", "feature_engineering", "grader", "import_bundle", "market_contract", "market_engine", "market_pipeline", "market_runner", "memory", "models", "scan", "scoring", "warehouse"]
+py-modules = ["bulk_ingest", "data_provider", "delta_engine", "detectors", "ebay_ingest", "engine", "entity_matcher", "evidence_store", "evidence_to_warehouse", "feature_engineering", "grader", "import_bundle", "market_contract", "market_engine", "market_pipeline", "market_runner", "memory", "models", "opportunity_cli", "opportunity_contract", "opportunity_engine", "scan", "scoring", "warehouse"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
