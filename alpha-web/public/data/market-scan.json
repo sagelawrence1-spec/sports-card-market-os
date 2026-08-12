@@ -1,0 +1,79 @@
+{
+  "schema_version": "market-scan.v1",
+  "generated_at": "2026-08-12T15:42:00Z",
+  "source": {
+    "kind": "illustrative_alpha",
+    "label": "Illustrative market state — not live recommendations"
+  },
+  "universe_size": 428,
+  "items": [
+    {
+      "observation_id": "ALPHA-OBS-001",
+      "card_id": "ALPHA-CURRY-2009-TC-101-PSA9",
+      "sport": "NBA",
+      "player": "Stephen Curry",
+      "card": "2009 Topps Chrome Stephen Curry #101 · PSA 9",
+      "action": "ACCUMULATE",
+      "engine_classification": "ACCUMULATE",
+      "alerts": ["AOA"],
+      "confidence": 86,
+      "evidence_grade": "A",
+      "fair_value": 4820,
+      "move_30d": 0.084,
+      "liquidity_score": 81,
+      "accepted_sales_30d": 12,
+      "thesis": "Premium rookie velocity is accelerating while available supply contracts."
+    },
+    {
+      "observation_id": "ALPHA-OBS-002",
+      "card_id": "ALPHA-OHTANI-2018-TCU-HMT1-PSA10",
+      "sport": "MLB",
+      "player": "Shohei Ohtani",
+      "card": "2018 Topps Chrome Update Shohei Ohtani HMT1 · PSA 10",
+      "action": "BUY",
+      "engine_classification": "BUY",
+      "alerts": ["MIR"],
+      "confidence": 82,
+      "evidence_grade": "A",
+      "fair_value": 3140,
+      "move_30d": 0.031,
+      "liquidity_score": 78,
+      "accepted_sales_30d": 15,
+      "thesis": "Accepted sales remain below the player's adjacent premium rookie hierarchy."
+    },
+    {
+      "observation_id": "ALPHA-OBS-003",
+      "card_id": "ALPHA-HERBERT-2020-PRIZM-325-SILVER-PSA10",
+      "sport": "NFL",
+      "player": "Justin Herbert",
+      "card": "2020 Prizm Justin Herbert #325 Silver · PSA 10",
+      "action": "TRIM",
+      "engine_classification": "TRIM",
+      "alerts": ["PMD"],
+      "confidence": 74,
+      "evidence_grade": "B",
+      "fair_value": 1090,
+      "move_30d": -0.067,
+      "liquidity_score": 66,
+      "accepted_sales_30d": 8,
+      "thesis": "Listings expanded 29% while buyer absorption and peer momentum weakened."
+    },
+    {
+      "observation_id": "ALPHA-OBS-004",
+      "card_id": "ALPHA-WEMBANYAMA-2023-PRIZM-136-SILVER-PSA10",
+      "sport": "NBA",
+      "player": "Victor Wembanyama",
+      "card": "2023 Prizm Victor Wembanyama #136 Silver · PSA 10",
+      "action": "HOLD",
+      "engine_classification": "HOLD",
+      "alerts": ["MIR"],
+      "confidence": 69,
+      "evidence_grade": "B",
+      "fair_value": 1425,
+      "move_30d": 0.012,
+      "liquidity_score": 73,
+      "accepted_sales_30d": 7,
+      "thesis": "Demand is healthy, but current price already reflects most near-term upside."
+    }
+  ]
+}

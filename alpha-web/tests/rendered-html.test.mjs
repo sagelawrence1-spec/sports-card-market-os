@@ -1,1 +1,54 @@
-ýK®Ïæ‰Æ¦¦Æ {üé®‡â•íg¢Ëœ…ø¥zŠÝŠ·œ¶ŠòþŠmþ&yºÞÃöâŸöë{Ô±êìþhœjjlj¿Îšè~)^Úz,¹È_ŠW¨­Ø«yËh¯/è¦ßá¢g›­ì?n)ÿn·°ýK®Ïæ‰Æ¦¦Æ {üé®‡â•íç¢Ëœ…ø¥zŠÝŠ·œ¶ŠòþŠmþ&yºÞÃöâŸöë{–×÷'B76W'Bg&öÒ&æöFS¦76W'B÷7G&–7B#°¦–×÷'B²&VDf–ÆRÒg&öÒ&æöFS¦g2÷&öÖ—6W2#°¦–×÷'BFW7Bg&öÒ&æöFS§FW7B#°  ¦7–æ2gVæ7F–öâ&VæFW"‚’°¢6öç7Bv÷&¶W%W&ÂÒæWrU$Â‚"ââöF—7B÷6W'fW"ö–æFW‚æ§2"Â–×÷'BæÖWFçW&Â“°¢v÷&¶W%W&Âç6V&6…&×2ç6WB‚'FW7B"ÂG·&ö6W72ç–GÒÒG´FFRææ÷r‚—Ö“°¢6öç7B²FVfVÇC¢v÷&¶W"ÒÒv—B–×÷'B‡v÷&¶W%W&Âæ‡&Vb“° ¢&WGW&âv÷&¶W"æfWF6‚€¢æWr&WVW7B‚&‡GG¢òöÆö6Æ†÷7Bò"Â°¢†VFW'3¢²66WC¢'FW‡Bö‡FÖÂ"ÒÀ¢Ò’À¢°¢54UE3¢°¢fWF6ƒ¢7–æ2‚’ÓâæWr&W7öç6R‚$æ÷Bf÷VæB"Â²7FGW3¢CBÒ’À¢ÒÀ¢ÒÀ¢°¢v—EVçF–Â‚’·ÒÀ¢75F‡&÷Vv„öäW†6WF–öâ‚’·ÒÀ¢ÒÀ¢“°§Ð §FW7B‚'6W'fW"×&VæFW'2F†R&—fFRVæv–æRÇ†"Â7–æ2‚’Óâ°¢6öç7B&W7öç6RÒv—B&VæFW"‚“°¢76W'BæWVÂ‡&W7öç6Rç7FGW2Â#“°¢76W'BæÖF6‚‡&W7öç6Ræ†VFW'2ævWB‚&6öçFVçB×G—R"’óò""ÂõçFW‡EÂö‡FÖÅÆ"ö’“° ¢6öç7B‡FÖÂÒv—B&W7öç6RçFW‡B‚“°¢76W'BæÖF6‚†‡FÖÂÂóÇF—FÆSäÖ&¶WBõ2(	B7÷'G26&B–çFVÆÆ–vVæ6SÅÂ÷F—FÆSâö’“°¢76W'BæÖF6‚†‡FÖÂÂôÖ&¶WB66âò“°¢76W'BæÖF6‚†‡FÖÂÂô†–v†W7BÖ6öçf–7F–öâ6†ævW2ò“°¢76W'BæÖF6‚†‡FÖÂÂô45TÕTÄDRò“°§Ò“° §FW7B‚'6†—2Wf–FVæ6RÖf—'7B&öGV7BÆæwVvRv—F†÷WB7F'FW"'F–f7G2"Â7–æ2‚’Óâ°¢6öç7B·vRÂÆ–÷WBÂ6¶vT§6öåÒÒv—B&öÖ—6RæÆÂ…°¢&VDf–ÆR†æWrU$Â‚"ââö÷vRçG7‚"Â–×÷'BæÖWFçW&Â’Â'WFc‚"’À¢&VDf–ÆR†æWrU$Â‚"ââööÆ–÷WBçG7‚"Â–×÷'BæÖWFçW&Â’Â'WFc‚"’À¢&VDf–ÆR†æWrU$Â‚"ââ÷6¶vRæ§6öâ"Â–×÷'BæÖWFçW&Â’Â'WFc‚"’À¢Ò“°¢76W'BæÖF6‚‡vRÂô÷÷'GVæ—G’fVVBò“°¢76W'BæÖF6‚‡vRÂõÆ–W"Ö&¶WBò“°¢76W'BæÖF6‚‡vRÂô4•DÂÄÄô4Dõ"ò“°¢76W'BæÖF6‚‡vRÂõ&W6V&6‚FW6²ò“°¢76W'BæÖF6‚†Æ–÷WBÂõ7÷'G26&B–çFVÆÆ–vVæ6Rò“°¢76W'BæFöW4æ÷DÖF6‚‡6¶vT§6öâÂ÷&V7BÖÆöF–ær×6¶VÆWFöâò“°§Ò“°
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import test from "node:test";
+
+
+async function render() {
+  const workerUrl = new URL("../dist/server/index.js", import.meta.url);
+  workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}`);
+  const { default: worker } = await import(workerUrl.href);
+
+  return worker.fetch(
+    new Request("http://localhost/", {
+      headers: { accept: "text/html" },
+    }),
+    {
+      ASSETS: {
+        fetch: async () => new Response("Not found", { status: 404 }),
+      },
+    },
+    {
+      waitUntil() {},
+      passThroughOnException() {},
+    },
+  );
+}
+
+test("server-renders the private engine alpha", async () => {
+  const response = await render();
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
+
+  const html = await response.text();
+  assert.match(html, /<title>Market OS â€” Sports Card Intelligence<\/title>/i);
+  assert.match(html, /Market Scan/);
+  assert.match(html, /Highest-conviction changes/);
+  assert.match(html, /ACCUMULATE/);
+  assert.match(html, /ILLUSTRATIVE ALPHA DATA/);
+});
+
+test("ships evidence-first product language without starter artifacts", async () => {
+  const [page, layout, packageJson] = await Promise.all([
+    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../package.json", import.meta.url), "utf8"),
+  ]);
+  assert.match(page, /Opportunity Feed/);
+  assert.match(page, /Player Market/);
+  assert.match(page, /CAPITAL ALLOCATOR/);
+  assert.match(page, /Research Desk/);
+  assert.match(page, /market-scan\.json/);
+  assert.doesNotMatch(page, /const signals=\[/);
+  assert.match(layout, /Sports Card Intelligence/);
+  assert.doesNotMatch(packageJson, /react-loading-skeleton/);
+});

@@ -15,7 +15,7 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-py-modules = ["bulk_ingest", "data_provider", "delta_engine", "detectors", "ebay_ingest", "engine", "entity_matcher", "evidence_store", "evidence_to_warehouse", "feature_engineering", "grader", "import_bundle", "market_engine", "memory", "models", "scan", "scoring", "warehouse"]
+py-modules = ["bulk_ingest", "data_provider", "delta_engine", "detectors", "ebay_ingest", "engine", "entity_matcher", "evidence_store", "evidence_to_warehouse", "feature_engineering", "grader", "import_bundle", "market_contract", "market_engine", "memory", "models", "scan", "scoring", "warehouse"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
