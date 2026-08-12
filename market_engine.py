@@ -45,6 +45,9 @@ def estimate_market(card_id, sales, as_of=None, half_life_days=45, currency="USD
     ess=sum(w for _,w in weighted)**2/sum(w*w for _,w in weighted)
     dispersion=(statistics.pstdev([p for p,_ in weighted])/fair) if len(weighted)>1 and fair else 0
     confidence=max(0,min(100,18+min(ess,12)*5.2-max(0,dispersion-.08)*85))
+    newest_age=min((cutoff-sold).days for sold,_ in clean)
+    confidence-=min(40,max(0,newest_age-30)*.5)
+    confidence=max(0,confidence)
     grade="A" if confidence>=80 else "B" if confidence>=65 else "C" if confidence>=50 else "D" if confidence>=35 else "F"
     return MarketEstimate(card_id,cutoff.isoformat(),round(fair,2),len(weighted),round(ess,2),round(dispersion,4),round(confidence,1),grade)
 

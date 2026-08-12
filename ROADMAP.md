@@ -1,0 +1,113 @@
+# Evidence-gated product roadmap
+
+Progress is earned by measured evidence, not feature count. The decisive asset is a
+history of timestamped predictions and realized outcomes that shows where the system
+works, where it fails, and whether any advantage survives fees, liquidity, and
+uncertainty.
+
+## Release progression
+
+| Release | Exit goal |
+| --- | --- |
+| Private Engine Alpha | Process genuine eBay exports correctly |
+| Valuation Alpha | Produce trustworthy, explainable fair values |
+| Intelligence Alpha | Demonstrate forward predictive value |
+| Portfolio Alpha | Improve actual capital decisions after costs |
+| Collector Beta | Make the proven workflow dependable for others |
+
+## Stage 1 — Prove data quality
+
+Label genuine eBay Product Research exports across roughly 25–50 liquid cards.
+
+Measure auto-accept precision, false-accept rate, review burden, duplicates, parser
+failures, forward valuation error, and accuracy by evidence grade. False acceptance
+is the critical gate: questionable rows must fail closed because one wrong comp can
+corrupt every downstream result.
+
+## Stage 2 — Prove usefulness
+
+Use the private alpha daily for several weeks. Journal each valuation and
+recommendation before its outcome is knowable. Measure valuation error, directional
+accuracy, performance after fees, results by confidence and evidence grade, results
+against simple sold-comp benchmarks, and opportunities rejected for weak evidence.
+
+The stage passes only if the system demonstrates repeatable value beyond ordinary
+sold-comp analysis.
+
+## Stage 3 — Expand carefully
+
+After the metrics are credible, expand the canonical universe and learn aliases only
+from approved review decisions. Improve hierarchy/comparable selection, then add
+watchlists, positions, saved searches, evidence-change notifications, active supply,
+and explicit entry, invalidation, and exit conditions.
+
+Prefer liquid cards whose outcomes mature quickly enough to evaluate.
+
+## Stage 4 — Productize the proven workflow
+
+Turn the internal tool into a dependable private PWA with secure authentication,
+backups and import recovery, scheduled reconstruction, a morning evidence brief,
+mobile notifications, opportunity-cost ranking, stale/broken-import monitoring, and
+a complete valuation/recommendation audit trail.
+
+A collector-facing beta requires sustained successful private use.
+
+## Post-validation destination — Capital Market OS
+
+This phase begins only after the earlier evidence gates pass. The product then
+graduates from estimating cards to answering: **given available cash and current
+holdings, what is the best risk-adjusted action today?**
+
+### Establish a verifiable track record
+
+Run continuously for 6–12 months and preserve every timestamped recommendation,
+including entry, expected upside, contemporaneous evidence, confidence, risk,
+thesis, invalidation, subsequent sales, fees, liquidity, and realized performance.
+Report all results—not selected winners—by strategy, sport, price band, and
+confidence.
+
+### Convert demonstrated patterns into durable edge
+
+Test performance in grail compression, temporary supply dislocations, liquidity
+leading price, neglected players/sets, grade and parallel mispricing, cross-market
+substitution, and event-driven demand. Remove weak signals and allocate more only to
+patterns that retain value out of sample and after costs. The defensible asset is the
+labeled evidence, adjudication history, and outcome record.
+
+### Build a disciplined capital engine
+
+For each card, recommend buy, hold, trim, sell, or no action; maximum entry, minimum
+exit, position size, expected holding period, opportunity cost, and explicit
+invalidation evidence. Portfolio constraints and existing exposure must be part of
+the decision rather than an afterthought.
+
+### Add proprietary data loops
+
+Integrate scheduled authoritative sold history, live listing/supply observations,
+auction-house results, grading-population changes, portfolio transactions,
+user-confirmed identities/aliases, and structured catalysts. Each decision and
+realized outcome should improve identity resolution, valuation, and calibration.
+
+### Let evidence choose the business
+
+The credible paths are a private investment system, professional intelligence
+subscription, or marketplace/data infrastructure. Do not select or broadly monetize
+a path until repeatable value is demonstrated. Any external expansion requires
+security, licensed data, support, model governance, correction procedures, and a
+clear separation between educational analytics and individualized financial advice.
+
+The mature learning loop is:
+
+`market evidence → card identity → valuation → opportunity → capital decision → realized outcome → calibration`
+
+At maturity, the system must answer better than existing tools:
+
+1. Where is the market wrong?
+2. Which specific card best expresses that mispricing?
+3. How much capital should be deployed, and what invalidates the thesis?
+
+## Current gate
+
+The repository is at **Private Engine Alpha**. The next release decision depends on a
+sanitized genuine export corpus and manual labels—not additional intelligence or
+portfolio features.
