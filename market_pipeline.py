@@ -11,6 +11,7 @@ from entity_matcher import MatchDecision, SportsCardEntityMatcher, build_ebay_qu
 from evidence_store import EvidenceStore
 from market_contract import build_evidence_market_scan, card_title
 from market_engine import estimate_market, valuation_sample
+from reconstruction import summarize_reconstruction_health
 
 
 @dataclass(frozen=True)
@@ -325,6 +326,7 @@ class ScheduledMarketPipeline:
             self.store.save_market_state(run_id,state)
             states.append(state)
 
+        reconstruction_health=summarize_reconstruction_health(states)
         status="complete" if sold_source_available else "blocked_sold_source"
         provider_label=getattr(self.sold_provider,"source_label",None)
         label=(
@@ -347,8 +349,14 @@ class ScheduledMarketPipeline:
                 "listing_source_available":listing_source_available,
                 "sold_queries_attempted":sorted(sold_queries_attempted),
                 "sold_queries_completed":sorted(sold_queries_completed),
+                "reconstruction_health":reconstruction_health,
                 "errors":errors,
             },
         )
-        self.store.finish_market_run(run_id,status,{"errors":errors,"cards":len(assets)})
+        contract["reconstruction_health"]=reconstruction_health
+        self.store.finish_market_run(run_id,status,{
+            "errors":errors,
+            "cards":len(assets),
+            "reconstruction_health":reconstruction_health,
+        })
         return PipelineResult(run_id,contract,status,tuple(errors))
