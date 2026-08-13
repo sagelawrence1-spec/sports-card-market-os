@@ -3,9 +3,15 @@
 Sports-card market intelligence built around auditable sold evidence, strict card
 identity, robust valuation, and measurable forward outcomes.
 
-Current maturity: **private engine alpha**. The v0.7.4 code is a reconstructed
+Current maturity: **public engine alpha**. The v0.7.4 code is a reconstructed
 engine baseline, not a finished application. See [RECOVERY.md](RECOVERY.md).
 Release progression and evidence gates are defined in [ROADMAP.md](ROADMAP.md).
+
+Use the public alpha at
+[sagelawrence1-spec.github.io/sports-card-market-os](https://sagelawrence1-spec.github.io/sports-card-market-os/).
+It is an evidence-first operating view, not a promise of actionable pricing:
+when the data has not cleared the trust gates, the product deliberately says
+**Not enough evidence** and recommends no action.
 
 The product direction is a continuously operating market-intelligence system:
 market evidence → card identity → valuation → opportunity → capital decision →
@@ -84,3 +90,9 @@ python grader.py /path/to/raw_test_data /path/to/synthetic_answer_key.csv
 
 The large synthetic fixture is intentionally kept outside Git. Synthetic classification
 validates engineered regimes; it is not evidence of live-market edge.
+
+## Open source
+
+Sports Card Market OS is released under the [MIT License](LICENSE). Contributions
+are welcome through short-lived branches and focused pull requests. Never commit
+provider credentials, personal portfolio data, or proprietary exports.
