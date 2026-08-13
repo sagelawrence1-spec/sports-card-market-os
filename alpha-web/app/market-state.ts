@@ -1,5 +1,26 @@
 export type View = "today" | "market" | "card" | "health";
 export type EvidenceRange = { low: number; high: number } | null;
+export type EvidenceTab = "accepted" | "review" | "excluded";
+export type EvidenceLedgerEntry = {
+  evidence_id: string;
+  status: "accepted" | "review" | "rejected";
+  title: string;
+  price: number | null;
+  currency: "USD" | null;
+  event_date: string | null;
+  source: string;
+  url: string | null;
+  used_in_valuation: boolean;
+  reason: string;
+};
+export type EvidenceLedger = {
+  accepted: EvidenceLedgerEntry[];
+  review: EvidenceLedgerEntry[];
+  excluded: EvidenceLedgerEntry[];
+  accepted_total: number;
+  review_total: number;
+  excluded_total: number;
+};
 
 export type MarketItem = {
   observation_id: string;
@@ -33,6 +54,7 @@ export type MarketItem = {
   thesis: string;
   evidence_explanation?: string;
   blockers?: string[];
+  evidence_ledger?: EvidenceLedger;
 };
 
 export type MarketPayload = {
