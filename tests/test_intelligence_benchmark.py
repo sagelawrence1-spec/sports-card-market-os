@@ -1,3 +1,4 @@
+import sqlite3
 from datetime import date
 
 from intelligence_benchmark import (
@@ -19,6 +20,8 @@ def obs(
     realized_at=date(2026, 2, 1),
     evidence_grade="A",
     confidence=0.9,
+    exit_fee_rate=0.0,
+    liquidity_haircut_rate=0.0,
 ):
     return BenchmarkObservation(
         card_id=card_id,
@@ -31,6 +34,8 @@ def obs(
         realized_at=realized_at,
         evidence_grade=evidence_grade,
         confidence=confidence,
+        exit_fee_rate=exit_fee_rate,
+        liquidity_haircut_rate=liquidity_haircut_rate,
     )
 
 
@@ -88,11 +93,54 @@ def test_directional_accuracy_compares_forecast_to_as_of_price():
     assert result["lift"]["directional_accuracy_lift"] == 1.0
 
 
+def test_net_realized_outcome_applies_exit_fee_and_liquidity_haircut():
+    row = obs(
+        current=100.0,
+        baseline=100.0,
+        intelligence=90.0,
+        realized=120.0,
+        exit_fee_rate=0.10,
+        liquidity_haircut_rate=0.10,
+    )
+
+    result = evaluate_intelligence_vs_baseline(
+        [row], evaluation_date=date(2026, 2, 15), min_mature_samples=1
+    )
+
+    assert row.net_realized_price == 97.2
+    assert round(result["baseline"]["mae"], 6) == 2.8
+    assert round(result["intelligence"]["mae"], 6) == 7.2
+    assert result["outcome_basis"] == "net_realized_after_exit_fees_and_liquidity_haircut"
+
+
+def test_segments_results_by_evidence_grade_and_confidence_band():
+    rows = [
+        obs(card_id="a", evidence_grade="A", confidence=0.9),
+        obs(card_id="b", evidence_grade="B", confidence=0.7),
+        obs(card_id="c", evidence_grade="B", confidence=0.4),
+        obs(card_id="d", evidence_grade=None, confidence=None),
+    ]
+
+    result = evaluate_intelligence_vs_baseline(
+        rows, evaluation_date=date(2026, 2, 15), min_mature_samples=4
+    )
+
+    assert result["segments"]["evidence_grade"]["A"]["observations"] == 1
+    assert result["segments"]["evidence_grade"]["B"]["observations"] == 2
+    assert result["segments"]["evidence_grade"]["unknown"]["observations"] == 1
+    assert result["segments"]["confidence_band"]["high"]["observations"] == 1
+    assert result["segments"]["confidence_band"]["medium"]["observations"] == 1
+    assert result["segments"]["confidence_band"]["low"]["observations"] == 1
+    assert result["segments"]["confidence_band"]["unknown"]["observations"] == 1
+
+
 def test_store_upsert_is_deterministic_and_survives_restart(tmp_path):
     db = tmp_path / "benchmark.sqlite"
     store = IntelligenceBenchmarkStore(db)
     store.upsert_observation(obs(intelligence=115.0))
-    store.upsert_observation(obs(intelligence=121.0))
+    store.upsert_observation(
+        obs(intelligence=121.0, exit_fee_rate=0.13, liquidity_haircut_rate=0.04)
+    )
 
     restarted = IntelligenceBenchmarkStore(db)
     rows = restarted.load_observations()
@@ -101,6 +149,47 @@ def test_store_upsert_is_deterministic_and_survives_restart(tmp_path):
     assert rows[0].intelligence_estimate == 121.0
     assert rows[0].evidence_grade == "A"
     assert rows[0].confidence == 0.9
+    assert rows[0].exit_fee_rate == 0.13
+    assert rows[0].liquidity_haircut_rate == 0.04
+
+
+def test_store_migrates_existing_benchmark_database(tmp_path):
+    db = tmp_path / "legacy.sqlite"
+    with sqlite3.connect(db) as connection:
+        connection.execute(
+            """
+            CREATE TABLE intelligence_benchmark_observations (
+                card_id TEXT NOT NULL,
+                as_of_date TEXT NOT NULL,
+                horizon_days INTEGER NOT NULL,
+                current_price REAL NOT NULL,
+                baseline_estimate REAL NOT NULL,
+                intelligence_estimate REAL NOT NULL,
+                realized_price REAL,
+                realized_at TEXT,
+                evidence_grade TEXT,
+                confidence REAL,
+                PRIMARY KEY (card_id, as_of_date, horizon_days)
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE intelligence_benchmark_runs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                evaluated_at TEXT NOT NULL,
+                min_mature_samples INTEGER NOT NULL,
+                result_json TEXT NOT NULL
+            )
+            """
+        )
+
+    store = IntelligenceBenchmarkStore(db)
+    store.upsert_observation(obs())
+    row = store.load_observations()[0]
+
+    assert row.exit_fee_rate == 0.0
+    assert row.liquidity_haircut_rate == 0.0
 
 
 def test_store_records_append_only_benchmark_runs(tmp_path):
