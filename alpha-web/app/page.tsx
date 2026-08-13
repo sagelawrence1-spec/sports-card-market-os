@@ -10,6 +10,7 @@ import {
   plainBlocker,
   rankPriority,
   safeAction,
+  type EvidenceTab,
   type MarketItem,
   type MarketPayload,
   type View,
@@ -76,9 +77,23 @@ export default function Home() {
   const [query, setQuery] = useState("");
   const [sport, setSport] = useState("All");
   const [selectedCardId, setSelectedCardId] = useState(marketData.items[0]?.card_id ?? "");
+  const [evidenceTab, setEvidenceTab] = useState<EvidenceTab>("accepted");
 
   const selected = getSelectedCard(marketData.items, selectedCardId);
   const sourceState = deriveMarketState(marketData);
+  const evidenceLedger = selected?.evidence_ledger ?? {
+    accepted: [], review: [], excluded: [],
+    accepted_total: selected?.accepted_sales_total ?? 0,
+    review_total: selected?.review_count ?? 0,
+    excluded_total: selected?.excluded_count ?? 0,
+  };
+  const ledgerTotals = {
+    accepted: evidenceLedger.accepted_total,
+    review: evidenceLedger.review_total,
+    excluded: evidenceLedger.excluded_total,
+  };
+  const ledgerEntries = evidenceLedger[evidenceTab];
+  const ledgerTotal = ledgerTotals[evidenceTab];
   const totalAccepted = marketData.items.reduce((sum, item) => sum + (item.accepted_sales_total ?? 0), 0);
   const totalReviews = marketData.items.reduce((sum, item) => sum + (item.review_count ?? 0), 0);
   const totalExcluded = marketData.items.reduce((sum, item) => sum + (item.excluded_count ?? 0), 0);
@@ -218,6 +233,28 @@ export default function Home() {
             </dl>
             <label>Switch card<select value={selected.card_id} onChange={(event) => setSelectedCardId(event.target.value)}>{marketData.items.map((item) => <option key={item.card_id} value={item.card_id}>{item.player} · {item.card.split("·").at(-1)?.trim()}</option>)}</select></label>
           </aside>
+        </section>
+
+        <section className="evidence-ledger">
+          <div className="ledger-heading">
+            <div><span className="eyebrow">COMP EVIDENCE</span><h2>Audit the valuation</h2><p>See exactly what entered the evidence set, what was held back, and why.</p></div>
+            <div className="ledger-tabs" role="group" aria-label="Filter comp evidence">
+              {(["accepted", "review", "excluded"] as EvidenceTab[]).map((tab) => <button key={tab} aria-pressed={evidenceTab === tab} className={evidenceTab === tab ? "active" : ""} onClick={() => setEvidenceTab(tab)}>
+                {tab === "accepted" ? "Accepted" : tab === "review" ? "Held for review" : "Excluded"}
+                <b>{ledgerTotals[tab]}</b>
+              </button>)}
+            </div>
+          </div>
+          <div className="ledger-list">
+            {ledgerEntries.map((entry) => <article className="ledger-row" key={entry.evidence_id}>
+              <div className="ledger-state"><span className={`evidence-pill ${entry.status}`}>{entry.status === "accepted" ? entry.used_in_valuation ? "USED" : "FILTERED" : entry.status === "review" ? "HELD" : "EXCLUDED"}</span><small>{entry.source}</small></div>
+              <div className="ledger-title"><b>{entry.title}</b><span>{entry.reason}</span></div>
+              <div className="ledger-facts"><b>{entry.price == null ? "Price withheld" : formatPrice(entry.price)}</b><small>{formatDate(entry.event_date)}</small></div>
+              {entry.url ? <a href={entry.url} target="_blank" rel="noreferrer" aria-label={`Open source listing for ${entry.title}`}>View source ↗</a> : <span className="source-unavailable">Source link unavailable</span>}
+            </article>)}
+            {!ledgerEntries.length && <div className="ledger-empty"><b>{ledgerTotal ? "Detailed rows arrive with the next evidence scan." : `No ${evidenceTab === "review" ? "held" : evidenceTab} comps for this card.`}</b><p>{ledgerTotal ? `The current snapshot reports ${ledgerTotal} ${evidenceTab === "review" ? "held" : evidenceTab} comps, but predates the auditable ledger format.` : "Nothing is being hidden from this category."}</p></div>}
+          </div>
+          {ledgerEntries.length < ledgerTotal && ledgerEntries.length > 0 && <p className="ledger-note">Showing {ledgerEntries.length} of {ledgerTotal}. The most recent evidence is shown first.</p>}
         </section>
       </>}
 
