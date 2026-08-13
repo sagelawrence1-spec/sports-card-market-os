@@ -32,9 +32,10 @@ test("server-renders the usable daily capital brief", async () => {
   const html = await response.text();
   assert.match(html, /<title>Market OS — Know When the Evidence Is Ready<\/title>/i);
   assert.match(html, /Today, capital stays still/);
+  assert.match(html, /CURRENT EVIDENCE/);
   assert.match(html, /What needs attention/);
   assert.match(html, /Shohei Ohtani/);
-  assert.match(html, /LIVE EVIDENCE/);
+  assert.doesNotMatch(html, /\/Users\//);
   assert.match(html, /The restraint is the product/);
 });
 
@@ -57,7 +58,13 @@ test("ships only working product surfaces without speculative features", async (
   assert.match(page, /What must change/);
   assert.match(page, /You do not need to upload exports/);
   assert.match(page, /setQuery/);
+  assert.match(page, /window\.scrollTo/);
+  assert.match(page, /aria-current/);
+  assert.match(page, /deriveMarketState/);
+  assert.match(page, /isActionable/);
   assert.match(page, /Cash is a valid position/);
+  assert.doesNotMatch(page, /unsupported actions shown/);
+  assert.doesNotMatch(page, /One card was deferred/);
   assert.doesNotMatch(page, /Opportunity Feed/);
   assert.doesNotMatch(page, /Portfolio/);
   assert.doesNotMatch(page, /Player Market/);
