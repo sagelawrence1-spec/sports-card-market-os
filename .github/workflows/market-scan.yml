@@ -7,11 +7,18 @@ on:
 
 permissions:
   contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages-production
+  cancel-in-progress: false
 
 jobs:
-  scan:
+  scan-and-build:
     if: ${{ vars.MARKET_SCAN_ENABLED == 'true' }}
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     env:
       MARKET_SOLD_PROVIDER: ${{ vars.MARKET_SOLD_PROVIDER || 'sold_comps' }}
       SOLD_COMPS_API_KEY: ${{ secrets.SOLD_COMPS_API_KEY }}
@@ -39,3 +46,30 @@ jobs:
           path: alpha-web/public/data/market-scan.json
           if-no-files-found: error
           retention-days: 14
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.16.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: pnpm
+          cache-dependency-path: alpha-web/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+        working-directory: alpha-web
+      - run: pnpm build:pages
+        working-directory: alpha-web
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: alpha-web/pages-dist
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: scan-and-build
+    steps:
+      - name: Deploy refreshed market evidence
+        id: deployment
+        uses: actions/deploy-pages@v4

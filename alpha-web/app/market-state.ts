@@ -1,4 +1,12 @@
 export type View = "today" | "market" | "card" | "health";
+export type RouteState = { view: View; cardId: string };
+export type TrustGate = {
+  id: string;
+  label: string;
+  value: string;
+  state: "pass" | "fail" | "waiting";
+  detail: string;
+};
 export type EvidenceRange = { low: number; high: number } | null;
 export type EvidenceTab = "accepted" | "review" | "excluded";
 export type EvidenceLedgerEntry = {
@@ -76,6 +84,75 @@ export type MarketPayload = {
 
 const TRUSTED_ACTION_GRADES = new Set(["A", "B"]);
 const MAX_CURRENT_AGE_MS = 36 * 60 * 60 * 1000;
+const VIEWS = new Set<View>(["today", "market", "card", "health"]);
+
+export function parseRoute(search: string, items: MarketItem[]): RouteState {
+  const params = new URLSearchParams(search);
+  const requestedView = params.get("view") as View | null;
+  const requestedCardId = params.get("card") ?? "";
+  const fallbackCardId = items[0]?.card_id ?? "";
+  const cardId = items.some((item) => item.card_id === requestedCardId)
+    ? requestedCardId
+    : fallbackCardId;
+
+  return {
+    view: requestedView && VIEWS.has(requestedView) ? requestedView : "today",
+    cardId,
+  };
+}
+
+export function buildRouteSearch(view: View, cardId = "") {
+  if (view === "today") return "";
+  const params = new URLSearchParams({ view });
+  if (view === "card" && cardId) params.set("card", cardId);
+  return `?${params.toString()}`;
+}
+
+export function valuationTrustGates(item: MarketItem, payload: MarketPayload): TrustGate[] {
+  const soldAvailable = payload.source.provenance?.sold_source_available === true;
+  const scanned = item.scanned_this_run === true;
+  const sampleSize = item.valuation_sample_size ?? 0;
+  const trustedGrade = TRUSTED_ACTION_GRADES.has(item.evidence_grade);
+  const calibrated = !((item.blockers ?? []).some((blocker) => /forward calibration/i.test(blocker)));
+
+  return [
+    {
+      id: "source",
+      label: "Confirmed sold source",
+      value: soldAvailable ? "Available" : "Unavailable",
+      state: soldAvailable ? "pass" : "fail",
+      detail: soldAvailable ? "Sold observations were available to the scan." : "No valuation can clear without confirmed sold evidence.",
+    },
+    {
+      id: "scan",
+      label: "Current card scan",
+      value: scanned ? "Complete" : "Waiting",
+      state: scanned ? "pass" : "waiting",
+      detail: scanned ? "This card was refreshed in the latest run." : "This card is scheduled for a later source rotation.",
+    },
+    {
+      id: "sample",
+      label: "Usable valuation sample",
+      value: `${sampleSize} / 8 required`,
+      state: sampleSize >= 8 ? "pass" : "fail",
+      detail: sampleSize >= 8 ? "Enough consistent sales remain after filtering." : "More verified sales must survive identity and outlier checks.",
+    },
+    {
+      id: "grade",
+      label: "Evidence quality",
+      value: `${item.evidence_grade} · ${TRUSTED_ACTION_GRADES.has(item.evidence_grade) ? "cleared" : "below B"}`,
+      state: trustedGrade ? "pass" : "fail",
+      detail: trustedGrade ? "Evidence quality is sufficient to display a valuation." : "Recency, depth, or consistency is still too weak.",
+    },
+    {
+      id: "calibration",
+      label: "Forward action calibration",
+      value: calibrated ? "Cleared" : "Waiting",
+      state: calibrated ? "pass" : "waiting",
+      detail: calibrated ? "Matured outcomes support capital guidance." : "Future sales must verify estimates before BUY or SELL guidance appears.",
+    },
+  ];
+}
 
 export function isActionable(item: MarketItem) {
   const hasClosedGate = (item.blockers ?? []).some((blocker) => (
