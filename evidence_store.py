@@ -1,6 +1,9 @@
 import sqlite3, json, hashlib, uuid
 from datetime import datetime
 
+from entity_matcher import norm
+from reconstruction import build_reconstruction_delta
+
 SCHEMA=r'''
 CREATE TABLE IF NOT EXISTS source_evidence(
   evidence_id TEXT PRIMARY KEY,
@@ -30,6 +33,17 @@ CREATE TABLE IF NOT EXISTS import_batches(
   rejected_count INTEGER NOT NULL, affected_cards_json TEXT NOT NULL,
   imported_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
+CREATE TABLE IF NOT EXISTS identity_alias_adjudications(
+  title_key TEXT NOT NULL,
+  title TEXT NOT NULL,
+  asset_id TEXT NOT NULL,
+  reviewer_id TEXT NOT NULL,
+  approved INTEGER NOT NULL CHECK(approved IN (0,1)),
+  evidence_id TEXT,
+  adjudicated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY(title_key,asset_id,reviewer_id)
+);
+CREATE INDEX IF NOT EXISTS idx_alias_adjudications_title ON identity_alias_adjudications(title_key);
 CREATE TABLE IF NOT EXISTS market_runs(
   run_id TEXT PRIMARY KEY,
   as_of TEXT NOT NULL,
@@ -121,12 +135,73 @@ class EvidenceStore:
     def review_queue(self, status="review"):
         return self.conn.execute("SELECT * FROM source_evidence WHERE match_status=? ORDER BY ingested_at",(status,)).fetchall()
 
-    def adjudicate(self,evidence_id,approved):
+    def adjudicate(self,evidence_id,approved,reviewer_id=None):
+        row=self.conn.execute(
+            "SELECT evidence_id,title,card_id FROM source_evidence WHERE evidence_id=? AND match_status='review'",
+            (evidence_id,)
+        ).fetchone()
+        if row is None:
+            return False
+        if reviewer_id is not None and not str(reviewer_id).strip():
+            raise ValueError("reviewer_id cannot be blank")
+
         status="accepted" if approved else "rejected"
         reason="manual_override" if approved else "manual_reject"
-        cur=self.conn.execute("UPDATE source_evidence SET match_status=?,match_reason=? WHERE evidence_id=? AND match_status='review'",(status,reason,evidence_id))
+        cur=self.conn.execute(
+            "UPDATE source_evidence SET match_status=?,match_reason=? WHERE evidence_id=? AND match_status='review'",
+            (status,reason,evidence_id)
+        )
+        if cur.rowcount == 1 and reviewer_id is not None:
+            title=str(row["title"] or "").strip()
+            asset_id=str(row["card_id"] or "").strip()
+            title_key=norm(title)
+            if not title_key or not asset_id:
+                self.conn.rollback()
+                raise ValueError("review evidence must have title and card_id to learn an alias")
+            self.conn.execute('''INSERT INTO identity_alias_adjudications(
+              title_key,title,asset_id,reviewer_id,approved,evidence_id,adjudicated_at)
+              VALUES(?,?,?,?,?,?,CURRENT_TIMESTAMP)
+              ON CONFLICT(title_key,asset_id,reviewer_id) DO UPDATE SET
+                title=excluded.title, approved=excluded.approved, evidence_id=excluded.evidence_id,
+                adjudicated_at=CURRENT_TIMESTAMP''',(
+                title_key,title,asset_id,str(reviewer_id).strip(),1 if approved else 0,evidence_id
+            ))
         self.conn.commit()
         return cur.rowcount == 1
+
+    def alias_diagnostics(self,title,min_approvals=2):
+        if min_approvals < 2:
+            raise ValueError("min_approvals must be at least 2")
+        title_key=norm(title)
+        rows=self.conn.execute('''SELECT asset_id,reviewer_id,approved
+          FROM identity_alias_adjudications WHERE title_key=?''',(title_key,)).fetchall()
+        if not rows:
+            return {"known":False,"active":False,"conflicting":False}
+
+        approvals={}
+        rejections={}
+        for row in rows:
+            target=approvals if row["approved"] else rejections
+            target.setdefault(row["asset_id"],set()).add(row["reviewer_id"])
+
+        approved_assets=[asset_id for asset_id,reviewers in approvals.items() if reviewers]
+        conflicting=len(approved_assets)>1
+        qualified=[
+            asset_id for asset_id,reviewers in approvals.items()
+            if len(reviewers)>=min_approvals and not rejections.get(asset_id)
+        ]
+        resolved=qualified[0] if len(qualified)==1 and not conflicting else None
+        return {
+            "known":True,
+            "active":resolved is not None,
+            "resolved_asset_id":resolved,
+            "conflicting":conflicting,
+            "approval_counts":{asset_id:len(reviewers) for asset_id,reviewers in approvals.items()},
+            "rejection_counts":{asset_id:len(reviewers) for asset_id,reviewers in rejections.items()},
+        }
+
+    def resolved_alias_asset_id(self,title,min_approvals=2):
+        return self.alias_diagnostics(title,min_approvals=min_approvals).get("resolved_asset_id")
 
     def accepted_sales(self,card_id):
         return self.conn.execute('''SELECT * FROM source_evidence WHERE card_id=? AND record_type='sold' AND match_status='accepted' ORDER BY event_date DESC''',(card_id,)).fetchall()
@@ -163,6 +238,18 @@ class EvidenceStore:
         self.conn.commit()
 
     def save_market_state(self,run_id,state):
+        previous=self.previous_market_state(state["card_id"])
+        reconstruction=build_reconstruction_delta(previous,state)
+        state["reconstruction"]=reconstruction
+        if reconstruction["unexplained_repricing"]:
+            blockers=state.setdefault("blockers",[])
+            blockers.append("Unexplained scan-to-scan repricing requires review")
+        if reconstruction["reconstruction_health_failure"]:
+            state["action"]=None
+            state["engine_classification"]="RECONSTRUCTION_HEALTH_FAILURE"
+            blockers=state.setdefault("blockers",[])
+            blockers.append("Reconstruction health failed: large valuation move lacks material evidence change")
+
         evidence_range=state.get("evidence_range") or {}
         self.conn.execute('''INSERT OR REPLACE INTO card_market_history(
           run_id,card_id,as_of,fair_value,range_low,range_high,evidence_grade,confidence,
