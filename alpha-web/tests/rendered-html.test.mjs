@@ -91,3 +91,9 @@ test("a successful scheduled scan builds and publishes the same evidence snapsho
   assert.match(workflow, /actions\/deploy-pages@v4/);
   assert.match(workflow, /needs: scan-and-build/);
 });
+
+test("tablet widths retain a visible primary navigation surface", async () => {
+  const css = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
+  assert.match(css, /@media\(min-width:761px\) and \(max-width:1050px\)/);
+  assert.match(css, /@media\(min-width:761px\) and \(max-width:1050px\)\{[^}]*main\{padding-bottom:92px\}\.mobile-nav\{[^}]*display:grid/);
+});
