@@ -116,6 +116,8 @@ def test_pipeline_routes_evidence_and_publishes_only_gated_value(tmp_path):
     assert item["lowest_ask"]==4650
     assert item["action"] is None
     assert "Forward calibration" in item["blockers"][-1]
+    assert len(item["evidence_ledger"]["accepted"])==12
+    assert all(row["used_in_valuation"] for row in item["evidence_ledger"]["accepted"])
     assert len(store.market_history(ASSET["card_id"]))==1
 
 
@@ -141,6 +143,7 @@ def test_pipeline_persists_but_excludes_provider_policy_failures(tmp_path):
     assert item["fair_value"] is None
     assert item["excluded_count"]==1
     assert store.review_queue("rejected")[0]["match_reason"]=="provider_policy:price_not_confirmed"
+    assert item["evidence_ledger"]["excluded"][0]["reason"]=="Listing did not meet the evidence rules"
 
 
 def test_public_sold_result_source_cannot_claim_grade_a(tmp_path):
@@ -161,6 +164,10 @@ def test_pipeline_distinguishes_accepted_sales_from_filtered_valuation_sample(tm
     item=result.contract["items"][0]
     assert item["accepted_sales_total"]==9
     assert item["valuation_sample_size"]==8
+    ledger=item["evidence_ledger"]["accepted"]
+    assert len(ledger)==9
+    assert sum(row["used_in_valuation"] for row in ledger)==8
+    assert next(row for row in ledger if row["price"]==25000)["reason"].endswith("price outlier")
     assert "9 accepted USD sales; 8 used after robust outlier filtering" in item["evidence_explanation"]
 
 
