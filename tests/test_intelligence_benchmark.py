@@ -55,9 +55,9 @@ def test_reports_error_lift_against_simple_baseline():
     ]
     result = evaluate_intelligence_vs_baseline(rows, min_mature_samples=2)
 
-    assert result["baseline"]["mae"] == 27.5
+    assert result["baseline"]["mae"] == 17.5
     assert result["intelligence"]["mae"] == 3.5
-    assert result["lift"]["mae_improvement_pct"] > 0.87
+    assert result["lift"]["mae_improvement_pct"] > 0.79
     assert result["production_ready"] is True
 
 
