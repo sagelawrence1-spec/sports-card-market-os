@@ -98,6 +98,11 @@ def build_market_scan(
                 "move_30d": round(diagnostics.get("price_change_30d", 0), 4),
                 "liquidity_score": round(diagnostics.get("liquidity_score", 0), 1),
                 "accepted_sales_30d": int(diagnostics.get("sales_30d", 0)),
+                "evidence_ledger":{
+                    "accepted":[],"review":[],"excluded":[],
+                    "accepted_total":int(diagnostics.get("sales_30d",0)),
+                    "review_total":0,"excluded_total":0,
+                },
                 "thesis": signal.thesis,
             }
         )
@@ -141,6 +146,12 @@ def build_evidence_market_scan(
         state.setdefault("review_count",0)
         state.setdefault("excluded_count",0)
         state.setdefault("blockers",[])
+        state.setdefault("evidence_ledger",{
+            "accepted":[],"review":[],"excluded":[],
+            "accepted_total":state["accepted_sales_total"],
+            "review_total":state["review_count"],
+            "excluded_total":state["excluded_count"],
+        })
         state.setdefault("scanned_this_run",False)
         state.setdefault("scan_state","unknown")
         items.append(state)
