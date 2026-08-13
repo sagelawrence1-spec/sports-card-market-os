@@ -1,15 +1,18 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import marketScan from "../public/data/market-scan.json";
 import {
+  buildRouteSearch,
   deriveMarketState,
   filterMarketItems,
   getSelectedCard,
   isActionable,
+  parseRoute,
   plainBlocker,
   rankPriority,
   safeAction,
+  valuationTrustGates,
   type EvidenceTab,
   type MarketItem,
   type MarketPayload,
@@ -78,6 +81,7 @@ export default function Home() {
   const [sport, setSport] = useState("All");
   const [selectedCardId, setSelectedCardId] = useState(marketData.items[0]?.card_id ?? "");
   const [evidenceTab, setEvidenceTab] = useState<EvidenceTab>("accepted");
+  const mainRef = useRef<HTMLElement>(null);
 
   const selected = getSelectedCard(marketData.items, selectedCardId);
   const sourceState = deriveMarketState(marketData);
@@ -102,18 +106,50 @@ export default function Home() {
   const valued = marketData.items.filter((item) => item.fair_value != null);
   const priority = rankPriority(marketData.items);
   const visibleItems = useMemo(() => filterMarketItems(marketData.items, query, sport), [query, sport]);
+  const trustGates = selected ? valuationTrustGates(selected, marketData) : [];
 
-  const navigate = (nextView: View) => {
+  const syncRoute = useCallback(() => {
+    const route = parseRoute(window.location.search, marketData.items);
+    setView(route.view);
+    setSelectedCardId(route.cardId);
+  }, []);
+
+  useEffect(() => {
+    window.addEventListener("popstate", syncRoute);
+    queueMicrotask(syncRoute);
+    return () => window.removeEventListener("popstate", syncRoute);
+  }, [syncRoute]);
+
+  useEffect(() => {
+    const viewTitle = view === "today"
+      ? "Today"
+      : view === "market"
+        ? "Market"
+        : view === "health"
+          ? "Data Health"
+          : selected?.player ?? "Card Intelligence";
+    document.title = `${viewTitle} — Market OS`;
+  }, [selected?.player, view]);
+
+  const navigate = (nextView: View, cardId = selectedCardId) => {
+    const search = buildRouteSearch(nextView, cardId);
+    const nextUrl = `${window.location.pathname}${search}`;
+    if (`${window.location.pathname}${window.location.search}` !== nextUrl) {
+      window.history.pushState({}, "", nextUrl);
+    }
     setView(nextView);
+    if (nextView === "card") setSelectedCardId(cardId);
+    setEvidenceTab("accepted");
     window.scrollTo({ top: 0, behavior: "smooth" });
+    window.requestAnimationFrame(() => mainRef.current?.focus({ preventScroll: true }));
   };
 
   const openCard = (cardId: string) => {
-    setSelectedCardId(cardId);
-    navigate("card");
+    navigate("card", cardId);
   };
 
   return <div className="product-shell">
+    <a className="skip-link" href="#main-content">Skip to market intelligence</a>
     <header className="topbar">
       <button className="brand" onClick={() => navigate("today")} aria-label="Open today's brief">
         <span>MO</span>
@@ -125,7 +161,7 @@ export default function Home() {
       <div className={`connection ${sourceState.connectionTone}`}><i></i><span>{sourceState.connectionLabel}<small>{sourceState.connectionDetail} · {scanTime}</small></span></div>
     </header>
 
-    <main>
+    <main id="main-content" ref={mainRef} tabIndex={-1}>
       {view === "today" && <>
         <section className="brief-hero">
           <div>
@@ -148,7 +184,7 @@ export default function Home() {
         <section className="brief-layout">
           <div className="priority-panel">
             <div className="section-heading"><div><span>PRIORITY QUEUE</span><h2>What needs attention</h2></div><button onClick={() => navigate("market")}>View full market</button></div>
-            {priority.map((item, index) => <button className="priority-row" key={item.card_id} onClick={() => openCard(item.card_id)}>
+            {priority.map((item, index) => <button className="priority-row" key={item.card_id} aria-label={`Open ${item.card} intelligence`} onClick={() => openCard(item.card_id)}>
               <span className="priority-number">{String(index + 1).padStart(2, "0")}</span>
               <span className="asset"><b>{item.player}</b><small>{item.card.replace(item.player, "").trim()}</small></span>
               <span className="reason"><b>{statusLabel(item)}</b><small>{attentionReason(item)}</small></span>
@@ -173,7 +209,7 @@ export default function Home() {
 
       {view === "market" && <>
         <section className="page-title">
-          <div><span className="eyebrow">MONITORED UNIVERSE</span><h1>Market</h1><p>Every card is shown with its current evidence state. No speculative prices.</p></div>
+          <div><span className="eyebrow">MONITORED UNIVERSE · {marketData.items.length} CARDS</span><h1>Market</h1><p>Every monitored card is shown with its current evidence state. No speculative prices.</p></div>
           <div className="market-controls">
             <label><span className="sr-only">Search cards or players</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search player, card, set…" /></label>
             <select aria-label="Filter by sport" value={sport} onChange={(event) => setSport(event.target.value)}><option>All</option><option>NBA</option><option>MLB</option><option>NFL</option></select>
@@ -181,7 +217,7 @@ export default function Home() {
         </section>
         <section className="market-list">
           <div className="market-head"><span>ASSET</span><span>STATUS</span><span>FAIR VALUE</span><span>EVIDENCE</span><span>SALES</span><span></span></div>
-          {visibleItems.map((item) => <button className="market-row" key={item.card_id} onClick={() => openCard(item.card_id)}>
+          {visibleItems.map((item) => <button className="market-row" key={item.card_id} aria-label={`Open ${item.card} intelligence`} onClick={() => openCard(item.card_id)}>
             <span className="asset"><b>{item.player}</b><small>{item.card.replace(item.player, "").trim()}</small></span>
             <span className={`status ${item.scanned_this_run === false ? "waiting" : ""}`}>{statusLabel(item)}</span>
             <span className="market-value"><b>{item.fair_value == null ? "Not enough evidence" : formatPrice(item.fair_value)}</b><small>{item.evidence_range ? `${formatPrice(item.evidence_range.low)}–${formatPrice(item.evidence_range.high)}` : attentionReason(item)}</small></span>
@@ -212,6 +248,16 @@ export default function Home() {
           <article className={selected.fair_value == null ? "locked" : "cleared"}><small>03 · DISPLAY GATE</small><b>{selected.fair_value == null ? "Locked" : "Cleared"}</b><p>{selected.fair_value == null ? "The evidence is not strong enough to publish a price." : "A fair value can be shown."}</p></article>
         </section>
 
+        <section className="trust-gates" aria-labelledby="trust-gates-heading">
+          <div className="trust-gates-heading"><span className="eyebrow">TRUST GATES</span><h2 id="trust-gates-heading">Exactly what has cleared</h2><p>A valuation and a capital action use separate gates. Waiting is not the same as failing.</p></div>
+          <div className="trust-gate-list">
+            {trustGates.map((gate) => <article className={`trust-gate ${gate.state}`} key={gate.id}>
+              <span aria-hidden="true">{gate.state === "pass" ? "✓" : gate.state === "waiting" ? "…" : "×"}</span>
+              <div><small>{gate.label}</small><b>{gate.value}</b><p>{gate.detail}</p></div>
+            </article>)}
+          </div>
+        </section>
+
         <section className="card-grid">
           <div className="why-panel">
             <span className="eyebrow">THE EVIDENCE CASE</span>
@@ -231,7 +277,7 @@ export default function Home() {
               <div><dt>Dispersion</dt><dd>{dispersion(selected) == null ? "—" : `${dispersion(selected)}%`}</dd></div>
               <div><dt>Scan state</dt><dd>{selected.scanned_this_run ? "Complete" : "Scheduled later"}</dd></div>
             </dl>
-            <label>Switch card<select value={selected.card_id} onChange={(event) => setSelectedCardId(event.target.value)}>{marketData.items.map((item) => <option key={item.card_id} value={item.card_id}>{item.player} · {item.card.split("·").at(-1)?.trim()}</option>)}</select></label>
+            <label>Switch card<select value={selected.card_id} onChange={(event) => openCard(event.target.value)}>{marketData.items.map((item) => <option key={item.card_id} value={item.card_id}>{item.player} · {item.card.split("·").at(-1)?.trim()}</option>)}</select></label>
           </aside>
         </section>
 
@@ -252,7 +298,7 @@ export default function Home() {
               <div className="ledger-facts"><b>{entry.price == null ? "Price withheld" : formatPrice(entry.price)}</b><small>{formatDate(entry.event_date)}</small></div>
               {entry.url ? <a href={entry.url} target="_blank" rel="noreferrer" aria-label={`Open source listing for ${entry.title}`}>View source ↗</a> : <span className="source-unavailable">Source link unavailable</span>}
             </article>)}
-            {!ledgerEntries.length && <div className="ledger-empty"><b>{ledgerTotal ? "Detailed rows arrive with the next evidence scan." : `No ${evidenceTab === "review" ? "held" : evidenceTab} comps for this card.`}</b><p>{ledgerTotal ? `The current snapshot reports ${ledgerTotal} ${evidenceTab === "review" ? "held" : evidenceTab} comps, but predates the auditable ledger format.` : "Nothing is being hidden from this category."}</p></div>}
+            {!ledgerEntries.length && <div className="ledger-empty"><b>{ledgerTotal ? "The published snapshot does not contain these audit rows yet." : `No ${evidenceTab === "review" ? "held" : evidenceTab} comps for this card.`}</b><p>{ledgerTotal ? `The scan reports ${ledgerTotal} ${evidenceTab === "review" ? "held" : evidenceTab} comps. The next successfully published scan will replace this count-only fallback with the actual evidence rows.` : "Nothing is being hidden from this category."}</p></div>}
           </div>
           {ledgerEntries.length < ledgerTotal && ledgerEntries.length > 0 && <p className="ledger-note">Showing {ledgerEntries.length} of {ledgerTotal}. The most recent evidence is shown first.</p>}
         </section>

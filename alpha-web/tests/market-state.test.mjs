@@ -3,13 +3,16 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import {
+  buildRouteSearch,
   deriveMarketState,
   filterMarketItems,
   getSelectedCard,
   isActionable,
+  parseRoute,
   plainBlocker,
   rankPriority,
   safeAction,
+  valuationTrustGates,
 } from "../app/market-state.ts";
 
 const marketData = JSON.parse(await readFile(new URL("../public/data/market-scan.json", import.meta.url), "utf8"));
@@ -59,4 +62,28 @@ test("technical blockers are translated into collector language", () => {
     plainBlocker("Forward calibration has not cleared the action gate"),
     "Future sales have not yet verified the model's estimate.",
   );
+});
+
+test("shareable routes preserve valid views and card identity", () => {
+  const curryId = "CURRY-2009-TOPPS-CHROME-101-PSA9";
+  assert.equal(buildRouteSearch("today"), "");
+  assert.equal(buildRouteSearch("market"), "?view=market");
+  assert.equal(buildRouteSearch("card", curryId), `?view=card&card=${curryId}`);
+  assert.deepEqual(parseRoute(`?view=card&card=${curryId}`, marketData.items), {
+    view: "card",
+    cardId: curryId,
+  });
+  assert.deepEqual(parseRoute("?view=unknown&card=missing", marketData.items), {
+    view: "today",
+    cardId: marketData.items[0].card_id,
+  });
+});
+
+test("trust gates name the exact valuation and action blockers", () => {
+  const gates = valuationTrustGates(marketData.items[0], marketData);
+  assert.deepEqual(gates.map((gate) => gate.id), ["source", "scan", "sample", "grade", "calibration"]);
+  assert.equal(gates.find((gate) => gate.id === "source").state, "pass");
+  assert.equal(gates.find((gate) => gate.id === "sample").value, "4 / 8 required");
+  assert.equal(gates.find((gate) => gate.id === "sample").state, "fail");
+  assert.equal(gates.find((gate) => gate.id === "calibration").state, "waiting");
 });

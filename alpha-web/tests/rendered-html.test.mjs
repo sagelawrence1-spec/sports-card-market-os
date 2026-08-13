@@ -59,6 +59,8 @@ test("ships only working product surfaces without speculative features", async (
   assert.match(page, /You do not need to upload exports/);
   assert.match(page, /setQuery/);
   assert.match(page, /window\.scrollTo/);
+  assert.match(page, /window\.history\.pushState/);
+  assert.match(page, /parseRoute/);
   assert.match(page, /aria-current/);
   assert.match(page, /deriveMarketState/);
   assert.match(page, /isActionable/);
@@ -66,7 +68,9 @@ test("ships only working product surfaces without speculative features", async (
   assert.match(page, /Held for review/);
   assert.match(page, /View source/);
   assert.match(page, /aria-pressed/);
-  assert.match(page, /predates the auditable ledger format/);
+  assert.match(page, /next successfully published scan/);
+  assert.match(page, /Exactly what has cleared/);
+  assert.match(page, /Skip to market intelligence/);
   assert.match(page, /Cash is a valid position/);
   assert.doesNotMatch(page, /unsupported actions shown/);
   assert.doesNotMatch(page, /One card was deferred/);
@@ -77,4 +81,13 @@ test("ships only working product surfaces without speculative features", async (
   assert.doesNotMatch(page, /const signals=\[/);
   assert.match(layout, /Know When the Evidence Is Ready/);
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
+});
+
+test("a successful scheduled scan builds and publishes the same evidence snapshot", async () => {
+  const workflow = await readFile(new URL("../../.github/workflows/market-scan.yml", import.meta.url), "utf8");
+  assert.match(workflow, /market_runner\.py/);
+  assert.match(workflow, /pnpm build:pages/);
+  assert.match(workflow, /actions\/upload-pages-artifact@v4/);
+  assert.match(workflow, /actions\/deploy-pages@v4/);
+  assert.match(workflow, /needs: scan-and-build/);
 });
