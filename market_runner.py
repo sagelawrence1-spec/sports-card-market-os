@@ -18,6 +18,7 @@ from providers.ebay_browse import EbayBrowseProvider
 from providers.ebay_marketplace_insights import EbayMarketplaceInsightsProvider
 from providers.sold_comps import SoldCompsProvider
 from providers.the_card_api import TheCardApiSoldProvider
+from recommendation_journal import RecommendationJournal, capture_recommendations, settle_outcomes
 
 
 PAID_CARD_API_PLANS={"starter","builder","pro","enterprise"}
@@ -135,6 +136,16 @@ def run(args):
             horizon_days=horizon_days,
             exit_fee_rate=_env_fraction("BENCHMARK_EXIT_FEE_RATE"),
             liquidity_haircut_rate=_env_fraction("BENCHMARK_LIQUIDITY_HAIRCUT_RATE"),
+        )
+        recommendation_horizon=int(os.getenv("RECOMMENDATION_HORIZON_DAYS") or str(horizon_days))
+        if recommendation_horizon<=0:
+            raise ValueError("RECOMMENDATION_HORIZON_DAYS must be positive.")
+        journal=RecommendationJournal(args.database)
+        settle_outcomes(journal,result.contract)
+        capture_recommendations(
+            journal,
+            result.contract,
+            horizon_days=recommendation_horizon,
         )
     build_daily_brief(result.contract,previous_contract)
     history_path=getattr(args,"history_output","alpha-web/public/data/market-history.json")
