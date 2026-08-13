@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import marketScan from "../public/data/market-scan.json";
 import {
   buildRouteSearch,
+  buildReviewQueue,
   deriveMarketState,
   filterMarketItems,
   getSelectedCard,
@@ -14,6 +15,7 @@ import {
   safeAction,
   valuationTrustGates,
   type EvidenceTab,
+  type DailyChange,
   type MarketItem,
   type MarketPayload,
   type View,
@@ -25,18 +27,20 @@ const money = new Intl.NumberFormat("en-US", {
   currency: "USD",
   maximumFractionDigits: 0,
 });
-const scanTime = new Intl.DateTimeFormat("en-US", {
+const formatScanTime = (value: string) => new Intl.DateTimeFormat("en-US", {
   month: "short",
   day: "numeric",
   hour: "numeric",
   minute: "2-digit",
   timeZone: "America/Phoenix",
   timeZoneName: "short",
-}).format(new Date(marketData.generated_at));
+}).format(new Date(value));
+const scanTime = formatScanTime(marketData.generated_at);
 const navigation: { id: View; label: string; short: string }[] = [
   { id: "today", label: "Today", short: "Today" },
   { id: "market", label: "Market", short: "Market" },
   { id: "card", label: "Card Intelligence", short: "Card" },
+  { id: "review", label: "Review Queue", short: "Review" },
   { id: "health", label: "Data Health", short: "Health" },
 ];
 
@@ -71,6 +75,14 @@ const attentionReason = (item: MarketItem) => {
   if ((item.accepted_sales_total ?? 0) < 8) return "More verified sales are needed before publishing a price.";
   return "Evidence is improving, but it has not cleared every trust gate.";
 };
+const changeLabel = (change: DailyChange) => ({
+  reliable: "VALUATION CLEARED",
+  weakened: "EVIDENCE WEAKENED",
+  valuation: "VALUE CHANGED",
+  evidence: "EVIDENCE CHANGED",
+  review: "REVIEW REQUIRED",
+  coverage: "COVERAGE CHANGED",
+}[change.kind]);
 function Grade({ value }: { value: string }) {
   return <span className={`grade grade-${value.toLowerCase()}`}><b>{value}</b>{gradeLabel(value)}</span>;
 }
@@ -105,6 +117,14 @@ export default function Home() {
   const actionable = marketData.items.filter(isActionable);
   const valued = marketData.items.filter((item) => item.fair_value != null);
   const priority = rankPriority(marketData.items);
+  const reviewQueue = buildReviewQueue(marketData.items);
+  const reviewCards = marketData.items.filter((item) => (item.review_count ?? 0) > 0);
+  const dailyBrief = marketData.daily_brief ?? {
+    status: "collecting" as const,
+    previous_generated_at: null,
+    summary: { meaningful_changes: 0, new_reliable_valuations: 0, material_valuation_changes: 0, weakened_markets: 0, new_reviews: 0, review_queue: totalReviews },
+    changes: [],
+  };
   const visibleItems = useMemo(() => filterMarketItems(marketData.items, query, sport), [query, sport]);
   const trustGates = selected ? valuationTrustGates(selected, marketData) : [];
 
@@ -127,6 +147,8 @@ export default function Home() {
         ? "Market"
         : view === "health"
           ? "Data Health"
+          : view === "review"
+            ? "Review Queue"
           : selected?.player ?? "Card Intelligence";
     document.title = `${viewTitle} — Market OS`;
   }, [selected?.player, view]);
@@ -146,6 +168,10 @@ export default function Home() {
 
   const openCard = (cardId: string) => {
     navigate("card", cardId);
+  };
+  const openHeldEvidence = (cardId: string) => {
+    navigate("card", cardId);
+    setEvidenceTab("review");
   };
 
   return <div className="product-shell">
@@ -181,9 +207,23 @@ export default function Home() {
           <article><small>PRICES CLEARED</small><b>{valued.length}</b><span>trustworthy fair values</span></article>
         </section>
 
+        <section className="delta-panel" aria-labelledby="daily-delta-heading">
+          <div className="delta-heading"><div><span className="eyebrow">DAILY DELTA</span><h2 id="daily-delta-heading">What changed since the last scan</h2><p>{dailyBrief.previous_generated_at ? `Compared with ${formatScanTime(dailyBrief.previous_generated_at)}.` : "A trustworthy comparison needs two published scans."}</p></div><dl><div><dt>{dailyBrief.summary.meaningful_changes}</dt><dd>material changes</dd></div><div><dt>{dailyBrief.summary.weakened_markets}</dt><dd>weakened markets</dd></div><div><dt>{dailyBrief.summary.new_reviews}</dt><dd>new reviews</dd></div></dl></div>
+          <div className="delta-list">
+            {dailyBrief.changes.map((change) => <button key={change.card_id} className={`delta-row ${change.kind}`} onClick={() => openCard(change.card_id)} aria-label={`Open ${change.card} intelligence`}>
+              <span className="delta-kind">{changeLabel(change)}</span>
+              <span className="asset"><b>{change.player}</b><small>{change.card.replace(change.player, "").trim()}</small></span>
+              <span className="delta-copy"><b>{change.headline}</b><small>{change.detail}</small></span>
+              <span className="arrow">→</span>
+            </button>)}
+            {dailyBrief.status === "collecting" && <div className="delta-empty"><b>Daily comparison starts with the next automatic scan.</b><p>The current snapshot is now the baseline. Market OS will report only verified changes after another scan is published.</p></div>}
+            {dailyBrief.status === "ready" && !dailyBrief.changes.length && <div className="delta-empty"><b>No material evidence changed.</b><p>The scan completed, but no card crossed a valuation, evidence, review, or coverage threshold.</p></div>}
+          </div>
+        </section>
+
         <section className="brief-layout">
           <div className="priority-panel">
-            <div className="section-heading"><div><span>PRIORITY QUEUE</span><h2>What needs attention</h2></div><button onClick={() => navigate("market")}>View full market</button></div>
+            <div className="section-heading"><div><span>PRIORITY QUEUE</span><h2>What needs attention</h2></div><button onClick={() => navigate("review")}>Open review queue</button></div>
             {priority.map((item, index) => <button className="priority-row" key={item.card_id} aria-label={`Open ${item.card} intelligence`} onClick={() => openCard(item.card_id)}>
               <span className="priority-number">{String(index + 1).padStart(2, "0")}</span>
               <span className="asset"><b>{item.player}</b><small>{item.card.replace(item.player, "").trim()}</small></span>
@@ -301,6 +341,27 @@ export default function Home() {
             {!ledgerEntries.length && <div className="ledger-empty"><b>{ledgerTotal ? "The published snapshot does not contain these audit rows yet." : `No ${evidenceTab === "review" ? "held" : evidenceTab} comps for this card.`}</b><p>{ledgerTotal ? `The scan reports ${ledgerTotal} ${evidenceTab === "review" ? "held" : evidenceTab} comps. The next successfully published scan will replace this count-only fallback with the actual evidence rows.` : "Nothing is being hidden from this category."}</p></div>}
           </div>
           {ledgerEntries.length < ledgerTotal && ledgerEntries.length > 0 && <p className="ledger-note">Showing {ledgerEntries.length} of {ledgerTotal}. The most recent evidence is shown first.</p>}
+        </section>
+      </>}
+
+      {view === "review" && <>
+        <section className="page-title review-title"><div><span className="eyebrow">EVIDENCE OPERATIONS</span><h1>Review Queue</h1><p>Questionable matches remain outside every valuation until their card identity is resolved.</p></div><div className="review-count"><small>UNRESOLVED</small><b>{totalReviews}</b><span>{reviewQueue.length ? `${reviewQueue.length} listing rows available` : "rows arrive with the next scan"}</span></div></section>
+        <section className="review-policy" aria-label="Review queue policy"><b>Public, read-only evidence triage</b><p>This surface exposes what is blocking valuations without letting anonymous visitors alter the canonical registry. Final Approve, Reject, and Choose another card controls remain operator-only.</p></section>
+        <section className="review-queue">
+          <div className="review-head"><span>HELD LISTING</span><span>PROPOSED CANONICAL CARD</span><span>WHY IT IS HELD</span><span>ACTIONS</span></div>
+          {reviewQueue.map((entry) => <article className="review-row" key={`${entry.card_id}:${entry.evidence_id}`}>
+            <div className="held-listing"><span className="evidence-pill review">HELD</span><b>{entry.title}</b><small>{entry.source} · {entry.price == null ? "price withheld" : formatPrice(entry.price)} · {formatDate(entry.event_date)}</small></div>
+            <div className="proposed-card"><b>{entry.player}</b><span>{entry.card.replace(entry.player, "").trim()}</span><small>{entry.sport} · Evidence grade {marketData.items.find((item) => item.card_id === entry.card_id)?.evidence_grade}</small></div>
+            <div className="review-reason"><b>Identity conflict</b><p>{entry.reason}</p></div>
+            <div className="review-actions"><button onClick={() => openHeldEvidence(entry.card_id)}>Inspect match</button>{entry.url ? <a href={entry.url} target="_blank" rel="noreferrer">Source ↗</a> : <span>Source unavailable</span>}</div>
+          </article>)}
+          {!reviewQueue.length && reviewCards.map((item) => <article className="review-row count-only" key={item.card_id}>
+            <div className="held-listing"><span className="evidence-pill review">HELD</span><b>{item.review_count} questionable matches</b><small>Detailed listing rows are not present in this older public snapshot.</small></div>
+            <div className="proposed-card"><b>{item.player}</b><span>{item.card.replace(item.player, "").trim()}</span><small>{item.sport} · Evidence grade {item.evidence_grade}</small></div>
+            <div className="review-reason"><b>Waiting for row-level evidence</b><p>The next successfully published scan will attach the actual held listings and reasons.</p></div>
+            <div className="review-actions"><button onClick={() => openHeldEvidence(item.card_id)}>Inspect card</button></div>
+          </article>)}
+          {!totalReviews && <div className="review-empty"><b>The review queue is clear.</b><p>No questionable card matches are currently blocking monitored valuations.</p></div>}
         </section>
       </>}
 

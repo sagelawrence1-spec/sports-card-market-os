@@ -49,6 +49,10 @@ test("ships only working product surfaces without speculative features", async (
   assert.match(page, /Market/);
   assert.match(page, /Card Intelligence/);
   assert.match(page, /Data Health/);
+  assert.match(page, /Review Queue/);
+  assert.match(page, /What changed since the last scan/);
+  assert.match(page, /Public, read-only evidence triage/);
+  assert.match(page, /buildReviewQueue/);
   assert.match(page, /market-scan\.json/);
   assert.match(page, /Not enough evidence/);
   assert.match(page, /selectedCardId/);
@@ -83,17 +87,21 @@ test("ships only working product surfaces without speculative features", async (
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
 });
 
-test("a successful scheduled scan builds and publishes the same evidence snapshot", async () => {
+test("a successful scheduled scan persists history and triggers the normal public deployment", async () => {
   const workflow = await readFile(new URL("../../.github/workflows/market-scan.yml", import.meta.url), "utf8");
+  const pagesWorkflow = await readFile(new URL("../../.github/workflows/pages.yml", import.meta.url), "utf8");
   assert.match(workflow, /market_runner\.py/);
-  assert.match(workflow, /pnpm build:pages/);
-  assert.match(workflow, /actions\/upload-pages-artifact@v4/);
-  assert.match(workflow, /actions\/deploy-pages@v4/);
-  assert.match(workflow, /needs: scan-and-build/);
+  assert.match(workflow, /contents: write/);
+  assert.match(workflow, /actions\/cache@v4/);
+  assert.match(workflow, /market-history\.json/);
+  assert.match(workflow, /git push origin HEAD:main/);
+  assert.match(pagesWorkflow, /branches: \[main\]/);
+  assert.match(pagesWorkflow, /actions\/deploy-pages@v4/);
 });
 
 test("tablet widths retain a visible primary navigation surface", async () => {
   const css = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
   assert.match(css, /@media\(min-width:761px\) and \(max-width:1050px\)/);
   assert.match(css, /@media\(min-width:761px\) and \(max-width:1050px\)\{[^}]*main\{padding-bottom:92px\}\.mobile-nav\{[^}]*display:grid/);
+  assert.match(css, /grid-template-columns:repeat\(5,1fr\)/);
 });

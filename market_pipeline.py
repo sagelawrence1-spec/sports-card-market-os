@@ -152,7 +152,6 @@ class ScheduledMarketPipeline:
         })
         errors=[]
         accepted_active={asset["card_id"]:[] for asset in assets}
-        run_counts={asset["card_id"]:{"review":0,"rejected":0} for asset in assets}
         sold_queries_attempted=set()
         sold_queries_completed=set()
 
@@ -175,10 +174,7 @@ class ScheduledMarketPipeline:
                         asset=plan_assets[0],
                     )
                     sold_queries_completed.update(plan_card_ids)
-                    accepted,counts=self._route(result.records,assets,query,run_id)
-                    for card_id,values in counts.items():
-                        run_counts[card_id]["review"]+=values["review"]
-                        run_counts[card_id]["rejected"]+=values["rejected"]
+                    self._route(result.records,assets,query,run_id)
                 except Exception as exc:
                     group=",".join(asset["card_id"] for asset in plan_assets)
                     errors.append(f"sold:{group}:{type(exc).__name__}:{exc}")
@@ -189,12 +185,9 @@ class ScheduledMarketPipeline:
                 category_id=str(asset.get("ebay_category_id") or "261328")
                 try:
                     result=self.listing_provider.search_active(query,category_id=category_id)
-                    accepted,counts=self._route(result.records,assets,query,run_id)
+                    accepted,_=self._route(result.records,assets,query,run_id)
                     for card_id,records in accepted.items():
                         accepted_active[card_id].extend(records)
-                    for card_id,values in counts.items():
-                        run_counts[card_id]["review"]+=values["review"]
-                        run_counts[card_id]["rejected"]+=values["rejected"]
                 except Exception as exc:
                     errors.append(f"active:{asset['card_id']}:{type(exc).__name__}:{exc}")
 
@@ -239,12 +232,15 @@ class ScheduledMarketPipeline:
             ]
             review_ledger=[
                 _ledger_entry(row,"review")
-                for row in self.store.evidence_rows(card_id,"review",run_id=run_id,limit=12)
+                for row in self.store.evidence_rows(card_id,"review",limit=12,record_type=None)
             ]
             excluded_ledger=[
                 _ledger_entry(row,"rejected")
-                for row in self.store.evidence_rows(card_id,"rejected",run_id=run_id,limit=12)
+                for row in self.store.evidence_rows(card_id,"rejected",limit=12,record_type=None)
             ]
+            evidence_counts=self.store.evidence_counts(card_id)
+            review_total=int(evidence_counts.get("review",0))
+            excluded_total=int(evidence_counts.get("rejected",0))
             grade_cap=getattr(self.sold_provider,"evidence_grade_cap",None)
             evidence_grade=_cap_grade(estimate.evidence_grade,grade_cap)
             display_ready=evidence_grade in {"A","B"} and estimate.sample_size >= 8
@@ -291,8 +287,8 @@ class ScheduledMarketPipeline:
                 "accepted_sales_total":len(recent),
                 "valuation_sample_size":estimate.sample_size,
                 "accepted_active_count":len(active_prices),
-                "review_count":run_counts[card_id]["review"],
-                "excluded_count":run_counts[card_id]["rejected"],
+                "review_count":review_total,
+                "excluded_count":excluded_total,
                 "lowest_ask":round(min(active_prices),2) if active_prices else None,
                 "median_ask":round(statistics.median(active_prices),2) if active_prices else None,
                 "latest_sale_date":latest_sale.isoformat() if latest_sale else None,
@@ -319,8 +315,8 @@ class ScheduledMarketPipeline:
                     "review":review_ledger,
                     "excluded":excluded_ledger,
                     "accepted_total":len(recent),
-                    "review_total":run_counts[card_id]["review"],
-                    "excluded_total":run_counts[card_id]["rejected"],
+                    "review_total":review_total,
+                    "excluded_total":excluded_total,
                 },
             }
             self.store.save_market_state(run_id,state)

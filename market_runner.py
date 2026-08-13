@@ -9,6 +9,7 @@ from pathlib import Path
 import tempfile
 
 from evidence_store import EvidenceStore
+from market_history import append_history, build_daily_brief
 from market_pipeline import ScheduledMarketPipeline
 from providers.ebay_auth import EbayOAuthClient
 from providers.ebay_browse import EbayBrowseProvider
@@ -40,6 +41,17 @@ def write_contract(path,contract):
         handle.write("\n")
         temporary=Path(handle.name)
     temporary.replace(destination)
+
+
+def read_json(path,default):
+    source=Path(path)
+    if not source.exists():
+        return default
+    try:
+        value=json.loads(source.read_text(encoding="utf-8"))
+    except (OSError,json.JSONDecodeError):
+        return default
+    return value
 
 
 def configured_sold_provider(oauth,marketplace):
@@ -86,6 +98,7 @@ def configured_sold_provider(oauth,marketplace):
 
 
 def run(args):
+    previous_contract=read_json(args.output,None)
     assets=load_registry(args.registry)
     oauth=EbayOAuthClient()
     configured=oauth.configured()
@@ -102,6 +115,14 @@ def run(args):
             "The scheduled scan did not publish because sold-data access is unavailable. "
             "Configure a supported sold-evidence provider before retrying."
         )
+    build_daily_brief(result.contract,previous_contract)
+    history_path=getattr(args,"history_output","alpha-web/public/data/market-history.json")
+    history=append_history(
+        read_json(history_path,{}),
+        result.contract,
+        previous=previous_contract,
+    )
+    write_contract(history_path,history)
     write_contract(args.output,result.contract)
     return result
 
@@ -111,6 +132,7 @@ def main():
     parser.add_argument("--registry",default="config/monitored_cards.json")
     parser.add_argument("--database",default="market_state.sqlite")
     parser.add_argument("--output",default="alpha-web/public/data/market-scan.json")
+    parser.add_argument("--history-output",default="alpha-web/public/data/market-history.json")
     parser.add_argument("--as-of")
     parser.add_argument("--allow-blocked",action="store_true",help="Write a clearly labeled blocked-state payload.")
     args=parser.parse_args()
@@ -121,6 +143,7 @@ def main():
         "cards":result.contract["universe_size"],
         "errors":len(result.errors),
         "output":args.output,
+        "history_output":args.history_output,
     },sort_keys=True))
 
 
