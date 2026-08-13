@@ -1,4 +1,4 @@
-export type View = "today" | "market" | "card" | "health";
+export type View = "today" | "market" | "card" | "review" | "health";
 export type RouteState = { view: View; cardId: string };
 export type TrustGate = {
   id: string;
@@ -28,6 +28,40 @@ export type EvidenceLedger = {
   accepted_total: number;
   review_total: number;
   excluded_total: number;
+};
+export type DailyChange = {
+  card_id: string;
+  player: string;
+  card: string;
+  kind: "reliable" | "weakened" | "valuation" | "evidence" | "review" | "coverage";
+  headline: string;
+  detail: string;
+  accepted_sales_delta: number;
+  valuation_sample_delta: number;
+  review_delta: number;
+  fair_value_delta: number | null;
+  fair_value_delta_pct: number | null;
+  evidence_grade_from: string | null;
+  evidence_grade_to: string;
+};
+export type DailyBrief = {
+  status: "collecting" | "ready";
+  previous_generated_at: string | null;
+  summary: {
+    meaningful_changes: number;
+    new_reliable_valuations: number;
+    material_valuation_changes: number;
+    weakened_markets: number;
+    new_reviews: number;
+    review_queue: number;
+  };
+  changes: DailyChange[];
+};
+export type ReviewQueueEntry = EvidenceLedgerEntry & {
+  card_id: string;
+  card: string;
+  player: string;
+  sport: string;
 };
 
 export type MarketItem = {
@@ -79,12 +113,13 @@ export type MarketPayload = {
     };
   };
   universe_size: number;
+  daily_brief?: DailyBrief;
   items: MarketItem[];
 };
 
 const TRUSTED_ACTION_GRADES = new Set(["A", "B"]);
 const MAX_CURRENT_AGE_MS = 36 * 60 * 60 * 1000;
-const VIEWS = new Set<View>(["today", "market", "card", "health"]);
+const VIEWS = new Set<View>(["today", "market", "card", "review", "health"]);
 
 export function parseRoute(search: string, items: MarketItem[]): RouteState {
   const params = new URLSearchParams(search);
@@ -183,6 +218,19 @@ export function rankPriority(items: MarketItem[]) {
   return [...items].sort((left, right) => (
     (right.review_count ?? 0) - (left.review_count ?? 0)
     || right.confidence - left.confidence
+  ));
+}
+
+export function buildReviewQueue(items: MarketItem[]) {
+  return items.flatMap((item) => (item.evidence_ledger?.review ?? []).map((entry) => ({
+    ...entry,
+    card_id: item.card_id,
+    card: item.card,
+    player: item.player,
+    sport: item.sport,
+  }))).sort((left, right) => (
+    String(right.event_date ?? "").localeCompare(String(left.event_date ?? ""))
+    || left.player.localeCompare(right.player)
   ));
 }
 

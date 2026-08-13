@@ -4,6 +4,7 @@ import test from "node:test";
 
 import {
   buildRouteSearch,
+  buildReviewQueue,
   deriveMarketState,
   filterMarketItems,
   getSelectedCard,
@@ -68,6 +69,7 @@ test("shareable routes preserve valid views and card identity", () => {
   const curryId = "CURRY-2009-TOPPS-CHROME-101-PSA9";
   assert.equal(buildRouteSearch("today"), "");
   assert.equal(buildRouteSearch("market"), "?view=market");
+  assert.equal(buildRouteSearch("review"), "?view=review");
   assert.equal(buildRouteSearch("card", curryId), `?view=card&card=${curryId}`);
   assert.deepEqual(parseRoute(`?view=card&card=${curryId}`, marketData.items), {
     view: "card",
@@ -77,6 +79,33 @@ test("shareable routes preserve valid views and card identity", () => {
     view: "today",
     cardId: marketData.items[0].card_id,
   });
+});
+
+test("review queue exposes held rows with their proposed canonical card", () => {
+  const items = structuredClone(marketData.items);
+  items[0].evidence_ledger = {
+    accepted: [],
+    excluded: [],
+    review: [{
+      evidence_id: "held-1",
+      status: "review",
+      title: "Questionable listing",
+      price: 500,
+      currency: "USD",
+      event_date: "2026-08-12",
+      source: "eBay sold result",
+      url: null,
+      used_in_valuation: false,
+      reason: "Card identity needs review before this sale can affect valuation",
+    }],
+    accepted_total: 0,
+    review_total: 1,
+    excluded_total: 0,
+  };
+  const queue = buildReviewQueue(items);
+  assert.equal(queue.length, 1);
+  assert.equal(queue[0].card_id, items[0].card_id);
+  assert.equal(queue[0].player, items[0].player);
 });
 
 test("trust gates name the exact valuation and action blockers", () => {

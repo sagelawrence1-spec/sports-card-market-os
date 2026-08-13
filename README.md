@@ -15,9 +15,9 @@ when the data has not cleared the trust gates, the product deliberately says
 
 The product direction is a continuously operating market-intelligence system:
 market evidence → card identity → valuation → opportunity → capital decision →
-realized outcome → calibration. The current interface demonstrates that workflow,
-but its visible market state is explicitly illustrative until verified data
-ingestion and forward validation are live.
+realized outcome → calibration. The current interface publishes scheduled public
+sold-result evidence with explicit source limitations. Capital guidance remains
+locked until verified data quality and forward calibration are proven.
 
 ## Priorities
 
@@ -30,7 +30,7 @@ ingestion and forward validation are live.
 ## Engine-to-interface contract
 
 `market_contract.py` emits the versioned `market-scan.v1` payload consumed by the
-Market Scan and Card Intelligence surfaces. The interface renders three source
+Today, Market, Card Intelligence, Review Queue, and Data Health surfaces. The interface renders three source
 states without hiding provenance: illustrative alpha, scheduled evidence, and a
 blocked sold-data state. A valuation is displayed only after the accepted sold
 sample clears its evidence gate; otherwise the product says **Not enough
@@ -71,9 +71,16 @@ python market_runner.py --allow-blocked --database /tmp/market-os.sqlite --outpu
 
 `.github/workflows/market-scan.yml` provides the gated daily/dispatch job. It is
 disabled until the repository variable `MARKET_SCAN_ENABLED=true` and the
-selected provider's secret and variables are configured. Its generated contract is
-retained as a run artifact for inspection; automated product publication is
-intentionally deferred until the confirmed source is activated.
+selected provider's secret and variables are configured. Each successful run
+restores the bounded evidence database, creates a compact public history, computes
+material changes against the prior snapshot, commits only the two public data
+files, and triggers the normal tested Pages deployment. Generated contracts are
+also retained as short-lived run artifacts for inspection.
+
+The public Review Queue is deliberately read-only: it shows held listing rows,
+their proposed canonical cards, and the reason each match is excluded from
+valuation. Registry-changing decisions remain operator-only so anonymous visitors
+cannot approve corrupt evidence.
 
 SoldComps is treated as public-result evidence rather than authoritative eBay
 transaction data. The API key remains a user-owned secret and is never committed
