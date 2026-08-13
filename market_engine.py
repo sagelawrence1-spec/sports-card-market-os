@@ -19,7 +19,8 @@ def _day(value):
     if isinstance(value,date): return value
     return datetime.fromisoformat(str(value)[:10]).date()
 
-def estimate_market(card_id, sales, as_of=None, half_life_days=45, currency="USD"):
+def valuation_sample(sales,as_of=None,currency="USD"):
+    """Return the exact evidence rows that survive the valuation filters."""
     cutoff=_day(as_of or date.today())
     clean=[]
     for row in sales:
@@ -28,15 +29,23 @@ def estimate_market(card_id, sales, as_of=None, half_life_days=45, currency="USD
         if sold > cutoff: continue
         price=float(row["sale_price"])
         if price <= 0: continue
-        clean.append((sold,price))
+        clean.append((sold,price,row))
     if not clean:
-        return MarketEstimate(card_id,cutoff.isoformat(),None,0,0,None,0,"F")
-    prices=[p for _,p in clean]
+        return []
+    prices=[price for _,price,_ in clean]
     median=statistics.median(prices)
     deviations=[abs(p-median) for p in prices]
     mad=statistics.median(deviations) if len(prices)>1 else 0
     if mad:
-        clean=[x for x in clean if abs(x[1]-median)/(1.4826*mad) <= 3.5]
+        clean=[entry for entry in clean if abs(entry[1]-median)/(1.4826*mad) <= 3.5]
+    return [row for _,_,row in clean]
+
+def estimate_market(card_id, sales, as_of=None, half_life_days=45, currency="USD"):
+    cutoff=_day(as_of or date.today())
+    sample=valuation_sample(sales,cutoff,currency)
+    if not sample:
+        return MarketEstimate(card_id,cutoff.isoformat(),None,0,0,None,0,"F")
+    clean=[(_day(row["sale_date"]),float(row["sale_price"])) for row in sample]
     weighted=[]
     for sold,price in clean:
         weight=.5 ** ((cutoff-sold).days/half_life_days)

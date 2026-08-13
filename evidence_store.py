@@ -206,6 +206,17 @@ class EvidenceStore:
     def accepted_sales(self,card_id):
         return self.conn.execute('''SELECT * FROM source_evidence WHERE card_id=? AND record_type='sold' AND match_status='accepted' ORDER BY event_date DESC''',(card_id,)).fetchall()
 
+    def evidence_rows(self,card_id,status,run_id=None,limit=None):
+        q="""SELECT evidence_id,provider,title,price,currency,event_date,url,match_status,match_reason
+          FROM source_evidence WHERE card_id=? AND record_type='sold' AND match_status=?"""
+        args=[card_id,status]
+        if run_id:
+            q+=" AND run_id=?"; args.append(run_id)
+        q+=" ORDER BY event_date DESC, ingested_at DESC"
+        if limit is not None:
+            q+=" LIMIT ?"; args.append(int(limit))
+        return self.conn.execute(q,args).fetchall()
+
     def evidence_counts(self,card_id,run_id=None):
         q="SELECT match_status,COUNT(*) FROM source_evidence WHERE card_id=?"
         args=[card_id]

@@ -10,7 +10,7 @@ from typing import Any, Iterable, Mapping
 from entity_matcher import MatchDecision, SportsCardEntityMatcher, build_ebay_query
 from evidence_store import EvidenceStore
 from market_contract import build_evidence_market_scan, card_title
-from market_engine import estimate_market
+from market_engine import estimate_market, valuation_sample
 from reconstruction import summarize_reconstruction_health
 
 
@@ -31,6 +31,67 @@ def _cap_grade(grade: str, cap: str | None) -> str:
     if cap in order and grade in order and order[grade] < order[cap]:
         return cap
     return grade
+
+
+def _public_source(provider: str) -> str:
+    return {
+        "sold_comps":"eBay sold result",
+        "ebay_marketplace_insights":"eBay Marketplace Insights",
+        "ebay_product_research":"eBay Product Research",
+        "the_card_api":"Licensed marketplace result",
+    }.get(provider,str(provider or "market source").replace("_"," ").title())
+
+
+def _public_reason(status: str, reason: str | None, *, used_in_valuation: bool=False) -> str:
+    reason=str(reason or "")
+    if status=="accepted":
+        return "Used in valuation" if used_in_valuation else "Accepted match; filtered from valuation as a price outlier"
+    if status=="review":
+        return "Card identity needs review before this sale can affect valuation"
+    if reason.startswith("provider_policy:"):
+        reason=reason.split(":",1)[1]
+    labels={
+        "best_offer_price_is_upper_bound":"Best Offer price cannot be verified",
+        "non_usd_currency":"Sale was not reported in USD",
+        "shipping_price_unknown":"Shipping cost was unavailable",
+        "invalid_sold_price":"Sold price was missing or invalid",
+        "invalid_sale_date":"Sale date was missing or invalid",
+        "player_mismatch":"Different player",
+        "wrong_year":"Different card year",
+        "wrong_card_number":"Different card number",
+        "wrong_grade":"Different grade",
+        "wrong_grading_company":"Different grading company",
+        "raw_vs_graded_mismatch":"Raw card does not match the graded target",
+        "base_vs_parallel_mismatch":"Base card does not match the target parallel",
+        "unexpected_parallel":"Different parallel",
+        "multi_card_lot":"Multi-card lot is not a clean single-card comp",
+        "low_match_score":"Listing identity was not close enough",
+    }
+    if reason.startswith("hard_exclude:"):
+        return f"Listing is a {reason.split(':',1)[1]}"
+    return labels.get(reason,"Listing did not meet the evidence rules")
+
+
+def _ledger_entry(row, status: str, sample_ids: set[str] | None=None) -> dict[str, Any]:
+    evidence_id=row["evidence_id"]
+    used=evidence_id in (sample_ids or set())
+    price=float(row["price"] or 0)
+    currency=str(row["currency"] or "").upper()
+    url=str(row["url"] or "")
+    if not url.startswith(("https://","http://")):
+        url=""
+    return {
+        "evidence_id":evidence_id,
+        "status":status,
+        "title":row["title"] or "Untitled listing",
+        "price":round(price,2) if price > 0 and currency=="USD" else None,
+        "currency":"USD" if price > 0 and currency=="USD" else None,
+        "event_date":row["event_date"],
+        "source":_public_source(row["provider"]),
+        "url":url or None,
+        "used_in_valuation":used if status=="accepted" else False,
+        "reason":_public_reason(status,row["match_reason"],used_in_valuation=used),
+    }
 
 
 class ScheduledMarketPipeline:
@@ -162,6 +223,7 @@ class ScheduledMarketPipeline:
                 age=(cutoff-sold).days
                 if 0 <= age <= 180:
                     recent.append({
+                        "evidence_id":row["evidence_id"],
                         "sale_date":row["event_date"],
                         "sale_price":row["price"],
                         "currency":row["currency"],
@@ -169,6 +231,20 @@ class ScheduledMarketPipeline:
                     if latest_sale is None or sold > latest_sale:
                         latest_sale=sold
             estimate=estimate_market(card_id,recent,cutoff.isoformat())
+            sample_ids={row["evidence_id"] for row in valuation_sample(recent,cutoff.isoformat())}
+            recent_ids={row["evidence_id"] for row in recent}
+            accepted_ledger=[
+                _ledger_entry(row,"accepted",sample_ids)
+                for row in accepted_rows if row["evidence_id"] in recent_ids
+            ]
+            review_ledger=[
+                _ledger_entry(row,"review")
+                for row in self.store.evidence_rows(card_id,"review",run_id=run_id,limit=12)
+            ]
+            excluded_ledger=[
+                _ledger_entry(row,"rejected")
+                for row in self.store.evidence_rows(card_id,"rejected",run_id=run_id,limit=12)
+            ]
             grade_cap=getattr(self.sold_provider,"evidence_grade_cap",None)
             evidence_grade=_cap_grade(estimate.evidence_grade,grade_cap)
             display_ready=evidence_grade in {"A","B"} and estimate.sample_size >= 8
@@ -238,6 +314,14 @@ class ScheduledMarketPipeline:
                     )
                 ),
                 "blockers":blockers,
+                "evidence_ledger":{
+                    "accepted":accepted_ledger,
+                    "review":review_ledger,
+                    "excluded":excluded_ledger,
+                    "accepted_total":len(recent),
+                    "review_total":run_counts[card_id]["review"],
+                    "excluded_total":run_counts[card_id]["rejected"],
+                },
             }
             self.store.save_market_state(run_id,state)
             states.append(state)

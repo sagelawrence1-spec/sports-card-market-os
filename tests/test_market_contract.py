@@ -90,6 +90,10 @@ def test_market_scan_items_preserve_engine_provenance():
     assert item["engine_classification"] == "BUY"
     assert item["evidence_grade"] == "A"
     assert item["accepted_sales_30d"] == 12
+    assert item["evidence_ledger"] == {
+        "accepted":[],"review":[],"excluded":[],
+        "accepted_total":12,"review_total":0,"excluded_total":0,
+    }
 
 
 def test_non_actionable_engine_states_are_not_promoted_to_actions():

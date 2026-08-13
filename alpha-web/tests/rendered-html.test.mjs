@@ -62,6 +62,11 @@ test("ships only working product surfaces without speculative features", async (
   assert.match(page, /aria-current/);
   assert.match(page, /deriveMarketState/);
   assert.match(page, /isActionable/);
+  assert.match(page, /Audit the valuation/);
+  assert.match(page, /Held for review/);
+  assert.match(page, /View source/);
+  assert.match(page, /aria-pressed/);
+  assert.match(page, /predates the auditable ledger format/);
   assert.match(page, /Cash is a valid position/);
   assert.doesNotMatch(page, /unsupported actions shown/);
   assert.doesNotMatch(page, /One card was deferred/);
