@@ -2,58 +2,18 @@
 
 import { useMemo, useState } from "react";
 import marketScan from "../public/data/market-scan.json";
-
-type View = "today" | "market" | "card" | "health";
-type EvidenceRange = { low: number; high: number } | null;
-type MarketItem = {
-  observation_id: string;
-  card_id: string;
-  sport: string;
-  player: string;
-  card: string;
-  action: string | null;
-  engine_classification: string;
-  alerts: string[];
-  confidence: number;
-  evidence_grade: string;
-  fair_value: number | null;
-  evidence_range?: EvidenceRange;
-  move_30d: number | null;
-  liquidity_score: number;
-  accepted_sales_30d: number;
-  accepted_sales_total?: number;
-  valuation_sample_size?: number;
-  accepted_active_count?: number;
-  review_count?: number;
-  excluded_count?: number;
-  lowest_ask?: number | null;
-  median_ask?: number | null;
-  latest_sale_date?: string | null;
-  last_updated?: string;
-  scanned_this_run?: boolean;
-  scan_state?: "complete" | "deferred_rotation" | "failed" | "unavailable" | "unknown";
-  ideal_entry?: number | null;
-  do_not_chase?: number | null;
-  thesis: string;
-  evidence_explanation?: string;
-  blockers?: string[];
-};
-type MarketPayload = {
-  generated_at: string;
-  source: {
-    kind: string;
-    label: string;
-    provenance?: {
-      sold_source_available?: boolean;
-      listing_source_available?: boolean;
-      evidence_grade_cap?: string;
-      sold_provider?: string;
-      errors?: string[];
-    };
-  };
-  universe_size: number;
-  items: MarketItem[];
-};
+import {
+  deriveMarketState,
+  filterMarketItems,
+  getSelectedCard,
+  isActionable,
+  plainBlocker,
+  rankPriority,
+  safeAction,
+  type MarketItem,
+  type MarketPayload,
+  type View,
+} from "./market-state";
 
 const marketData = marketScan as unknown as MarketPayload;
 const money = new Intl.NumberFormat("en-US", {
@@ -93,7 +53,7 @@ const dispersion = (item: MarketItem) => {
   return match ? Number(match[1]) : null;
 };
 const statusLabel = (item: MarketItem) => {
-  if (item.action) return item.action;
+  if (safeAction(item)) return safeAction(item);
   if (item.scanned_this_run === false) return "ROTATES NEXT";
   if (item.fair_value != null) return "VALUE READY";
   return "EVIDENCE BUILDING";
@@ -107,15 +67,6 @@ const attentionReason = (item: MarketItem) => {
   if ((item.accepted_sales_total ?? 0) < 8) return "More verified sales are needed before publishing a price.";
   return "Evidence is improving, but it has not cleared every trust gate.";
 };
-const plainBlocker = (blocker: string) => {
-  if (blocker.includes("free-plan rotation")) return "This card will be collected on a later automatic scan.";
-  if (blocker.includes("valuation gate")) return "More consistent verified sales are required.";
-  if (blocker.includes("capped at evidence grade")) return "This public source can reach grade B at best until a second source agrees.";
-  if (blocker.includes("Forward calibration")) return "Future sales have not yet verified the model's estimate.";
-  if (blocker.includes("unavailable")) return "Confirmed sold evidence is currently unavailable.";
-  return blocker;
-};
-
 function Grade({ value }: { value: string }) {
   return <span className={`grade grade-${value.toLowerCase()}`}><b>{value}</b>{gradeLabel(value)}</span>;
 }
@@ -126,41 +77,37 @@ export default function Home() {
   const [sport, setSport] = useState("All");
   const [selectedCardId, setSelectedCardId] = useState(marketData.items[0]?.card_id ?? "");
 
-  const selected = marketData.items.find((item) => item.card_id === selectedCardId) ?? marketData.items[0];
+  const selected = getSelectedCard(marketData.items, selectedCardId);
+  const sourceState = deriveMarketState(marketData);
   const totalAccepted = marketData.items.reduce((sum, item) => sum + (item.accepted_sales_total ?? 0), 0);
   const totalReviews = marketData.items.reduce((sum, item) => sum + (item.review_count ?? 0), 0);
   const totalExcluded = marketData.items.reduce((sum, item) => sum + (item.excluded_count ?? 0), 0);
-  const scannedCount = marketData.items.filter((item) => item.scanned_this_run).length;
-  const actionable = marketData.items.filter((item) => item.action);
+  const scannedCount = sourceState.scannedCount;
+  const actionable = marketData.items.filter(isActionable);
   const valued = marketData.items.filter((item) => item.fair_value != null);
-  const priority = [...marketData.items].sort((left, right) => (
-    (right.review_count ?? 0) - (left.review_count ?? 0)
-    || right.confidence - left.confidence
-  ));
-  const visibleItems = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    return marketData.items.filter((item) => (
-      (sport === "All" || item.sport === sport)
-      && (!needle || [item.player, item.card, item.card_id, item.sport]
-        .some((value) => value.toLowerCase().includes(needle)))
-    ));
-  }, [query, sport]);
+  const priority = rankPriority(marketData.items);
+  const visibleItems = useMemo(() => filterMarketItems(marketData.items, query, sport), [query, sport]);
+
+  const navigate = (nextView: View) => {
+    setView(nextView);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
 
   const openCard = (cardId: string) => {
     setSelectedCardId(cardId);
-    setView("card");
+    navigate("card");
   };
 
   return <div className="product-shell">
     <header className="topbar">
-      <button className="brand" onClick={() => setView("today")} aria-label="Open today's brief">
+      <button className="brand" onClick={() => navigate("today")} aria-label="Open today's brief">
         <span>MO</span>
         <strong>Market OS<small>SPORTS CARD INTELLIGENCE</small></strong>
       </button>
       <nav className="desktop-nav" aria-label="Primary navigation">
-        {navigation.map((item) => <button key={item.id} className={view === item.id ? "active" : ""} onClick={() => setView(item.id)}>{item.label}</button>)}
+        {navigation.map((item) => <button key={item.id} aria-current={view === item.id ? "page" : undefined} className={view === item.id ? "active" : ""} onClick={() => navigate(item.id)}>{item.label}</button>)}
       </nav>
-      <div className="connection"><i></i><span>LIVE EVIDENCE<small>Updated {scanTime}</small></span></div>
+      <div className={`connection ${sourceState.connectionTone}`}><i></i><span>{sourceState.connectionLabel}<small>{sourceState.connectionDetail} · {scanTime}</small></span></div>
     </header>
 
     <main>
@@ -185,7 +132,7 @@ export default function Home() {
 
         <section className="brief-layout">
           <div className="priority-panel">
-            <div className="section-heading"><div><span>PRIORITY QUEUE</span><h2>What needs attention</h2></div><button onClick={() => setView("market")}>View full market</button></div>
+            <div className="section-heading"><div><span>PRIORITY QUEUE</span><h2>What needs attention</h2></div><button onClick={() => navigate("market")}>View full market</button></div>
             {priority.map((item, index) => <button className="priority-row" key={item.card_id} onClick={() => openCard(item.card_id)}>
               <span className="priority-number">{String(index + 1).padStart(2, "0")}</span>
               <span className="asset"><b>{item.player}</b><small>{item.card.replace(item.player, "").trim()}</small></span>
@@ -202,9 +149,9 @@ export default function Home() {
             <dl>
               <div><dt>{totalExcluded}</dt><dd>listings excluded</dd></div>
               <div><dt>{totalReviews}</dt><dd>matches held for review</dd></div>
-              <div><dt>{actionable.length}</dt><dd>unsupported actions shown</dd></div>
+              <div><dt>{actionable.length}</dt><dd>capital actions cleared</dd></div>
             </dl>
-            <button onClick={() => setView("health")}>See how evidence is graded</button>
+            <button onClick={() => navigate("health")}>See how evidence is graded</button>
           </aside>
         </section>
       </>}
@@ -233,7 +180,7 @@ export default function Home() {
 
       {view === "card" && selected && <>
         <section className="card-title">
-          <button className="back" onClick={() => setView("market")}>← Market</button>
+          <button className="back" onClick={() => navigate("market")}>← Market</button>
           <div className="card-title-row"><div><span className="eyebrow">CARD INTELLIGENCE · {selected.sport}</span><h1>{selected.card}</h1><p>Updated {scanTime}</p></div><div className="card-status"><span className={`status ${selected.scanned_this_run === false ? "waiting" : ""}`}>{statusLabel(selected)}</span><Grade value={selected.evidence_grade} /></div></div>
         </section>
 
@@ -255,7 +202,9 @@ export default function Home() {
             <span className="eyebrow">THE EVIDENCE CASE</span>
             <h2>Why this card should—or should not—be trusted</h2>
             <p>{selected.evidence_explanation ?? selected.thesis}</p>
-            <div className="blocker-list"><b>What must change</b>{(selected.blockers ?? []).map((blocker) => <span key={blocker}>{plainBlocker(blocker)}</span>)}</div>
+            {(selected.blockers ?? []).length > 0
+              ? <div className="blocker-list"><b>What must change</b>{(selected.blockers ?? []).map((blocker) => <span key={blocker}>{plainBlocker(blocker)}</span>)}</div>
+              : <div className="cleared-list"><b>Why it cleared</b><span>Every current valuation gate passed. Continue to monitor new evidence and invalidation conditions.</span></div>}
           </div>
           <aside className="facts-panel">
             <h3>Evidence facts</h3>
@@ -273,10 +222,14 @@ export default function Home() {
       </>}
 
       {view === "health" && <>
-        <section className="page-title"><div><span className="eyebrow">SYSTEM TRANSPARENCY</span><h1>Data Health</h1><p>What ran, what was trusted, and what was kept out.</p></div><div className="health-state"><i></i><span>CONNECTED<b>Automatic sold evidence is running</b></span></div></section>
+        <section className="page-title"><div><span className="eyebrow">SYSTEM TRANSPARENCY</span><h1>Data Health</h1><p>What ran, what was trusted, and what was kept out.</p></div><div className={`health-state ${sourceState.connectionTone}`}><i></i><span>{sourceState.connectionLabel}<b>{sourceState.connectionDetail}</b></span></div></section>
         <section className="health-grid">
           <article className="source-card"><span className="eyebrow">EVIDENCE SOURCE</span><h2>Public eBay sold results</h2><p>Market OS collects evidence automatically. You do not need to upload exports or manage raw files.</p><dl><div><dt>Cadence</dt><dd>Daily automatic scan</dd></div><div><dt>Currency</dt><dd>USD only</dd></div><div><dt>Best Offers</dt><dd>Excluded</dd></div><div><dt>Maximum grade</dt><dd>B until independently confirmed</dd></div></dl></article>
-          <article className="run-card"><span className="eyebrow">LATEST RUN</span><h2>{scannedCount} of {marketData.items.length} cards scanned</h2><p>One card was deferred by the free-source rotation. It is labeled as deferred—not mistaken for a market with no sales.</p><div className="run-meter"><i style={{ width: `${(scannedCount / marketData.items.length) * 100}%` }}></i></div><small>Last completed {scanTime}</small></article>
+          <article className="run-card"><span className="eyebrow">LATEST RUN</span><h2>{scannedCount} of {marketData.items.length} cards scanned</h2><p>{sourceState.deferredCount
+            ? `${sourceState.deferredCount} card${sourceState.deferredCount === 1 ? " was" : "s were"} deferred by the source rotation. Deferred cards are labeled—not mistaken for markets with no sales.`
+            : sourceState.failedCount
+              ? `${sourceState.failedCount} card${sourceState.failedCount === 1 ? "" : "s"} could not be refreshed and will not be treated as a market with no sales.`
+              : "Every monitored card completed its scheduled evidence scan."}</p><div className="run-meter"><i style={{ width: `${marketData.items.length ? (scannedCount / marketData.items.length) * 100 : 0}%` }}></i></div><small>Last completed {scanTime}</small></article>
           <article className="guardrail-card"><span className="eyebrow">GUARDRAILS</span><h2>Weak evidence cannot become a trade.</h2><ul><li>Questionable identity matches stay outside valuation.</li><li>Extreme prices are removed from the valuation sample.</li><li>Insufficient evidence displays “Not enough evidence.”</li><li>Capital actions require forward calibration.</li></ul></article>
         </section>
         <section className="grade-guide"><div><span className="eyebrow">EVIDENCE GRADES</span><h2>How to read the market</h2></div>{[["A", "Strong", "Deep, recent, consistent evidence."], ["B", "Usable", "Good evidence with controlled limitations."], ["C", "Developing", "Useful context, not ready for capital."], ["D", "Weak", "Sparse or inconsistent evidence."], ["F", "Insufficient", "No trustworthy valuation can be shown."]].map(([grade, title, description]) => <article key={grade}><Grade value={grade} /><b>{title}</b><p>{description}</p></article>)}</section>
@@ -284,7 +237,7 @@ export default function Home() {
     </main>
 
     <nav className="mobile-nav" aria-label="Mobile navigation">
-      {navigation.map((item) => <button key={item.id} className={view === item.id ? "active" : ""} onClick={() => setView(item.id)}>{item.short}</button>)}
+      {navigation.map((item) => <button key={item.id} aria-current={view === item.id ? "page" : undefined} className={view === item.id ? "active" : ""} onClick={() => navigate(item.id)}>{item.short}</button>)}
     </nav>
   </div>;
 }
