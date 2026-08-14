@@ -19,6 +19,7 @@ from routing_corpus_manifest import CorpusManifestPolicy, build_routing_corpus_m
 class ProofPolicy:
     target_cards: int = 25
     min_labeled_rows: int = 50
+    min_positive_recall: float = 0.80
     max_review_rate: float = 0.35
     max_single_card_share: float = 0.20
     max_sport_share: float = 0.40
@@ -26,6 +27,8 @@ class ProofPolicy:
     def __post_init__(self) -> None:
         if self.target_cards < 1 or self.min_labeled_rows < 1:
             raise ValueError("proof sample floors must be positive")
+        if not 0 <= self.min_positive_recall <= 1:
+            raise ValueError("min_positive_recall must be between 0 and 1")
         if not 0 <= self.max_review_rate <= 1:
             raise ValueError("max_review_rate must be between 0 and 1")
         if not 0 < self.max_single_card_share <= 1:
@@ -194,13 +197,26 @@ def build_corpus_proof_report(
         blockers.append("single_card_overrepresented")
     if routing["review_rate"] is not None and routing["review_rate"] > policy.max_review_rate:
         blockers.append("review_rate_above_ceiling")
+    if (
+        routing["positive_recall"] is None
+        or routing["positive_recall"] < policy.min_positive_recall
+    ):
+        blockers.append("positive_recall_below_floor")
     blockers.extend(f"routing:{value}" for value in routing["blockers"])
 
     return {
-        "proof_version": "routing-proof.v2",
+        "proof_version": "routing-proof.v3",
         "proof_ready": not blockers,
         "blockers": blockers,
         "corpus_sha256": intake["corpus_sha256"],
+        "policy": {
+            "target_cards": policy.target_cards,
+            "min_labeled_rows": policy.min_labeled_rows,
+            "min_positive_recall": policy.min_positive_recall,
+            "max_review_rate": policy.max_review_rate,
+            "max_single_card_share": policy.max_single_card_share,
+            "max_sport_share": policy.max_sport_share,
+        },
         "intake": {
             "input_rows": intake["input_rows"],
             "accepted_rows": intake["accepted_rows"],
@@ -234,6 +250,7 @@ def main() -> int:
     parser.add_argument("--output", required=True)
     parser.add_argument("--target-cards", type=int, default=25)
     parser.add_argument("--min-labeled-rows", type=int, default=50)
+    parser.add_argument("--min-positive-recall", type=float, default=0.80)
     args = parser.parse_args()
 
     candidates = json.loads(Path(args.candidates).read_text())
@@ -245,6 +262,7 @@ def main() -> int:
         policy=ProofPolicy(
             target_cards=args.target_cards,
             min_labeled_rows=args.min_labeled_rows,
+            min_positive_recall=args.min_positive_recall,
         ),
     )
     Path(args.output).write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
