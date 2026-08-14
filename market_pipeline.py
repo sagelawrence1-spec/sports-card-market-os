@@ -155,6 +155,9 @@ class ScheduledMarketPipeline:
         sold_queries_attempted=set()
         sold_queries_completed=set()
         sold_queries_failed=set()
+        listing_queries_attempted=set()
+        listing_queries_completed=set()
+        listing_queries_failed=set()
 
         if self.sold_provider is not None:
             planner=getattr(self.sold_provider,"plan_queries",None)
@@ -183,20 +186,25 @@ class ScheduledMarketPipeline:
 
         if self.listing_provider is not None:
             for asset in assets:
+                card_id=asset["card_id"]
+                listing_queries_attempted.add(card_id)
                 query=build_ebay_query(asset)
                 category_id=str(asset.get("ebay_category_id") or "261328")
                 try:
                     result=self.listing_provider.search_active(query,category_id=category_id)
+                    listing_queries_completed.add(card_id)
                     accepted,_=self._route(result.records,[asset],query,run_id)
-                    for card_id,records in accepted.items():
-                        accepted_active[card_id].extend(records)
+                    for accepted_card_id,records in accepted.items():
+                        accepted_active[accepted_card_id].extend(records)
                 except Exception as exc:
-                    errors.append(f"active:{asset['card_id']}:{type(exc).__name__}:{exc}")
+                    listing_queries_failed.add(card_id)
+                    errors.append(f"active:{card_id}:{type(exc).__name__}:{exc}")
 
         states=[]
         sold_source_available=self.sold_provider is not None and bool(sold_queries_completed or not sold_queries_attempted)
         sold_source_partial=bool(sold_queries_completed and sold_queries_failed)
-        listing_source_available=self.listing_provider is not None and not any(error.startswith("active:") for error in errors)
+        listing_source_available=self.listing_provider is not None and bool(listing_queries_completed or not listing_queries_attempted)
+        listing_source_partial=bool(listing_queries_completed and listing_queries_failed)
         for asset in assets:
             card_id=asset["card_id"]
             scanned_this_run=card_id in sold_queries_completed
@@ -209,6 +217,10 @@ class ScheduledMarketPipeline:
             else:
                 scan_state="deferred_rotation"
             card_sold_source_available=self.sold_provider is not None and scan_state != "failed"
+            card_listing_source_available=(
+                self.listing_provider is not None
+                and card_id not in listing_queries_failed
+            )
             accepted_rows=self.store.accepted_sales(card_id)
             recent=[]
             latest_sale=None
@@ -271,6 +283,8 @@ class ScheduledMarketPipeline:
                 blockers.append("Confirmed sold-data query failed for this card")
             if scan_state=="deferred_rotation":
                 blockers.append("Scheduled for a later free-plan rotation; no sold query ran for this card today")
+            if card_id in listing_queries_failed:
+                blockers.append("Active-listing query failed for this card; supply/liquidity context is incomplete")
             if not display_ready:
                 blockers.append("Accepted sold evidence has not cleared the valuation gate")
             if grade_cap:
@@ -306,6 +320,7 @@ class ScheduledMarketPipeline:
                 "scanned_this_run":scanned_this_run,
                 "scan_state":scan_state,
                 "sold_source_available":card_sold_source_available,
+                "listing_source_available":card_listing_source_available,
                 "thesis":(
                     "Accepted sold evidence supports a valuation, but the system is withholding a capital action until forward calibration passes."
                     if display_ready else
@@ -364,9 +379,13 @@ class ScheduledMarketPipeline:
                 "sold_source_available":sold_source_available,
                 "sold_source_partial":sold_source_partial,
                 "listing_source_available":listing_source_available,
+                "listing_source_partial":listing_source_partial,
                 "sold_queries_attempted":sorted(sold_queries_attempted),
                 "sold_queries_completed":sorted(sold_queries_completed),
                 "sold_queries_failed":sorted(sold_queries_failed),
+                "listing_queries_attempted":sorted(listing_queries_attempted),
+                "listing_queries_completed":sorted(listing_queries_completed),
+                "listing_queries_failed":sorted(listing_queries_failed),
                 "reconstruction_health":reconstruction_health,
                 "errors":errors,
             },
