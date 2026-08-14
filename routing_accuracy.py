@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sqlite3
+from collections import Counter
 from dataclasses import dataclass
 from typing import Any
 
@@ -22,6 +23,8 @@ CREATE INDEX IF NOT EXISTS idx_routing_ground_truth_evidence
 @dataclass(frozen=True)
 class RoutingAuditPolicy:
     min_labeled_rows: int = 50
+    min_distinct_relevant_cards: int = 25
+    max_single_card_share: float = 0.20
     min_auto_accept_precision: float = 0.99
     max_review_rate: float = 0.35
     max_false_accepts: int = 0
@@ -29,6 +32,10 @@ class RoutingAuditPolicy:
     def __post_init__(self) -> None:
         if self.min_labeled_rows < 1:
             raise ValueError("min_labeled_rows must be positive")
+        if self.min_distinct_relevant_cards < 1:
+            raise ValueError("min_distinct_relevant_cards must be positive")
+        if not 0 < self.max_single_card_share <= 1:
+            raise ValueError("max_single_card_share must be in (0,1]")
         if not 0 <= self.min_auto_accept_precision <= 1:
             raise ValueError("min_auto_accept_precision must be between 0 and 1")
         if not 0 <= self.max_review_rate <= 1:
@@ -139,9 +146,27 @@ def routing_accuracy_summary(
     review_rate = len(reviews) / total if total else None
     false_rejects = [row for row in rejects if row["is_relevant"]]
 
+    relevant_card_counts = Counter(
+        str(row["expected_card_id"])
+        for row in relevant
+        if row["expected_card_id"] is not None
+    )
+    distinct_relevant_cards = len(relevant_card_counts)
+    largest_card_rows = max(relevant_card_counts.values(), default=0)
+    largest_card_share = (
+        largest_card_rows / len(relevant) if relevant else None
+    )
+
     blockers: list[str] = []
     if total < policy.min_labeled_rows:
         blockers.append("labeled_sample_too_small")
+    if distinct_relevant_cards < policy.min_distinct_relevant_cards:
+        blockers.append("relevant_card_coverage_too_narrow")
+    if (
+        largest_card_share is not None
+        and largest_card_share > policy.max_single_card_share
+    ):
+        blockers.append("single_card_overrepresented")
     if len(false_accepts) > policy.max_false_accepts:
         blockers.append("false_accepts_observed")
     if auto_precision is not None and auto_precision < policy.min_auto_accept_precision:
@@ -153,6 +178,9 @@ def routing_accuracy_summary(
         "production_ready": not blockers,
         "blockers": blockers,
         "labeled_rows": total,
+        "distinct_relevant_cards": distinct_relevant_cards,
+        "largest_card_rows": largest_card_rows,
+        "largest_card_share": largest_card_share,
         "auto_accepts": len(auto_accepts),
         "false_accepts": len(false_accepts),
         "auto_accept_precision": auto_precision,
