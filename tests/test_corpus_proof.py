@@ -74,7 +74,7 @@ def policy():
 def test_balanced_clean_real_corpus_can_be_proof_ready():
     report = build_corpus_proof_report(raw_rows(), candidates(), labels(), policy=policy())
     assert report["proof_ready"] is True
-    assert report["proof_version"] == "routing-proof.v4"
+    assert report["proof_version"] == "routing-proof.v5"
     assert report["routing"]["auto_accept_precision"] == 1.0
     assert report["routing"]["positive_recall"] == 1.0
     assert report["policy"]["min_positive_recall"] == 0.80
@@ -156,25 +156,54 @@ def test_unlabeled_rows_cannot_be_hidden_from_proof():
     assert "label_coverage_below_floor" in report["blockers"]
 
 
-def test_duplicate_labels_do_not_inflate_coverage():
-    duplicate = labels()[:7] + [labels()[0]]
+def test_duplicate_labels_do_not_inflate_coverage_or_routing_sample():
+    duplicate = labels()[:7] + [labels()[0], labels()[0], labels()[0]]
     report = build_corpus_proof_report(
         raw_rows(),
         candidates(),
         duplicate,
         policy=ProofPolicy(
             target_cards=4,
-            min_labeled_rows=7,
+            min_labeled_rows=8,
             min_label_coverage=0.90,
             min_positive_recall=0.80,
             max_single_card_share=0.40,
             max_sport_share=0.50,
         ),
     )
-    assert report["labels"]["provided"] == 8
+    assert report["labels"]["provided"] == 10
+    assert report["labels"]["scoped"] == 7
     assert report["labels"]["unique_scoped"] == 7
+    assert report["labels"]["duplicate_rows_collapsed"] == 3
+    assert report["routing"]["labeled_rows"] == 7
     assert report["labels"]["coverage"] == 0.875
     assert "label_coverage_below_floor" in report["blockers"]
+    assert "routing:insufficient_labeled_rows" in report["blockers"]
+
+
+def test_conflicting_duplicate_labels_fail_closed_and_are_excluded():
+    label_rows = labels() + [{
+        **labels()[0],
+        "expected_card_id": "B",
+    }]
+    report = build_corpus_proof_report(
+        raw_rows(),
+        candidates(),
+        label_rows,
+        policy=ProofPolicy(
+            target_cards=4,
+            min_labeled_rows=7,
+            min_label_coverage=0.80,
+            min_positive_recall=0.80,
+            max_single_card_share=0.40,
+            max_sport_share=0.50,
+        ),
+    )
+    assert report["labels"]["scoped"] == 7
+    assert report["routing"]["labeled_rows"] == 7
+    assert report["labels"]["conflicting_evidence_ids"] == [labels()[0]["evidence_id"]]
+    assert report["proof_ready"] is False
+    assert "conflicting_duplicate_labels" in report["blockers"]
 
 
 def test_incomplete_card_coverage_fails_closed():
