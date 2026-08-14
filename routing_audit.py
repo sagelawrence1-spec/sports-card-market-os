@@ -32,6 +32,9 @@ def audit_routing(labels: Iterable[RoutingLabel], min_labeled_rows: int = 50) ->
     predicted_accepts = [r for r in rows if r.predicted_status == "accepted"]
     expected_accepts = [r for r in rows if r.expected_status == "accepted"]
     predicted_reviews = [r for r in rows if r.predicted_status == "review"]
+    non_definitive_ground_truth = sum(
+        1 for row in rows if row.expected_status == "review"
+    )
     accepted_labels_missing_card_id = sum(
         1
         for row in rows
@@ -69,6 +72,8 @@ def audit_routing(labels: Iterable[RoutingLabel], min_labeled_rows: int = 50) ->
     blockers: list[str] = []
     if total < min_labeled_rows:
         blockers.append("insufficient_labeled_rows")
+    if non_definitive_ground_truth > 0:
+        blockers.append("non_definitive_ground_truth")
     if accepted_labels_missing_card_id > 0:
         blockers.append("accepted_labels_missing_card_id")
     if false_accepts > 0:
@@ -81,6 +86,7 @@ def audit_routing(labels: Iterable[RoutingLabel], min_labeled_rows: int = 50) ->
         "predicted_accepts": len(predicted_accepts),
         "predicted_reviews": len(predicted_reviews),
         "expected_accepts": len(expected_accepts),
+        "non_definitive_ground_truth": non_definitive_ground_truth,
         "accepted_labels_missing_card_id": accepted_labels_missing_card_id,
         "true_accepts": true_accepts,
         "false_accepts": false_accepts,
