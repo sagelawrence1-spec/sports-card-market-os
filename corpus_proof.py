@@ -20,6 +20,7 @@ class ProofPolicy:
     target_cards: int = 25
     min_labeled_rows: int = 50
     min_label_coverage: float = 0.90
+    min_intake_retention: float = 0.90
     min_positive_recall: float = 0.80
     max_review_rate: float = 0.35
     max_single_card_share: float = 0.20
@@ -30,6 +31,8 @@ class ProofPolicy:
             raise ValueError("proof sample floors must be positive")
         if not 0 <= self.min_label_coverage <= 1:
             raise ValueError("min_label_coverage must be between 0 and 1")
+        if not 0 <= self.min_intake_retention <= 1:
+            raise ValueError("min_intake_retention must be between 0 and 1")
         if not 0 <= self.min_positive_recall <= 1:
             raise ValueError("min_positive_recall must be between 0 and 1")
         if not 0 <= self.max_review_rate <= 1:
@@ -199,6 +202,15 @@ def build_corpus_proof_report(
         if accepted_ids
         else None
     )
+    # Sanitizer-rejected rows cannot simply disappear from proof quality. Duplicates
+    # are valid evidence collapsed for reproducibility, so they count as retained;
+    # only actual rejected rows reduce intake retention.
+    intake_retained_rows = intake["accepted_rows"] + intake["duplicates"]
+    intake_retention = (
+        intake_retained_rows / intake["input_rows"]
+        if intake["input_rows"]
+        else None
+    )
 
     relevant = [
         row
@@ -217,6 +229,8 @@ def build_corpus_proof_report(
     blockers: list[str] = []
     if not intake["ready"]:
         blockers.extend(f"intake:{value}" for value in intake["blockers"])
+    if intake_retention is None or intake_retention < policy.min_intake_retention:
+        blockers.append("intake_retention_below_floor")
     if orphan_labels:
         blockers.append("labels_outside_sanitized_corpus")
     if off_manifest_labels:
@@ -239,7 +253,7 @@ def build_corpus_proof_report(
     blockers.extend(f"routing:{value}" for value in routing["blockers"])
 
     return {
-        "proof_version": "routing-proof.v5",
+        "proof_version": "routing-proof.v6",
         "proof_ready": not blockers,
         "blockers": blockers,
         "corpus_sha256": intake["corpus_sha256"],
@@ -247,6 +261,7 @@ def build_corpus_proof_report(
             "target_cards": policy.target_cards,
             "min_labeled_rows": policy.min_labeled_rows,
             "min_label_coverage": policy.min_label_coverage,
+            "min_intake_retention": policy.min_intake_retention,
             "min_positive_recall": policy.min_positive_recall,
             "max_review_rate": policy.max_review_rate,
             "max_single_card_share": policy.max_single_card_share,
@@ -257,6 +272,8 @@ def build_corpus_proof_report(
             "accepted_rows": intake["accepted_rows"],
             "rejected_rows": intake["rejected_rows"],
             "duplicates": intake["duplicates"],
+            "retained_rows": intake_retained_rows,
+            "retention": intake_retention,
         },
         "manifest": manifest,
         "labels": {
@@ -291,6 +308,7 @@ def main() -> int:
     parser.add_argument("--target-cards", type=int, default=25)
     parser.add_argument("--min-labeled-rows", type=int, default=50)
     parser.add_argument("--min-label-coverage", type=float, default=0.90)
+    parser.add_argument("--min-intake-retention", type=float, default=0.90)
     parser.add_argument("--min-positive-recall", type=float, default=0.80)
     args = parser.parse_args()
 
@@ -304,6 +322,7 @@ def main() -> int:
             target_cards=args.target_cards,
             min_labeled_rows=args.min_labeled_rows,
             min_label_coverage=args.min_label_coverage,
+            min_intake_retention=args.min_intake_retention,
             min_positive_recall=args.min_positive_recall,
         ),
     )
