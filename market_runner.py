@@ -8,9 +8,8 @@ import os
 from pathlib import Path
 import tempfile
 
-from benchmark_journal import sync_contract_benchmark
+from benchmark_runtime import sync_benchmark_if_trustworthy
 from evidence_store import EvidenceStore
-from intelligence_benchmark import IntelligenceBenchmarkStore
 from market_history import append_history, build_daily_brief
 from market_pipeline import ScheduledMarketPipeline
 from providers.ebay_auth import EbayOAuthClient
@@ -54,14 +53,6 @@ def read_json(path,default):
         value=json.loads(source.read_text(encoding="utf-8"))
     except (OSError,json.JSONDecodeError):
         return default
-    return value
-
-
-def _env_fraction(name,default=0.0):
-    raw=(os.getenv(name) or "").strip()
-    value=float(raw) if raw else float(default)
-    if not 0.0<=value<=1.0:
-        raise ValueError(f"{name} must be between 0 and 1.")
     return value
 
 
@@ -130,13 +121,13 @@ def run(args):
         horizon_days=int(os.getenv("BENCHMARK_HORIZON_DAYS") or "30")
         if horizon_days<=0:
             raise ValueError("BENCHMARK_HORIZON_DAYS must be positive.")
-        sync_contract_benchmark(
-            IntelligenceBenchmarkStore(args.database),
+        benchmark_status=sync_benchmark_if_trustworthy(
+            args.database,
             result.contract,
             horizon_days=horizon_days,
-            exit_fee_rate=_env_fraction("BENCHMARK_EXIT_FEE_RATE"),
-            liquidity_haircut_rate=_env_fraction("BENCHMARK_LIQUIDITY_HAIRCUT_RATE"),
         )
+        result.contract["benchmark_journal"] = benchmark_status
+
         recommendation_horizon=int(os.getenv("RECOMMENDATION_HORIZON_DAYS") or str(horizon_days))
         if recommendation_horizon<=0:
             raise ValueError("RECOMMENDATION_HORIZON_DAYS must be positive.")
