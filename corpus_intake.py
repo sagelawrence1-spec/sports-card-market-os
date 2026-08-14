@@ -26,7 +26,7 @@ PRICE_KEYS = ("sold_price", "price", "sale_price")
 DATE_KEYS = ("sold_date", "date_sold", "sale_date", "end_date")
 CURRENCY_KEYS = ("currency", "currency_code")
 
-_PRICE_RANGE_RE = re.compile(r"\d[\d,.]*\s*[-–—]\s*\d[\d,.]*")
+_PRICE_RANGE_RE = re.compile(r"\d[\d,.]*\s*[-–—]\s*[$€£]?\s*\d[\d,.]*")
 _HEADER_SEP_RE = re.compile(r"[^a-z0-9]+")
 
 
