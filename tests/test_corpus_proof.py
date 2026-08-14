@@ -64,6 +64,7 @@ def policy():
     return ProofPolicy(
         target_cards=4,
         min_labeled_rows=8,
+        min_positive_recall=0.80,
         max_single_card_share=0.30,
         max_sport_share=0.50,
     )
@@ -72,8 +73,10 @@ def policy():
 def test_balanced_clean_real_corpus_can_be_proof_ready():
     report = build_corpus_proof_report(raw_rows(), candidates(), labels(), policy=policy())
     assert report["proof_ready"] is True
-    assert report["proof_version"] == "routing-proof.v2"
+    assert report["proof_version"] == "routing-proof.v3"
     assert report["routing"]["auto_accept_precision"] == 1.0
+    assert report["routing"]["positive_recall"] == 1.0
+    assert report["policy"]["min_positive_recall"] == 0.80
     assert report["labels"]["distinct_labeled_cards"] == 4
     assert report["labels"]["prediction_source"] == "current_entity_matcher"
 
@@ -112,6 +115,25 @@ def test_caller_cannot_forge_predictions_in_label_file():
     assert report["predictions"][label_rows[0]["evidence_id"]]["predicted_card_id"] == "A"
 
 
+def test_low_recall_cannot_pass_on_perfect_precision():
+    rows = raw_rows()
+    # Keep the human ground truth unchanged, but make two genuine comps too weak
+    # for automatic matching. A precision-only proof would incorrectly pass this.
+    rows[0] = {**rows[0], "Title": "2025 baseball card #1"}
+    rows[2] = {**rows[2], "Title": "2025 baseball card #2"}
+    report = build_corpus_proof_report(
+        rows,
+        candidates(),
+        labels(),
+        policy=policy(),
+    )
+    assert report["routing"]["false_accepts"] == 0
+    assert report["routing"]["auto_accept_precision"] == 1.0
+    assert report["routing"]["positive_recall"] == 0.75
+    assert report["proof_ready"] is False
+    assert "positive_recall_below_floor" in report["blockers"]
+
+
 def test_incomplete_card_coverage_fails_closed():
     report = build_corpus_proof_report(
         raw_rows(),
@@ -120,12 +142,22 @@ def test_incomplete_card_coverage_fails_closed():
         policy=ProofPolicy(
             target_cards=4,
             min_labeled_rows=6,
+            min_positive_recall=0.80,
             max_single_card_share=0.40,
             max_sport_share=0.50,
         ),
     )
     assert report["proof_ready"] is False
     assert "selected_card_coverage_incomplete" in report["blockers"]
+
+
+def test_invalid_recall_floor_is_rejected():
+    try:
+        ProofPolicy(min_positive_recall=1.01)
+    except ValueError as exc:
+        assert "min_positive_recall" in str(exc)
+    else:
+        raise AssertionError("invalid recall floor should fail")
 
 
 def test_load_delimited_export_handles_tsv(tmp_path):
