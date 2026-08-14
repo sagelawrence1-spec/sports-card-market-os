@@ -154,6 +154,7 @@ class ScheduledMarketPipeline:
         accepted_active={asset["card_id"]:[] for asset in assets}
         sold_queries_attempted=set()
         sold_queries_completed=set()
+        sold_queries_failed=set()
 
         if self.sold_provider is not None:
             planner=getattr(self.sold_provider,"plan_queries",None)
@@ -176,6 +177,7 @@ class ScheduledMarketPipeline:
                     sold_queries_completed.update(plan_card_ids)
                     self._route(result.records,assets,query,run_id)
                 except Exception as exc:
+                    sold_queries_failed.update(plan_card_ids)
                     group=",".join(asset["card_id"] for asset in plan_assets)
                     errors.append(f"sold:{group}:{type(exc).__name__}:{exc}")
 
@@ -192,7 +194,8 @@ class ScheduledMarketPipeline:
                     errors.append(f"active:{asset['card_id']}:{type(exc).__name__}:{exc}")
 
         states=[]
-        sold_source_available=self.sold_provider is not None and not any(error.startswith("sold:") for error in errors)
+        sold_source_available=self.sold_provider is not None and bool(sold_queries_completed or not sold_queries_attempted)
+        sold_source_partial=bool(sold_queries_completed and sold_queries_failed)
         listing_source_available=self.listing_provider is not None and not any(error.startswith("active:") for error in errors)
         for asset in assets:
             card_id=asset["card_id"]
@@ -201,10 +204,11 @@ class ScheduledMarketPipeline:
                 scan_state="unavailable"
             elif scanned_this_run:
                 scan_state="complete"
-            elif card_id in sold_queries_attempted:
+            elif card_id in sold_queries_failed or card_id in sold_queries_attempted:
                 scan_state="failed"
             else:
                 scan_state="deferred_rotation"
+            card_sold_source_available=self.sold_provider is not None and scan_state != "failed"
             accepted_rows=self.store.accepted_sales(card_id)
             recent=[]
             latest_sale=None
@@ -243,7 +247,11 @@ class ScheduledMarketPipeline:
             excluded_total=int(evidence_counts.get("rejected",0))
             grade_cap=getattr(self.sold_provider,"evidence_grade_cap",None)
             evidence_grade=_cap_grade(estimate.evidence_grade,grade_cap)
-            display_ready=evidence_grade in {"A","B"} and estimate.sample_size >= 8
+            display_ready=(
+                card_sold_source_available
+                and evidence_grade in {"A","B"}
+                and estimate.sample_size >= 8
+            )
             fair_value=estimate.fair_value if display_ready else None
             dispersion=estimate.dispersion if estimate.dispersion is not None else None
             spread=max(0.05,dispersion or 0) if display_ready else None
@@ -257,8 +265,10 @@ class ScheduledMarketPipeline:
             accepted_sales_label=f"{len(recent)} accepted USD {'sale' if len(recent)==1 else 'sales'}"
             liquidity=min(100,round(accepted_sales_30d*5+len(active_prices)*1.5,1))
             blockers=[]
-            if not sold_source_available:
+            if self.sold_provider is None:
                 blockers.append("Confirmed sold-data source is unavailable")
+            elif scan_state=="failed":
+                blockers.append("Confirmed sold-data query failed for this card")
             if scan_state=="deferred_rotation":
                 blockers.append("Scheduled for a later free-plan rotation; no sold query ran for this card today")
             if not display_ready:
@@ -295,6 +305,7 @@ class ScheduledMarketPipeline:
                 "last_updated":as_of,
                 "scanned_this_run":scanned_this_run,
                 "scan_state":scan_state,
+                "sold_source_available":card_sold_source_available,
                 "thesis":(
                     "Accepted sold evidence supports a valuation, but the system is withholding a capital action until forward calibration passes."
                     if display_ready else
@@ -323,16 +334,25 @@ class ScheduledMarketPipeline:
             states.append(state)
 
         reconstruction_health=summarize_reconstruction_health(states)
-        status="complete" if sold_source_available else "blocked_sold_source"
+        if self.sold_provider is None or (sold_queries_failed and not sold_queries_completed):
+            status="blocked_sold_source"
+        elif sold_source_partial:
+            status="partial_sold_source"
+        else:
+            status="complete"
         provider_label=getattr(self.sold_provider,"source_label",None)
-        label=(
-            f"Scheduled {provider_label or 'confirmed sold evidence'}"
-            if status=="complete" else
-            "Automatic evidence pipeline — confirmed sold access pending"
-        )
+        if status=="complete":
+            label=f"Scheduled {provider_label or 'confirmed sold evidence'}"
+            source_kind="scheduled_evidence"
+        elif status=="partial_sold_source":
+            label=f"Scheduled {provider_label or 'confirmed sold evidence'} — partial sold-query failure"
+            source_kind="partial_evidence"
+        else:
+            label="Automatic evidence pipeline — confirmed sold access pending"
+            source_kind="blocked_evidence"
         contract=build_evidence_market_scan(
             states,
-            source_kind="scheduled_evidence" if status=="complete" else "blocked_evidence",
+            source_kind=source_kind,
             source_label=label,
             generated_at=as_of,
             universe_size=len(assets),
@@ -342,9 +362,11 @@ class ScheduledMarketPipeline:
                 "listing_provider":getattr(self.listing_provider,"provider_name",None),
                 "evidence_grade_cap":getattr(self.sold_provider,"evidence_grade_cap",None),
                 "sold_source_available":sold_source_available,
+                "sold_source_partial":sold_source_partial,
                 "listing_source_available":listing_source_available,
                 "sold_queries_attempted":sorted(sold_queries_attempted),
                 "sold_queries_completed":sorted(sold_queries_completed),
+                "sold_queries_failed":sorted(sold_queries_failed),
                 "reconstruction_health":reconstruction_health,
                 "errors":errors,
             },
