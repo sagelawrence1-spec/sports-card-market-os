@@ -3,20 +3,44 @@ from corpus_proof import ProofPolicy, build_corpus_proof_report, load_delimited_
 
 def candidates():
     return [
-        {"card_id": "A", "player": "A", "sport": "Baseball"},
-        {"card_id": "B", "player": "B", "sport": "Baseball"},
-        {"card_id": "C", "player": "C", "sport": "Basketball"},
-        {"card_id": "D", "player": "D", "sport": "Basketball"},
+        {
+            "card_id": "A",
+            "player": "Shohei Ohtani",
+            "sport": "Baseball",
+            "year": "2025",
+            "card_number": "1",
+        },
+        {
+            "card_id": "B",
+            "player": "Aaron Judge",
+            "sport": "Baseball",
+            "year": "2025",
+            "card_number": "2",
+        },
+        {
+            "card_id": "C",
+            "player": "Stephen Curry",
+            "sport": "Basketball",
+            "year": "2025",
+            "card_number": "3",
+        },
+        {
+            "card_id": "D",
+            "player": "Kevin Durant",
+            "sport": "Basketball",
+            "year": "2025",
+            "card_number": "4",
+        },
     ]
 
 
 def raw_rows():
     rows = []
-    for i, card in enumerate(["A", "B", "C", "D"], start=1):
+    for i, card in enumerate(candidates(), start=1):
         for j in range(2):
             rows.append({
                 "Item ID": f"12345678{i}{j}",
-                "Title": f"{card} card",
+                "Title": f"2025 {card['player']} #{card['card_number']}",
                 "Sold Date": "2026-08-01",
                 "Sold Price": "100",
                 "Currency": "USD",
@@ -30,9 +54,7 @@ def labels():
     for row, card in zip(raw_rows(), mapping):
         out.append({
             "evidence_id": row["Item ID"],
-            "predicted_status": "accepted",
             "expected_status": "accepted",
-            "predicted_card_id": card,
             "expected_card_id": card,
         })
     return out
@@ -50,16 +72,16 @@ def policy():
 def test_balanced_clean_real_corpus_can_be_proof_ready():
     report = build_corpus_proof_report(raw_rows(), candidates(), labels(), policy=policy())
     assert report["proof_ready"] is True
+    assert report["proof_version"] == "routing-proof.v2"
     assert report["routing"]["auto_accept_precision"] == 1.0
     assert report["labels"]["distinct_labeled_cards"] == 4
+    assert report["labels"]["prediction_source"] == "current_entity_matcher"
 
 
 def test_orphan_label_fails_closed():
     label_rows = labels() + [{
         "evidence_id": "missing",
-        "predicted_status": "accepted",
         "expected_status": "accepted",
-        "predicted_card_id": "A",
         "expected_card_id": "A",
     }]
     report = build_corpus_proof_report(raw_rows(), candidates(), label_rows, policy=policy())
@@ -67,12 +89,27 @@ def test_orphan_label_fails_closed():
     assert "labels_outside_sanitized_corpus" in report["blockers"]
 
 
-def test_wrong_card_accept_fails_closed():
+def test_wrong_ground_truth_card_exposes_live_matcher_false_accept():
     label_rows = labels()
-    label_rows[0] = {**label_rows[0], "predicted_card_id": "B"}
+    label_rows[0] = {**label_rows[0], "expected_card_id": "B"}
     report = build_corpus_proof_report(raw_rows(), candidates(), label_rows, policy=policy())
     assert report["proof_ready"] is False
     assert report["routing"]["false_accepts"] == 1
+    assert report["routing"]["wrong_card_accepts"] == 1
+
+
+def test_caller_cannot_forge_predictions_in_label_file():
+    label_rows = labels()
+    label_rows[0] = {
+        **label_rows[0],
+        "predicted_status": "rejected",
+        "predicted_card_id": "D",
+    }
+    report = build_corpus_proof_report(raw_rows(), candidates(), label_rows, policy=policy())
+    assert report["proof_ready"] is True
+    assert report["labels"]["caller_predictions_ignored"] == 1
+    assert report["predictions"][label_rows[0]["evidence_id"]]["predicted_status"] == "accepted"
+    assert report["predictions"][label_rows[0]["evidence_id"]]["predicted_card_id"] == "A"
 
 
 def test_incomplete_card_coverage_fails_closed():
@@ -97,7 +134,7 @@ def test_load_delimited_export_handles_tsv(tmp_path):
     path.write_text(
         tab.join(["Item ID", "Title", "Sold Date", "Sold Price", "Currency"])
         + "\n"
-        + tab.join(["123456789", "A card", "2026-08-01", "100", "USD"])
+        + tab.join(["123456789", "2025 Shohei Ohtani #1", "2026-08-01", "100", "USD"])
         + "\n"
     )
     rows = load_delimited_export(path)
