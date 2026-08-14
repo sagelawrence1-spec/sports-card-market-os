@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 
 from corpus_intake import CorpusIntakePolicy, sanitize_product_research_rows
+from entity_matcher import MatchDecision, SportsCardEntityMatcher
 from routing_audit import audit_routing, labels_from_rows
 from routing_corpus_manifest import CorpusManifestPolicy, build_routing_corpus_manifest
 
@@ -47,6 +48,63 @@ def load_delimited_export(path: str | Path) -> list[dict[str, str]]:
     return [dict(row) for row in csv.DictReader(text.splitlines(), delimiter=delimiter)]
 
 
+def _prediction_for_title(
+    title: str,
+    assets: list[Mapping[str, Any]],
+    matcher: SportsCardEntityMatcher,
+) -> dict[str, Any]:
+    """Run the same candidate ranking/ambiguity rule used by live evidence routing."""
+    ranked = sorted(
+        ((matcher.match(dict(asset), title), asset) for asset in assets),
+        key=lambda pair: pair[0].score,
+        reverse=True,
+    )
+    decision, asset = ranked[0]
+    if len(ranked) > 1 and decision.accepted and ranked[1][0].score >= decision.score - 3:
+        decision = MatchDecision(
+            False,
+            decision.score,
+            "manual_review",
+            {
+                **decision.diagnostics,
+                "ambiguous_candidates": [
+                    str(asset["card_id"]),
+                    str(ranked[1][1]["card_id"]),
+                ],
+            },
+        )
+
+    status = (
+        "accepted"
+        if decision.accepted
+        else "review"
+        if decision.reason == "manual_review"
+        else "rejected"
+    )
+    return {
+        "predicted_status": status,
+        "predicted_card_id": str(asset["card_id"]),
+        "match_score": decision.score,
+        "match_reason": decision.reason,
+    }
+
+
+def _generate_predictions(
+    accepted_rows: Iterable[Mapping[str, Any]],
+    assets: list[Mapping[str, Any]],
+) -> dict[str, dict[str, Any]]:
+    matcher = SportsCardEntityMatcher()
+    predictions: dict[str, dict[str, Any]] = {}
+    for row in accepted_rows:
+        evidence_id = str(row.get("item_id") or row["fingerprint"])
+        predictions[evidence_id] = _prediction_for_title(
+            str(row.get("title") or ""),
+            assets,
+            matcher,
+        )
+    return predictions
+
+
 def build_corpus_proof_report(
     raw_rows: Iterable[Mapping[str, Any]],
     candidates: list[Mapping[str, Any]],
@@ -75,10 +133,15 @@ def build_corpus_proof_report(
         for row in intake["accepted"]
     }
     selected_cards = {row["card_id"] for row in manifest["cards"]}
+    selected_assets = [
+        card for card in candidates if str(card.get("card_id")) in selected_cards
+    ]
+    predictions = _generate_predictions(intake["accepted"], selected_assets)
 
-    scoped_labels: list[Mapping[str, Any]] = []
+    scoped_labels: list[dict[str, Any]] = []
     orphan_labels = 0
     off_manifest_labels = 0
+    caller_predictions_ignored = 0
     for row in label_rows:
         evidence_id = str(row.get("evidence_id") or "")
         if evidence_id not in accepted_ids:
@@ -88,7 +151,16 @@ def build_corpus_proof_report(
         if expected_card_id is not None and str(expected_card_id) not in selected_cards:
             off_manifest_labels += 1
             continue
-        scoped_labels.append(row)
+        if "predicted_status" in row or "predicted_card_id" in row:
+            caller_predictions_ignored += 1
+        prediction = predictions[evidence_id]
+        scoped_labels.append({
+            "evidence_id": evidence_id,
+            "predicted_status": prediction["predicted_status"],
+            "predicted_card_id": prediction["predicted_card_id"],
+            "expected_status": row["expected_status"],
+            "expected_card_id": expected_card_id,
+        })
 
     routing = audit_routing(
         labels_from_rows(scoped_labels),
@@ -125,7 +197,7 @@ def build_corpus_proof_report(
     blockers.extend(f"routing:{value}" for value in routing["blockers"])
 
     return {
-        "proof_version": "routing-proof.v1",
+        "proof_version": "routing-proof.v2",
         "proof_ready": not blockers,
         "blockers": blockers,
         "corpus_sha256": intake["corpus_sha256"],
@@ -143,8 +215,14 @@ def build_corpus_proof_report(
             "off_manifest": off_manifest_labels,
             "distinct_labeled_cards": distinct_labeled_cards,
             "largest_card_share": largest_card_share,
+            "prediction_source": "current_entity_matcher",
+            "caller_predictions_ignored": caller_predictions_ignored,
         },
         "routing": routing,
+        "predictions": {
+            evidence_id: predictions[evidence_id]
+            for evidence_id in sorted({row["evidence_id"] for row in scoped_labels})
+        },
     }
 
 
