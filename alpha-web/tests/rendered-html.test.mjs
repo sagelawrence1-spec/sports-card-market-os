@@ -32,7 +32,7 @@ test("server-renders the usable daily capital brief", async () => {
   const html = await response.text();
   assert.match(html, /<title>Market OS — Know When the Evidence Is Ready<\/title>/i);
   assert.match(html, /Today, capital stays still/);
-  assert.match(html, /CURRENT EVIDENCE/);
+  assert.match(html, /VERIFIED SALES/);
   assert.match(html, /What needs attention/);
   assert.match(html, /Shohei Ohtani/);
   assert.doesNotMatch(html, /\/Users\//);
