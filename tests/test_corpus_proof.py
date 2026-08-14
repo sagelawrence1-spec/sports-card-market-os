@@ -74,7 +74,7 @@ def policy():
 def test_balanced_clean_real_corpus_can_be_proof_ready():
     report = build_corpus_proof_report(raw_rows(), candidates(), labels(), policy=policy())
     assert report["proof_ready"] is True
-    assert report["proof_version"] == "routing-proof.v5"
+    assert report["proof_version"] == "routing-proof.v6"
     assert report["routing"]["auto_accept_precision"] == 1.0
     assert report["routing"]["positive_recall"] == 1.0
     assert report["policy"]["min_positive_recall"] == 0.80
