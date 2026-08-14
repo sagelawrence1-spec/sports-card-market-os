@@ -19,6 +19,7 @@ from routing_corpus_manifest import CorpusManifestPolicy, build_routing_corpus_m
 class ProofPolicy:
     target_cards: int = 25
     min_labeled_rows: int = 50
+    min_label_coverage: float = 0.90
     min_positive_recall: float = 0.80
     max_review_rate: float = 0.35
     max_single_card_share: float = 0.20
@@ -27,6 +28,8 @@ class ProofPolicy:
     def __post_init__(self) -> None:
         if self.target_cards < 1 or self.min_labeled_rows < 1:
             raise ValueError("proof sample floors must be positive")
+        if not 0 <= self.min_label_coverage <= 1:
+            raise ValueError("min_label_coverage must be between 0 and 1")
         if not 0 <= self.min_positive_recall <= 1:
             raise ValueError("min_positive_recall must be between 0 and 1")
         if not 0 <= self.max_review_rate <= 1:
@@ -170,6 +173,13 @@ def build_corpus_proof_report(
         min_labeled_rows=policy.min_labeled_rows,
     )
 
+    unique_labeled_ids = {row["evidence_id"] for row in scoped_labels}
+    label_coverage = (
+        len(unique_labeled_ids) / len(accepted_ids)
+        if accepted_ids
+        else None
+    )
+
     relevant = [
         row
         for row in scoped_labels
@@ -191,6 +201,8 @@ def build_corpus_proof_report(
         blockers.append("labels_outside_sanitized_corpus")
     if off_manifest_labels:
         blockers.append("labels_outside_selected_manifest")
+    if label_coverage is None or label_coverage < policy.min_label_coverage:
+        blockers.append("label_coverage_below_floor")
     if distinct_labeled_cards < policy.target_cards:
         blockers.append("selected_card_coverage_incomplete")
     if largest_card_share is not None and largest_card_share > policy.max_single_card_share:
@@ -205,13 +217,14 @@ def build_corpus_proof_report(
     blockers.extend(f"routing:{value}" for value in routing["blockers"])
 
     return {
-        "proof_version": "routing-proof.v3",
+        "proof_version": "routing-proof.v4",
         "proof_ready": not blockers,
         "blockers": blockers,
         "corpus_sha256": intake["corpus_sha256"],
         "policy": {
             "target_cards": policy.target_cards,
             "min_labeled_rows": policy.min_labeled_rows,
+            "min_label_coverage": policy.min_label_coverage,
             "min_positive_recall": policy.min_positive_recall,
             "max_review_rate": policy.max_review_rate,
             "max_single_card_share": policy.max_single_card_share,
@@ -227,6 +240,9 @@ def build_corpus_proof_report(
         "labels": {
             "provided": len(label_rows),
             "scoped": len(scoped_labels),
+            "unique_scoped": len(unique_labeled_ids),
+            "coverage": label_coverage,
+            "unlabeled_sanitized_rows": max(len(accepted_ids) - len(unique_labeled_ids), 0),
             "orphan": orphan_labels,
             "off_manifest": off_manifest_labels,
             "distinct_labeled_cards": distinct_labeled_cards,
@@ -250,6 +266,7 @@ def main() -> int:
     parser.add_argument("--output", required=True)
     parser.add_argument("--target-cards", type=int, default=25)
     parser.add_argument("--min-labeled-rows", type=int, default=50)
+    parser.add_argument("--min-label-coverage", type=float, default=0.90)
     parser.add_argument("--min-positive-recall", type=float, default=0.80)
     args = parser.parse_args()
 
@@ -262,6 +279,7 @@ def main() -> int:
         policy=ProofPolicy(
             target_cards=args.target_cards,
             min_labeled_rows=args.min_labeled_rows,
+            min_label_coverage=args.min_label_coverage,
             min_positive_recall=args.min_positive_recall,
         ),
     )
