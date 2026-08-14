@@ -27,6 +27,7 @@ DATE_KEYS = ("sold_date", "date_sold", "sale_date", "end_date")
 CURRENCY_KEYS = ("currency", "currency_code")
 
 _PRICE_RANGE_RE = re.compile(r"\d[\d,.]*\s*[-–—]\s*\d[\d,.]*")
+_HEADER_SEP_RE = re.compile(r"[^a-z0-9]+")
 
 
 @dataclass(frozen=True)
@@ -50,6 +51,12 @@ def _first(row: Mapping[str, Any], keys: Iterable[str]) -> Any:
 
 def _normalized_text(value: Any) -> str:
     return " ".join(str(value or "").strip().split())
+
+
+def _normalized_header(value: Any) -> str:
+    """Canonicalize export headers across CSV/TSV spelling and spacing variants."""
+    text = str(value or "").strip().lower()
+    return _HEADER_SEP_RE.sub("_", text).strip("_")
 
 
 def _parse_price(value: Any) -> float | None:
@@ -102,7 +109,7 @@ def sanitize_product_research_rows(
 
     input_rows = list(rows)
     for index, source in enumerate(input_rows):
-        row = {str(k).strip().lower(): v for k, v in dict(source).items()}
+        row = {_normalized_header(k): v for k, v in dict(source).items()}
         title = _normalized_text(_first(row, TITLE_KEYS))
         sold_date = _normalized_text(_first(row, DATE_KEYS))
         item_id = _stable_item_id(row)
