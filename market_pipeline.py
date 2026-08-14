@@ -175,7 +175,7 @@ class ScheduledMarketPipeline:
                         asset=plan_assets[0],
                     )
                     sold_queries_completed.update(plan_card_ids)
-                    self._route(result.records,assets,query,run_id)
+                    self._route(result.records,plan_assets,query,run_id)
                 except Exception as exc:
                     sold_queries_failed.update(plan_card_ids)
                     group=",".join(asset["card_id"] for asset in plan_assets)
@@ -187,7 +187,7 @@ class ScheduledMarketPipeline:
                 category_id=str(asset.get("ebay_category_id") or "261328")
                 try:
                     result=self.listing_provider.search_active(query,category_id=category_id)
-                    accepted,_=self._route(result.records,assets,query,run_id)
+                    accepted,_=self._route(result.records,[asset],query,run_id)
                     for card_id,records in accepted.items():
                         accepted_active[card_id].extend(records)
                 except Exception as exc:
