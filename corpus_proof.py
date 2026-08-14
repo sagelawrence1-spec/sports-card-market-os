@@ -144,7 +144,7 @@ def build_corpus_proof_report(
     ]
     predictions = _generate_predictions(intake["accepted"], selected_assets)
 
-    scoped_labels: list[dict[str, Any]] = []
+    candidate_labels: dict[str, list[dict[str, Any]]] = {}
     orphan_labels = 0
     off_manifest_labels = 0
     caller_predictions_ignored = 0
@@ -159,12 +159,32 @@ def build_corpus_proof_report(
             continue
         if "predicted_status" in row or "predicted_card_id" in row:
             caller_predictions_ignored += 1
+        candidate_labels.setdefault(evidence_id, []).append({
+            "expected_status": row["expected_status"],
+            "expected_card_id": (
+                str(expected_card_id) if expected_card_id is not None else None
+            ),
+        })
+
+    scoped_labels: list[dict[str, Any]] = []
+    duplicate_labels = 0
+    conflicting_label_ids: list[str] = []
+    for evidence_id, rows in candidate_labels.items():
+        truths = {
+            (row["expected_status"], row["expected_card_id"])
+            for row in rows
+        }
+        duplicate_labels += max(len(rows) - 1, 0)
+        if len(truths) != 1:
+            conflicting_label_ids.append(evidence_id)
+            continue
+        expected_status, expected_card_id = next(iter(truths))
         prediction = predictions[evidence_id]
         scoped_labels.append({
             "evidence_id": evidence_id,
             "predicted_status": prediction["predicted_status"],
             "predicted_card_id": prediction["predicted_card_id"],
-            "expected_status": row["expected_status"],
+            "expected_status": expected_status,
             "expected_card_id": expected_card_id,
         })
 
@@ -201,6 +221,8 @@ def build_corpus_proof_report(
         blockers.append("labels_outside_sanitized_corpus")
     if off_manifest_labels:
         blockers.append("labels_outside_selected_manifest")
+    if conflicting_label_ids:
+        blockers.append("conflicting_duplicate_labels")
     if label_coverage is None or label_coverage < policy.min_label_coverage:
         blockers.append("label_coverage_below_floor")
     if distinct_labeled_cards < policy.target_cards:
@@ -217,7 +239,7 @@ def build_corpus_proof_report(
     blockers.extend(f"routing:{value}" for value in routing["blockers"])
 
     return {
-        "proof_version": "routing-proof.v4",
+        "proof_version": "routing-proof.v5",
         "proof_ready": not blockers,
         "blockers": blockers,
         "corpus_sha256": intake["corpus_sha256"],
@@ -241,6 +263,8 @@ def build_corpus_proof_report(
             "provided": len(label_rows),
             "scoped": len(scoped_labels),
             "unique_scoped": len(unique_labeled_ids),
+            "duplicate_rows_collapsed": duplicate_labels,
+            "conflicting_evidence_ids": sorted(conflicting_label_ids),
             "coverage": label_coverage,
             "unlabeled_sanitized_rows": max(len(accepted_ids) - len(unique_labeled_ids), 0),
             "orphan": orphan_labels,
@@ -253,7 +277,7 @@ def build_corpus_proof_report(
         "routing": routing,
         "predictions": {
             evidence_id: predictions[evidence_id]
-            for evidence_id in sorted({row["evidence_id"] for row in scoped_labels})
+            for evidence_id in sorted(unique_labeled_ids)
         },
     }
 
