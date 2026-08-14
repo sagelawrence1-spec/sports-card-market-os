@@ -24,6 +24,17 @@ def _seed(path, rows):
             )
 
 
+def _policy(**overrides):
+    values = dict(
+        min_labeled_rows=1,
+        min_distinct_relevant_cards=1,
+        max_single_card_share=1.0,
+        max_review_rate=1.0,
+    )
+    values.update(overrides)
+    return RoutingAuditPolicy(**values)
+
+
 def test_false_auto_accept_blocks_production(tmp_path):
     db = tmp_path / "market.sqlite"
     _seed(db, [("e1","card-a","accepted"),("e2","card-b","accepted")])
@@ -32,7 +43,7 @@ def test_false_auto_accept_blocks_production(tmp_path):
     labels.label("e2",reviewer_id="r1",expected_card_id="card-c",is_relevant=True)
     summary = routing_accuracy_summary(
         db,
-        policy=RoutingAuditPolicy(min_labeled_rows=2,min_auto_accept_precision=0.99,max_review_rate=1.0),
+        policy=_policy(min_labeled_rows=2,min_auto_accept_precision=0.99),
     )
     assert summary["false_accepts"] == 1
     assert summary["auto_accept_precision"] == 0.5
@@ -45,7 +56,10 @@ def test_clean_but_small_sample_does_not_unlock_production(tmp_path):
     _seed(db, [("e1","card-a","accepted")])
     labels = RoutingAccuracyStore(db)
     labels.label("e1",reviewer_id="r1",expected_card_id="card-a",is_relevant=True)
-    summary = routing_accuracy_summary(db,policy=RoutingAuditPolicy(min_labeled_rows=10))
+    summary = routing_accuracy_summary(
+        db,
+        policy=_policy(min_labeled_rows=10),
+    )
     assert summary["auto_accept_precision"] == 1.0
     assert summary["production_ready"] is False
     assert summary["blockers"] == ["labeled_sample_too_small"]
@@ -60,7 +74,7 @@ def test_review_rate_ceiling_and_positive_recall_are_measured(tmp_path):
     labels.label("e3",reviewer_id="r1",expected_card_id=None,is_relevant=False)
     summary = routing_accuracy_summary(
         db,
-        policy=RoutingAuditPolicy(min_labeled_rows=3,max_review_rate=0.20),
+        policy=_policy(min_labeled_rows=3,max_review_rate=0.20),
     )
     assert summary["positive_recall"] == 1.0
     assert summary["review_rate"] == pytest.approx(1/3)
@@ -75,7 +89,7 @@ def test_conflicting_reviewer_labels_are_excluded_from_consensus(tmp_path):
     labels.label("e1",reviewer_id="r2",expected_card_id="card-b",is_relevant=True)
     summary = routing_accuracy_summary(
         db,
-        policy=RoutingAuditPolicy(min_labeled_rows=1),
+        policy=_policy(),
         min_reviewers=2,
     )
     assert summary["labeled_rows"] == 0
@@ -90,3 +104,59 @@ def test_label_requires_existing_evidence_and_card_for_relevant_rows(tmp_path):
         labels.label("missing",reviewer_id="r1",expected_card_id="card-a",is_relevant=True)
     with pytest.raises(ValueError):
         labels.label("e1",reviewer_id="r1",expected_card_id=None,is_relevant=True)
+
+
+def test_default_policy_requires_broad_relevant_card_coverage(tmp_path):
+    db = tmp_path / "market.sqlite"
+    rows = [(f"e{i}", "card-a", "accepted") for i in range(50)]
+    _seed(db, rows)
+    labels = RoutingAccuracyStore(db)
+    for i in range(50):
+        labels.label(
+            f"e{i}",
+            reviewer_id="r1",
+            expected_card_id="card-a",
+            is_relevant=True,
+        )
+
+    summary = routing_accuracy_summary(db)
+
+    assert summary["labeled_rows"] == 50
+    assert summary["distinct_relevant_cards"] == 1
+    assert summary["largest_card_share"] == 1.0
+    assert summary["production_ready"] is False
+    assert "relevant_card_coverage_too_narrow" in summary["blockers"]
+    assert "single_card_overrepresented" in summary["blockers"]
+
+
+def test_balanced_multi_card_corpus_can_clear_coverage_gate(tmp_path):
+    db = tmp_path / "market.sqlite"
+    rows = []
+    for card_idx in range(25):
+        for sample_idx in range(2):
+            evidence_id = f"e-{card_idx}-{sample_idx}"
+            card_id = f"card-{card_idx}"
+            rows.append((evidence_id, card_id, "accepted"))
+    _seed(db, rows)
+    labels = RoutingAccuracyStore(db)
+    for evidence_id, card_id, _ in rows:
+        labels.label(
+            evidence_id,
+            reviewer_id="r1",
+            expected_card_id=card_id,
+            is_relevant=True,
+        )
+
+    summary = routing_accuracy_summary(db)
+
+    assert summary["labeled_rows"] == 50
+    assert summary["distinct_relevant_cards"] == 25
+    assert summary["largest_card_share"] == pytest.approx(0.04)
+    assert summary["production_ready"] is True
+
+
+def test_policy_validates_corpus_coverage_settings():
+    with pytest.raises(ValueError):
+        RoutingAuditPolicy(min_distinct_relevant_cards=0)
+    with pytest.raises(ValueError):
+        RoutingAuditPolicy(max_single_card_share=0)
