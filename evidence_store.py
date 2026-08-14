@@ -4,6 +4,18 @@ from datetime import datetime
 from entity_matcher import norm
 from reconstruction import build_reconstruction_delta
 
+PROVIDER_PRIORITY={
+    "ebay_product_research":500,
+    "ebay_marketplace_insights":450,
+    "the_card_api":300,
+    "sold_comps":200,
+}
+
+
+def _provider_priority(provider):
+    return PROVIDER_PRIORITY.get(str(provider or ""),0)
+
+
 SCHEMA=r'''
 CREATE TABLE IF NOT EXISTS source_evidence(
   evidence_id TEXT PRIMARY KEY,
@@ -106,11 +118,18 @@ class EvidenceStore:
         else:
             base=f"{record.provider}|{record.record_type}|{source_item_id}|{record.event_date}|{record.title}|{record.price}"
         eid=hashlib.sha256(base.encode()).hexdigest()[:32]
+        existing=self.conn.execute(
+            "SELECT provider FROM source_evidence WHERE evidence_id=?",
+            (eid,)
+        ).fetchone()
+        if existing is not None and existing["provider"] != record.provider:
+            if _provider_priority(record.provider) <= _provider_priority(existing["provider"]):
+                return eid
         self.conn.execute('''INSERT OR REPLACE INTO source_evidence(
           evidence_id,provider,record_type,source_item_id,card_id,query,title,price,currency,event_date,url,
           match_score,match_status,match_reason,match_diagnostics_json,raw_payload_json,run_id)
           VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',(
-            eid,record.provider,record.record_type,record.source_item_id,card_id,query,record.title,record.price,
+            eid,record.provider,record.record_type,source_item_id,card_id,query,record.title,record.price,
             record.currency,record.event_date,record.url,decision.score,
             "accepted" if decision.accepted else ("review" if decision.reason=="manual_review" else "rejected"),
             decision.reason,json.dumps(decision.diagnostics,sort_keys=True),raw,run_id
