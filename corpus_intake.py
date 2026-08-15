@@ -128,14 +128,15 @@ def sanitize_product_research_rows(
 
     The sanitizer deliberately preserves only evidence needed for parser/matcher auditing.
     Seller/buyer contact fields are removed. Ambiguous prices, malformed sold dates,
-    unknown currency, missing core fields, and non-USD rows (by default) fail closed
-    instead of being silently coerced into usable evidence.
+    unknown currency, missing core fields, conflicting duplicate item IDs, and non-USD
+    rows (by default) fail closed instead of being silently coerced into usable evidence.
     """
     policy = policy or CorpusIntakePolicy()
     accepted: list[dict[str, Any]] = []
     rejected: list[dict[str, Any]] = []
-    seen: set[str] = set()
+    seen_fingerprints_by_key: dict[str, str] = {}
     duplicates = 0
+    conflicting_duplicates = 0
 
     input_rows = list(rows)
     for index, source in enumerate(input_rows):
@@ -182,10 +183,20 @@ def sanitize_product_research_rows(
             continue
 
         dedupe_key = item_id or sanitized["fingerprint"]
-        if dedupe_key in seen:
-            duplicates += 1
+        prior_fingerprint = seen_fingerprints_by_key.get(dedupe_key)
+        if prior_fingerprint is not None:
+            if prior_fingerprint == sanitized["fingerprint"]:
+                duplicates += 1
+            else:
+                conflicting_duplicates += 1
+                rejected.append({
+                    "row_index": index,
+                    "reasons": ["conflicting_duplicate_item_id"],
+                    "sanitized": sanitized,
+                })
             continue
-        seen.add(dedupe_key)
+
+        seen_fingerprints_by_key[dedupe_key] = sanitized["fingerprint"]
         accepted.append(sanitized)
 
     missing_required = sum(
@@ -199,11 +210,14 @@ def sanitize_product_research_rows(
         blockers.append("empty_export")
     if missing_share > policy.max_missing_required_share:
         blockers.append("required_field_loss_exceeds_policy")
+    if conflicting_duplicates:
+        blockers.append("conflicting_duplicate_evidence")
 
     manifest_payload = {
         "accepted": accepted,
         "rejected": rejected,
         "duplicates": duplicates,
+        "conflicting_duplicates": conflicting_duplicates,
         "input_rows": len(input_rows),
     }
 
