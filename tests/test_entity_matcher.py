@@ -69,6 +69,21 @@ def test_chrome_update_and_chrome_are_distinct_set_families():
     assert decision.reason == "wrong_set_family"
 
 
+def test_raw_target_rejects_graded_listing():
+    asset={"year":2020,"manufacturer":"Panini","set_name":"Prizm","player":"Anthony Edwards","card_number":"258","parallel":"Base","autograph":0,"grade_company":"","grade":"","serial_number":""}
+    decision=M.match(asset,"2020 Panini Prizm Anthony Edwards #258 PSA 10")
+    assert not decision.accepted
+    assert decision.reason == "raw_vs_graded_mismatch"
+    assert decision.diagnostics["unexpected_grader"] == ["psa"]
+
+
+def test_raw_target_accepts_ungraded_listing():
+    asset={"year":2020,"manufacturer":"Panini","set_name":"Prizm","player":"Anthony Edwards","card_number":"258","parallel":"Base","autograph":0,"grade_company":"","grade":"","serial_number":""}
+    decision=M.match(asset,"2020 Panini Prizm Anthony Edwards #258")
+    assert decision.accepted
+    assert decision.reason == "accepted"
+
+
 def test_query_contains_discriminators():
     asset={"year":2000,"manufacturer":"Playoff","set_name":"Contenders","player":"Tom Brady","card_number":"144","parallel":"Base","autograph":1,"grade_company":"PSA","grade":9,"serial_number":"100"}
     query=build_ebay_query(asset)
