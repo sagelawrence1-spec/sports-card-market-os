@@ -22,6 +22,7 @@ class ProofPolicy:
     min_label_coverage: float = 0.90
     min_intake_retention: float = 0.90
     min_positive_recall: float = 0.80
+    min_negative_label_share: float | None = None
     max_review_rate: float = 0.35
     max_single_card_share: float = 0.20
     max_sport_share: float = 0.40
@@ -35,6 +36,8 @@ class ProofPolicy:
             raise ValueError("min_intake_retention must be between 0 and 1")
         if not 0 <= self.min_positive_recall <= 1:
             raise ValueError("min_positive_recall must be between 0 and 1")
+        if self.min_negative_label_share is not None and not 0 <= self.min_negative_label_share <= 1:
+            raise ValueError("min_negative_label_share must be between 0 and 1")
         if not 0 <= self.max_review_rate <= 1:
             raise ValueError("max_review_rate must be between 0 and 1")
         if not 0 < self.max_single_card_share <= 1:
@@ -122,7 +125,7 @@ def build_corpus_proof_report(
     policy: ProofPolicy | None = None,
     seed: str = "routing-corpus-v1",
 ) -> dict[str, Any]:
-    policy = policy or ProofPolicy()
+    policy = policy or ProofPolicy(min_negative_label_share=0.20)
 
     intake = sanitize_product_research_rows(
         raw_rows,
@@ -202,14 +205,18 @@ def build_corpus_proof_report(
         if accepted_ids
         else None
     )
-    # Sanitizer-rejected rows cannot simply disappear from proof quality. Duplicates
-    # are valid evidence collapsed for reproducibility, so they count as retained;
-    # only actual rejected rows reduce intake retention.
     intake_retained_rows = intake["accepted_rows"] + intake["duplicates"]
     intake_retention = (
         intake_retained_rows / intake["input_rows"]
         if intake["input_rows"]
         else None
+    )
+
+    negative_labels = [
+        row for row in scoped_labels if row.get("expected_status") == "rejected"
+    ]
+    negative_label_share = (
+        len(negative_labels) / len(scoped_labels) if scoped_labels else None
     )
 
     relevant = [
@@ -239,6 +246,14 @@ def build_corpus_proof_report(
         blockers.append("conflicting_duplicate_labels")
     if label_coverage is None or label_coverage < policy.min_label_coverage:
         blockers.append("label_coverage_below_floor")
+    if (
+        policy.min_negative_label_share is not None
+        and (
+            negative_label_share is None
+            or negative_label_share < policy.min_negative_label_share
+        )
+    ):
+        blockers.append("negative_label_share_below_floor")
     if distinct_labeled_cards < policy.target_cards:
         blockers.append("selected_card_coverage_incomplete")
     if largest_card_share is not None and largest_card_share > policy.max_single_card_share:
@@ -263,6 +278,7 @@ def build_corpus_proof_report(
             "min_label_coverage": policy.min_label_coverage,
             "min_intake_retention": policy.min_intake_retention,
             "min_positive_recall": policy.min_positive_recall,
+            "min_negative_label_share": policy.min_negative_label_share,
             "max_review_rate": policy.max_review_rate,
             "max_single_card_share": policy.max_single_card_share,
             "max_sport_share": policy.max_sport_share,
@@ -288,6 +304,8 @@ def build_corpus_proof_report(
             "off_manifest": off_manifest_labels,
             "distinct_labeled_cards": distinct_labeled_cards,
             "largest_card_share": largest_card_share,
+            "negative_rows": len(negative_labels),
+            "negative_share": negative_label_share,
             "prediction_source": "current_entity_matcher",
             "caller_predictions_ignored": caller_predictions_ignored,
         },
@@ -310,6 +328,7 @@ def main() -> int:
     parser.add_argument("--min-label-coverage", type=float, default=0.90)
     parser.add_argument("--min-intake-retention", type=float, default=0.90)
     parser.add_argument("--min-positive-recall", type=float, default=0.80)
+    parser.add_argument("--min-negative-label-share", type=float, default=0.20)
     args = parser.parse_args()
 
     candidates = json.loads(Path(args.candidates).read_text())
@@ -324,6 +343,7 @@ def main() -> int:
             min_label_coverage=args.min_label_coverage,
             min_intake_retention=args.min_intake_retention,
             min_positive_recall=args.min_positive_recall,
+            min_negative_label_share=args.min_negative_label_share,
         ),
     )
     Path(args.output).write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
