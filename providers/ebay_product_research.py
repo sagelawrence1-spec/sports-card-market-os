@@ -28,6 +28,7 @@ ALIASES={
 
 _SOLD_DATE_FORMATS=("%Y-%m-%d","%m/%d/%Y","%m/%d/%y","%b %d, %Y","%B %d, %Y")
 _PRICE_RANGE_RE=re.compile(r"\d[\d,.]*\s*[-–—]\s*[$€£]?\s*\d[\d,.]*")
+_MONEY_VALUE_RE=re.compile(r"^(?:[A-Z]{3}\s*)?[$€£]?\s*(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d{1,2})?$",re.IGNORECASE)
 _EBAY_ITEM_URL_RE=re.compile(r"/itm/(?:[^/?#]+/)?(\d+)(?:[/?#]|$)",re.IGNORECASE)
 
 def _norm(s): return re.sub(r"[^a-z0-9]+"," ",str(s).lower()).strip()
@@ -52,25 +53,27 @@ def _negative_money(text):
         return bool(re.match(r"\d",cleaned))
     return False
 
-def _money(v):
+def _parsed_money_value(v):
     text=" ".join(str(v or "").strip().split())
     if not text or _PRICE_RANGE_RE.search(text) or _negative_money(text): return None
-    s=re.sub(r"[^0-9.]","",text.replace(",",""))
-    if not s or s.count(".")>1: return None
-    try: value=float(s)
+    # Do not recover malformed evidence by deleting arbitrary text or punctuation.
+    # Accept only a single conventional monetary token with optional ISO code/symbol,
+    # well-formed thousands separators, and at most two decimal places.
+    if not _MONEY_VALUE_RE.fullmatch(text): return None
+    numeric=re.sub(r"^(?:[A-Z]{3}\s*)?[$€£]?\s*", "", text, flags=re.IGNORECASE).replace(",","")
+    try: return float(numeric)
     except ValueError: return None
-    return value if value>0 else None
+
+def _money(v):
+    value=_parsed_money_value(v)
+    return value if value is not None and value>0 else None
 
 def _shipping_amount(v):
     text=" ".join(str(v or "").strip().split())
     if not text: return None
     if text.lower() in {"free","free shipping"}: return 0.0
-    if _PRICE_RANGE_RE.search(text) or _negative_money(text): return None
-    s=re.sub(r"[^0-9.]","",text.replace(",",""))
-    if not s or s.count(".")>1: return None
-    try: value=float(s)
-    except ValueError: return None
-    return value if value>=0 else None
+    value=_parsed_money_value(text)
+    return value if value is not None and value>=0 else None
 
 def _sold_date(v):
     text=" ".join(str(v or "").strip().split())
