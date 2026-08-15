@@ -29,18 +29,20 @@ with tempfile.TemporaryDirectory() as td:
         w.writerow({'Item Title':'Price range comp','Sold Price':'$100-$150','Sold Date':'2026-08-04','Item ID':'995'})
         w.writerow({'Item Title':'Missing stable identity','Sold Price':'$175.00','Sold Date':'2026-08-05'})
         w.writerow({'Item Title':'Conflicting identity','Sold Price':'$180.00','Sold Date':'2026-08-06','Item ID':'997','Item URL':'https://www.ebay.com/itm/998'})
+        w.writerow({'Item Title':'   ','Sold Price':'$190.00','Sold Date':'2026-08-07','Item ID':'999'})
     rr=EbayProductResearchProvider().load_csv(str(p),'ohtani')
     assert len(rr.records)==2
     assert rr.records[0].price==3250.0 and rr.records[0].source_item_id=='991'
     assert rr.records[0].event_date=='2026-08-01' and rr.records[0].currency=='USD'
     assert rr.records[1].source_item_id=='996'
-    assert rr.metadata['accepted_rows']==2 and rr.metadata['rejected_rows']==6
+    assert rr.metadata['accepted_rows']==2 and rr.metadata['rejected_rows']==7
     assert rr.metadata['rejection_reasons']=={
         'conflicting_item_id':1,
         'invalid_or_ambiguous_price':1,
         'invalid_sold_date':1,
         'missing_currency':1,
         'missing_stable_item_id':1,
+        'missing_title':1,
         'non_usd_currency':1,
     }
 print('adapter tests: PASS')
