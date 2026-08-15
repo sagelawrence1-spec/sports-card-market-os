@@ -55,3 +55,37 @@ def test_generic_refractor_still_accepts_when_confirmed():
     decision=M.match(_asset("Refractor"),"2024 Topps Chrome Shohei Ohtani #10 Refractor PSA 10")
     assert decision.accepted
     assert decision.reason == "accepted"
+
+
+def test_base_target_rejects_sapphire_listing():
+    decision=M.match(_asset("Base"),"2024 Topps Chrome Shohei Ohtani #10 Sapphire PSA 10")
+    assert not decision.accepted
+    assert decision.reason == "unexpected_parallel"
+    assert decision.diagnostics["unexpected_parallel"] == ["sapphire"]
+
+
+def test_base_target_rejects_wave_listing():
+    decision=M.match(_asset("Base"),"2024 Topps Chrome Shohei Ohtani #10 Wave PSA 10")
+    assert not decision.accepted
+    assert decision.reason == "unexpected_parallel"
+    assert decision.diagnostics["unexpected_parallel"] == ["wave"]
+
+
+def test_base_target_rejects_atomic_listing():
+    decision=M.match(_asset("Base"),"2024 Topps Chrome Shohei Ohtani #10 Atomic PSA 10")
+    assert not decision.accepted
+    assert decision.reason == "unexpected_parallel"
+    assert decision.diagnostics["unexpected_parallel"] == ["atomic"]
+
+
+def test_base_target_rejects_generic_refractor_listing():
+    decision=M.match(_asset("Base"),"2024 Topps Chrome Shohei Ohtani #10 Refractor PSA 10")
+    assert not decision.accepted
+    assert decision.reason == "unexpected_parallel"
+    assert decision.diagnostics["unexpected_parallel"] == ["refractor"]
+
+
+def test_base_target_still_accepts_plain_base_listing():
+    decision=M.match(_asset("Base"),"2024 Topps Chrome Shohei Ohtani #10 PSA 10")
+    assert decision.accepted
+    assert decision.reason == "accepted"
