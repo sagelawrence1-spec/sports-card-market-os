@@ -66,6 +66,22 @@ def _sold_date(v):
         except ValueError: continue
     return None
 
+def _strong_currency_marker(raw):
+    """Return a currency only when the raw amount carries an unambiguous marker."""
+    text=" ".join(str(raw or "").strip().split())
+    upper=text.upper()
+    if "€" in text: return "EUR"
+    if "£" in text: return "GBP"
+    for code in ("USD","CAD","AUD","NZD","HKD"):
+        if re.search(rf"\b{code}\b",upper): return code
+    for pattern,code in ((r"C\s*\$","CAD"),(r"A\s*\$","AUD"),(r"NZ\s*\$","NZD"),(r"HK\s*\$","HKD")):
+        if re.search(pattern,upper): return code
+    return None
+
+def _currency_conflicts(currency, raw_amount):
+    marker=_strong_currency_marker(raw_amount)
+    return bool(currency and marker and marker!=currency)
+
 def _currency(explicit, raw_price):
     value=" ".join(str(explicit or "").strip().split()).upper()
     if value: return value
@@ -119,6 +135,9 @@ class EbayProductResearchProvider:
             if sold_date is None:
                 rejection_reasons["invalid_sold_date"]+=1
                 continue
+            if _currency_conflicts(currency,raw_price):
+                rejection_reasons["conflicting_currency_evidence"]+=1
+                continue
             if currency is None:
                 rejection_reasons["missing_currency"]+=1
                 continue
@@ -137,7 +156,11 @@ class EbayProductResearchProvider:
                 continue
             shipping=None
             if cols["shipping"]:
-                shipping=_shipping_amount(r.get(cols["shipping"]))
+                raw_shipping=r.get(cols["shipping"])
+                if _currency_conflicts(currency,raw_shipping):
+                    rejection_reasons["conflicting_shipping_currency"]+=1
+                    continue
+                shipping=_shipping_amount(raw_shipping)
                 if shipping is None:
                     rejection_reasons["invalid_or_missing_shipping"]+=1
                     continue
