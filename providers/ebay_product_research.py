@@ -98,6 +98,10 @@ def _currency(explicit, raw_price):
         return None
     return "USD"
 
+def _canonical_item_id(v):
+    text=str(v or "").strip()
+    return text if text.isdigit() else None
+
 def _item_id_from_url(v):
     text=str(v or "").strip()
     if not text: return None
@@ -144,7 +148,11 @@ class EbayProductResearchProvider:
             if currency!="USD":
                 rejection_reasons["non_usd_currency"]+=1
                 continue
-            explicit_id=str(r.get(cols["id"]) or "").strip() if cols["id"] else ""
+            raw_explicit_id=str(r.get(cols["id"]) or "").strip() if cols["id"] else ""
+            explicit_id=_canonical_item_id(raw_explicit_id)
+            if raw_explicit_id and explicit_id is None:
+                rejection_reasons["invalid_item_id"]+=1
+                continue
             raw_url=r.get(cols["url"]) if cols["url"] else None
             url_id=_item_id_from_url(raw_url)
             if explicit_id and url_id and explicit_id!=url_id:
