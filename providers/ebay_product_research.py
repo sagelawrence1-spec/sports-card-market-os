@@ -28,6 +28,7 @@ ALIASES={
 
 _SOLD_DATE_FORMATS=("%Y-%m-%d","%m/%d/%Y","%m/%d/%y","%b %d, %Y","%B %d, %Y")
 _PRICE_RANGE_RE=re.compile(r"\d[\d,.]*\s*[-–—]\s*[$€£]?\s*\d[\d,.]*")
+_NEGATIVE_MONEY_RE=re.compile(r"(?:^|\s)(?:[A-Z]{3}\s*)?[$€£]?\s*-\s*\d",re.IGNORECASE)
 _EBAY_ITEM_URL_RE=re.compile(r"/itm/(?:[^/?#]+/)?(\d+)(?:[/?#]|$)",re.IGNORECASE)
 
 def _norm(s): return re.sub(r"[^a-z0-9]+"," ",str(s).lower()).strip()
@@ -38,9 +39,14 @@ def _find(headers, aliases):
         if _norm(a) in nh: return nh[_norm(a)]
     return None
 
+def _negative_money(text):
+    stripped=" ".join(str(text or "").strip().split())
+    if _NEGATIVE_MONEY_RE.search(stripped): return True
+    return bool(re.fullmatch(r"\(\s*(?:[A-Z]{3}\s*)?[$€£]?\s*\d[\d,.]*\s*\)",stripped,re.IGNORECASE))
+
 def _money(v):
     text=" ".join(str(v or "").strip().split())
-    if not text or _PRICE_RANGE_RE.search(text): return None
+    if not text or _PRICE_RANGE_RE.search(text) or _negative_money(text): return None
     s=re.sub(r"[^0-9.]","",text.replace(",",""))
     if not s or s.count(".")>1: return None
     try: value=float(s)
@@ -51,7 +57,7 @@ def _shipping_amount(v):
     text=" ".join(str(v or "").strip().split())
     if not text: return None
     if text.lower() in {"free","free shipping"}: return 0.0
-    if _PRICE_RANGE_RE.search(text): return None
+    if _PRICE_RANGE_RE.search(text) or _negative_money(text): return None
     s=re.sub(r"[^0-9.]","",text.replace(",",""))
     if not s or s.count(".")>1: return None
     try: value=float(s)
