@@ -38,9 +38,23 @@ def _find(headers, aliases):
         if _norm(a) in nh: return nh[_norm(a)]
     return None
 
+def _negative_money(text):
+    stripped=" ".join(str(text or "").strip().split())
+    if re.fullmatch(r"\(\s*(?:[A-Z]{3}\s*)?[$€£]?\s*\d[\d,.]*\s*\)",stripped,re.IGNORECASE):
+        return True
+    # Normalize only leading currency decoration so both "-$125" and "$-125"
+    # remain visibly negative instead of becoming positive when punctuation is stripped.
+    cleaned=re.sub(r"^(?:[A-Z]{3}\s*)?", "", stripped, flags=re.IGNORECASE)
+    cleaned=re.sub(r"^([$€£])\s*", "", cleaned)
+    if cleaned.startswith("-"):
+        cleaned=cleaned[1:].lstrip()
+        cleaned=re.sub(r"^([$€£])\s*", "", cleaned)
+        return bool(re.match(r"\d",cleaned))
+    return False
+
 def _money(v):
     text=" ".join(str(v or "").strip().split())
-    if not text or _PRICE_RANGE_RE.search(text): return None
+    if not text or _PRICE_RANGE_RE.search(text) or _negative_money(text): return None
     s=re.sub(r"[^0-9.]","",text.replace(",",""))
     if not s or s.count(".")>1: return None
     try: value=float(s)
@@ -51,7 +65,7 @@ def _shipping_amount(v):
     text=" ".join(str(v or "").strip().split())
     if not text: return None
     if text.lower() in {"free","free shipping"}: return 0.0
-    if _PRICE_RANGE_RE.search(text): return None
+    if _PRICE_RANGE_RE.search(text) or _negative_money(text): return None
     s=re.sub(r"[^0-9.]","",text.replace(",",""))
     if not s or s.count(".")>1: return None
     try: value=float(s)
