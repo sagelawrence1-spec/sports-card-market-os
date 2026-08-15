@@ -18,6 +18,7 @@ def test_sanitizer_removes_sensitive_fields_and_preserves_core_evidence():
     row = result["accepted"][0]
     assert row["item_id"] == "123456789012"
     assert row["sold_price"] == 250.0
+    assert row["sold_date"] == "2026-08-01"
     assert "seller_username" not in row
     assert "buyer_name" not in row
 
@@ -49,6 +50,60 @@ def test_non_usd_rows_fail_closed_by_default():
     ])
     assert result["accepted_rows"] == 0
     assert "non_usd_currency" in result["rejected"][0]["reasons"]
+
+
+def test_missing_currency_is_not_silently_assumed_usd():
+    result = sanitize_product_research_rows([
+        {
+            "Item ID": "123456789012",
+            "Title": "Shohei Ohtani PSA 10",
+            "Sold Price": "125.00",
+            "Sold Date": "2026-08-01",
+        }
+    ])
+    assert result["accepted_rows"] == 0
+    assert "missing_currency" in result["rejected"][0]["reasons"]
+
+
+def test_dollar_price_can_supply_usd_when_currency_column_is_absent():
+    result = sanitize_product_research_rows([
+        {
+            "Item ID": "123456789012",
+            "Title": "Shohei Ohtani PSA 10",
+            "Sold Price": "$125.00",
+            "Sold Date": "2026-08-01",
+        }
+    ])
+    assert result["accepted_rows"] == 1
+    assert result["accepted"][0]["currency"] == "USD"
+
+
+def test_common_sold_date_format_is_normalized_to_iso():
+    result = sanitize_product_research_rows([
+        {
+            "Item ID": "123456789012",
+            "Title": "Shohei Ohtani PSA 10",
+            "Sold Price": "$125.00",
+            "Sold Date": "08/01/2026",
+            "Currency": "USD",
+        }
+    ])
+    assert result["accepted_rows"] == 1
+    assert result["accepted"][0]["sold_date"] == "2026-08-01"
+
+
+def test_malformed_sold_date_fails_closed():
+    result = sanitize_product_research_rows([
+        {
+            "Item ID": "123456789012",
+            "Title": "Shohei Ohtani PSA 10",
+            "Sold Price": "$125.00",
+            "Sold Date": "not-a-date",
+            "Currency": "USD",
+        }
+    ])
+    assert result["accepted_rows"] == 0
+    assert "invalid_sold_date" in result["rejected"][0]["reasons"]
 
 
 def test_duplicate_item_ids_are_deduped_deterministically():
