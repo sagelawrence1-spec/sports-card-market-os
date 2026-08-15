@@ -6,7 +6,8 @@ publish an open Marketplace Insights endpoint for new users, so this adapter acc
 structured extracts captured from Product Research without changing downstream logic.
 
 Accepted input: CSV with flexible aliases for title, sold price, sold date, item ID and URL.
-Rows fail closed when sold date, price, or USD currency evidence is ambiguous.
+Rows fail closed when sold date, price, USD currency evidence, or stable sold-item identity
+is ambiguous.
 """
 import csv, re
 from collections import Counter
@@ -27,6 +28,7 @@ ALIASES={
 
 _SOLD_DATE_FORMATS=("%Y-%m-%d","%m/%d/%Y","%m/%d/%y","%b %d, %Y","%B %d, %Y")
 _PRICE_RANGE_RE=re.compile(r"\d[\d,.]*\s*[-–—]\s*[$€£]?\s*\d[\d,.]*")
+_EBAY_ITEM_URL_RE=re.compile(r"/itm/(?:[^/?#]+/)?(\d+)(?:[/?#]|$)",re.IGNORECASE)
 
 def _norm(s): return re.sub(r"[^a-z0-9]+"," ",str(s).lower()).strip()
 
@@ -62,6 +64,12 @@ def _currency(explicit, raw_price):
         return "USD"
     return None
 
+def _item_id_from_url(v):
+    text=str(v or "").strip()
+    if not text: return None
+    match=_EBAY_ITEM_URL_RE.search(text)
+    return match.group(1) if match else None
+
 class EbayProductResearchProvider:
     provider_name="ebay_product_research"
 
@@ -77,7 +85,7 @@ class EbayProductResearchProvider:
             raise ValueError(f"Could not locate title/price/date columns. Headers={headers}")
         records=[]
         rejection_reasons=Counter()
-        for i,r in enumerate(rows,1):
+        for r in rows:
             raw_price=r.get(cols["price"])
             price=_money(raw_price)
             sold_date=_sold_date(r.get(cols["date"]))
@@ -95,16 +103,25 @@ class EbayProductResearchProvider:
             if currency!="USD":
                 rejection_reasons["non_usd_currency"]+=1
                 continue
-            sid=(r.get(cols["id"]) if cols["id"] else None) or f"row-{i}"
+            explicit_id=str(r.get(cols["id"]) or "").strip() if cols["id"] else ""
+            raw_url=r.get(cols["url"]) if cols["url"] else None
+            url_id=_item_id_from_url(raw_url)
+            if explicit_id and url_id and explicit_id!=url_id:
+                rejection_reasons["conflicting_item_id"]+=1
+                continue
+            sid=explicit_id or url_id
+            if not sid:
+                rejection_reasons["missing_stable_item_id"]+=1
+                continue
             shipping=_money(r.get(cols["shipping"])) if cols["shipping"] else None
             payload=dict(r)
             payload["normalized_shipping"] = shipping
             payload["normalized_listing_format"] = r.get(cols["format"]) if cols["format"] else None
             records.append(EvidenceRecord(
-                provider=self.provider_name,record_type="sold",source_item_id=str(sid),
+                provider=self.provider_name,record_type="sold",source_item_id=sid,
                 title=r.get(cols["title"]) or "",price=price,
                 event_date=sold_date,
-                url=(r.get(cols["url"]) if cols["url"] else None),currency=currency,payload=payload,
+                url=raw_url,currency=currency,payload=payload,
             ))
         return ProviderResult(records,query,self.provider_name,{
             "path":str(p),"rows":len(rows),"columns":cols,
