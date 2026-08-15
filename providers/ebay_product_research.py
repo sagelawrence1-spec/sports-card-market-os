@@ -28,7 +28,6 @@ ALIASES={
 
 _SOLD_DATE_FORMATS=("%Y-%m-%d","%m/%d/%Y","%m/%d/%y","%b %d, %Y","%B %d, %Y")
 _PRICE_RANGE_RE=re.compile(r"\d[\d,.]*\s*[-–—]\s*[$€£]?\s*\d[\d,.]*")
-_NEGATIVE_MONEY_RE=re.compile(r"(?:^|\s)(?:[A-Z]{3}\s*)?[$€£]?\s*-\s*\d",re.IGNORECASE)
 _EBAY_ITEM_URL_RE=re.compile(r"/itm/(?:[^/?#]+/)?(\d+)(?:[/?#]|$)",re.IGNORECASE)
 
 def _norm(s): return re.sub(r"[^a-z0-9]+"," ",str(s).lower()).strip()
@@ -41,8 +40,17 @@ def _find(headers, aliases):
 
 def _negative_money(text):
     stripped=" ".join(str(text or "").strip().split())
-    if _NEGATIVE_MONEY_RE.search(stripped): return True
-    return bool(re.fullmatch(r"\(\s*(?:[A-Z]{3}\s*)?[$€£]?\s*\d[\d,.]*\s*\)",stripped,re.IGNORECASE))
+    if re.fullmatch(r"\(\s*(?:[A-Z]{3}\s*)?[$€£]?\s*\d[\d,.]*\s*\)",stripped,re.IGNORECASE):
+        return True
+    # Normalize only leading currency decoration so both "-$125" and "$-125"
+    # remain visibly negative instead of becoming positive when punctuation is stripped.
+    cleaned=re.sub(r"^(?:[A-Z]{3}\s*)?", "", stripped, flags=re.IGNORECASE)
+    cleaned=re.sub(r"^([$€£])\s*", "", cleaned)
+    if cleaned.startswith("-"):
+        cleaned=cleaned[1:].lstrip()
+        cleaned=re.sub(r"^([$€£])\s*", "", cleaned)
+        return bool(re.match(r"\d",cleaned))
+    return False
 
 def _money(v):
     text=" ".join(str(v or "").strip().split())
