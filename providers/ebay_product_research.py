@@ -6,8 +6,8 @@ publish an open Marketplace Insights endpoint for new users, so this adapter acc
 structured extracts captured from Product Research without changing downstream logic.
 
 Accepted input: CSV with flexible aliases for title, sold price, sold date, item ID and URL.
-Rows fail closed when title, sold date, price, USD currency evidence, or stable sold-item
-identity is ambiguous.
+Rows fail closed when title, sold date, price, USD currency evidence, stable sold-item
+identity, or an explicitly exported shipping amount is ambiguous.
 """
 import csv, re
 from collections import Counter
@@ -46,6 +46,17 @@ def _money(v):
     try: value=float(s)
     except ValueError: return None
     return value if value>0 else None
+
+def _shipping_amount(v):
+    text=" ".join(str(v or "").strip().split())
+    if not text: return None
+    if text.lower() in {"free","free shipping"}: return 0.0
+    if _PRICE_RANGE_RE.search(text): return None
+    s=re.sub(r"[^0-9.]","",text.replace(",",""))
+    if not s or s.count(".")>1: return None
+    try: value=float(s)
+    except ValueError: return None
+    return value if value>=0 else None
 
 def _sold_date(v):
     text=" ".join(str(v or "").strip().split())
@@ -88,14 +99,14 @@ class EbayProductResearchProvider:
         for r in rows:
             title=" ".join(str(r.get(cols["title"]) or "").strip().split())
             raw_price=r.get(cols["price"])
-            price=_money(raw_price)
+            sold_price=_money(raw_price)
             sold_date=_sold_date(r.get(cols["date"]))
             explicit_currency=r.get(cols["currency"]) if cols["currency"] else None
             currency=_currency(explicit_currency,raw_price)
             if not title:
                 rejection_reasons["missing_title"]+=1
                 continue
-            if price is None:
+            if sold_price is None:
                 rejection_reasons["invalid_or_ambiguous_price"]+=1
                 continue
             if sold_date is None:
@@ -117,8 +128,17 @@ class EbayProductResearchProvider:
             if not sid:
                 rejection_reasons["missing_stable_item_id"]+=1
                 continue
-            shipping=_money(r.get(cols["shipping"])) if cols["shipping"] else None
+            shipping=None
+            if cols["shipping"]:
+                shipping=_shipping_amount(r.get(cols["shipping"]))
+                if shipping is None:
+                    rejection_reasons["invalid_or_missing_shipping"]+=1
+                    continue
+            price=round(sold_price+(shipping or 0),2)
+            price_basis="sold_price_plus_shipping" if cols["shipping"] else "sold_price_only"
             payload=dict(r)
+            payload["price_basis"] = price_basis
+            payload["normalized_sold_price"] = sold_price
             payload["normalized_shipping"] = shipping
             payload["normalized_listing_format"] = r.get(cols["format"]) if cols["format"] else None
             records.append(EvidenceRecord(
@@ -129,6 +149,7 @@ class EbayProductResearchProvider:
             ))
         return ProviderResult(records,query,self.provider_name,{
             "path":str(p),"rows":len(rows),"columns":cols,
+            "price_basis":"sold_price_plus_shipping" if cols["shipping"] else "sold_price_only",
             "accepted_rows":len(records),"rejected_rows":len(rows)-len(records),
             "rejection_reasons":dict(sorted(rejection_reasons.items())),
         })
