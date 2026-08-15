@@ -7,10 +7,10 @@ structured extracts captured from Product Research without changing downstream l
 
 Accepted input: CSV with flexible aliases for title, sold price, sold date, item ID and URL.
 Rows fail closed when title, sold date, price, USD currency evidence, stable sold-item
-identity, or an explicitly exported shipping amount is ambiguous.
+identity, an explicitly exported shipping amount, or duplicate sold evidence is ambiguous.
 """
 import csv, re
-from collections import Counter
+from collections import Counter, defaultdict
 from datetime import datetime
 from pathlib import Path
 from .base import EvidenceRecord, ProviderResult
@@ -89,12 +89,12 @@ class EbayProductResearchProvider:
         with p.open(newline="",encoding="utf-8-sig") as f:
             rows=list(csv.DictReader(f))
         if not rows:
-            return ProviderResult([],query,self.provider_name,{"path":str(p),"rows":0,"accepted_rows":0,"rejected_rows":0,"rejection_reasons":{}})
+            return ProviderResult([],query,self.provider_name,{"path":str(p),"rows":0,"accepted_rows":0,"deduplicated_rows":0,"rejected_rows":0,"rejection_reasons":{}})
         headers=list(rows[0].keys())
         cols={k:_find(headers,v) for k,v in ALIASES.items()}
         if not cols["title"] or not cols["price"] or not cols["date"]:
             raise ValueError(f"Could not locate title/price/date columns. Headers={headers}")
-        records=[]
+        candidates=[]
         rejection_reasons=Counter()
         for r in rows:
             title=" ".join(str(r.get(cols["title"]) or "").strip().split())
@@ -141,15 +141,29 @@ class EbayProductResearchProvider:
             payload["normalized_sold_price"] = sold_price
             payload["normalized_shipping"] = shipping
             payload["normalized_listing_format"] = r.get(cols["format"]) if cols["format"] else None
-            records.append(EvidenceRecord(
+            candidates.append(EvidenceRecord(
                 provider=self.provider_name,record_type="sold",source_item_id=sid,
-                title=title,price=price,
-                event_date=sold_date,
+                title=title,price=price,event_date=sold_date,
                 url=raw_url,currency=currency,payload=payload,
             ))
+
+        grouped=defaultdict(list)
+        for record in candidates:
+            grouped[record.source_item_id].append(record)
+        records=[]
+        deduplicated_rows=0
+        for group in grouped.values():
+            fingerprints={(r.title,r.price,r.event_date,r.currency) for r in group}
+            if len(fingerprints)>1:
+                rejection_reasons["conflicting_duplicate_evidence"]+=len(group)
+                continue
+            records.append(group[0])
+            deduplicated_rows+=len(group)-1
+
+        rejected_rows=sum(rejection_reasons.values())
         return ProviderResult(records,query,self.provider_name,{
             "path":str(p),"rows":len(rows),"columns":cols,
             "price_basis":"sold_price_plus_shipping" if cols["shipping"] else "sold_price_only",
-            "accepted_rows":len(records),"rejected_rows":len(rows)-len(records),
+            "accepted_rows":len(records),"deduplicated_rows":deduplicated_rows,"rejected_rows":rejected_rows,
             "rejection_reasons":dict(sorted(rejection_reasons.items())),
         })
