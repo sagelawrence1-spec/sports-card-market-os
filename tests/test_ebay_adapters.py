@@ -31,6 +31,7 @@ with tempfile.TemporaryDirectory() as td:
         w.writerow({'Item Title':'Conflicting identity','Sold Price':'$180.00','Sold Date':'2026-08-06','Item ID':'997','Item URL':'https://www.ebay.com/itm/998','Shipping':'$0.00'})
         w.writerow({'Item Title':'   ','Sold Price':'$190.00','Sold Date':'2026-08-07','Item ID':'999','Shipping':'$0.00'})
         w.writerow({'Item Title':'Unknown shipping comp','Sold Price':'$200.00','Sold Date':'2026-08-08','Item ID':'1000','Shipping':''})
+        w.writerow({'Item Title':'Qualified foreign dollar comp','Sold Price':'NZD $210.00','Sold Date':'2026-08-09','Item ID':'1001','Shipping':'$0.00'})
     rr=EbayProductResearchProvider().load_csv(str(p),'ohtani')
     assert len(rr.records)==2
     assert rr.records[0].price==3262.5 and rr.records[0].source_item_id=='991'
@@ -40,13 +41,13 @@ with tempfile.TemporaryDirectory() as td:
     assert rr.records[0].event_date=='2026-08-01' and rr.records[0].currency=='USD'
     assert rr.records[1].source_item_id=='996' and rr.records[1].price==250.0
     assert rr.metadata['price_basis']=='sold_price_plus_shipping'
-    assert rr.metadata['accepted_rows']==2 and rr.metadata['rejected_rows']==8
+    assert rr.metadata['accepted_rows']==2 and rr.metadata['rejected_rows']==9
     assert rr.metadata['rejection_reasons']=={
         'conflicting_item_id':1,
         'invalid_or_ambiguous_price':1,
         'invalid_or_missing_shipping':1,
         'invalid_sold_date':1,
-        'missing_currency':1,
+        'missing_currency':2,
         'missing_stable_item_id':1,
         'missing_title':1,
         'non_usd_currency':1,

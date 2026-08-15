@@ -71,9 +71,16 @@ def _currency(explicit, raw_price):
     if value: return value
     price_text=" ".join(str(raw_price or "").strip().split())
     upper=price_text.upper()
-    if "$" in price_text and "CAD" not in upper and "AUD" not in upper:
+    if "USD" in upper and "$" in price_text:
         return "USD"
-    return None
+    if "$" not in price_text:
+        return None
+    # Infer USD only from a truly unqualified dollar marker. Strings such as
+    # "NZD $100", "C$100", or "HKD$100" are ambiguous/foreign and must not
+    # be silently treated as USD when the export omits a currency column.
+    if re.search(r"[A-Z]",upper):
+        return None
+    return "USD"
 
 def _item_id_from_url(v):
     text=str(v or "").strip()
