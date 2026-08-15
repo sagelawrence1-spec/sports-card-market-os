@@ -35,6 +35,24 @@ def aliases_for_parallel(p:str)->set:
     return {x for x in out if x}
 
 
+def card_number_evidence(cardnum:str, title:str) -> tuple[bool,list[str]]:
+    """Return whether the target card number is explicitly supported by title evidence.
+
+    Numeric card numbers require an identity marker (#, No., or Card) so unrelated
+    values such as PSA grades cannot masquerade as card-number evidence. Alphanumeric
+    catalog numbers remain safe to match as standalone tokens (for example HMT1).
+    """
+    if not cardnum:
+        return False,[]
+    if cardnum.isdigit():
+        pat=rf"(?<![a-z0-9])(?:#\s*|no\.?\s*|card\s+#?\s*){re.escape(cardnum)}(?![a-z0-9])"
+    else:
+        pat=rf"(?<![a-z0-9])(?:#\s*|no\.?\s*|card\s+#?\s*)?{re.escape(cardnum)}(?![a-z0-9])"
+    matched=bool(re.search(pat,title))
+    explicit_nums=re.findall(r"(?:#\s*|no\.?\s*|card\s+#?\s*)([a-z0-9-]+)",title)
+    return matched,explicit_nums
+
+
 @dataclass
 class MatchDecision:
     accepted: bool
@@ -87,14 +105,12 @@ class SportsCardEntityMatcher:
                 diag["year_match"]=0
 
         if cardnum:
-            pat=rf"(?<![a-z0-9])(?:#|no\.?\s*)?{re.escape(cardnum)}(?![a-z0-9])"
-            card_match=bool(re.search(pat,t))
+            card_match,explicit_nums=card_number_evidence(cardnum,t)
             if card_match:
                 score += 9
                 diag["card_number_match"]=1
             else:
                 diag["card_number_match"]=0
-                explicit_nums=re.findall(r"(?:#|no\.?\s*)([a-z0-9-]+)",t)
                 m=re.match(r"([a-z]+)([0-9].*)$",cardnum)
                 same_prefix=[]
                 if m:
@@ -102,7 +118,7 @@ class SportsCardEntityMatcher:
                     same_prefix=[tok for tok in title_tokens if tok.startswith(prefix) and tok!=cardnum and re.match(rf"^{re.escape(prefix)}[0-9]",tok)]
                 if explicit_nums or same_prefix:
                     return MatchDecision(False,20.0,"wrong_card_number",{**diag,"explicit_card_numbers":explicit_nums,"same_prefix_numbers":same_prefix})
-                score -= 12
+                return MatchDecision(False,70.0,"manual_review",{**diag,"review_reason":"card_number_not_confirmed"})
 
         set_tokens=toks(setname)
         if set_tokens:
