@@ -9,6 +9,11 @@ DISTINCTIVE_SET_MARKERS={
     "bowman","prizm","select","optic","mosaic","finest","heritage","stadium",
     "inception","museum","definitive","transcendent","immaculate","flawless",
 }
+PARALLEL_IDENTITY_MARKERS={
+    "silver","gold","red","blue","green","orange","purple","black","pink","aqua","teal",
+    "sepia","negative","xfractor","superfractor","wave","shimmer","sapphire","atomic","speckle",
+    "raywave","lava",
+}
 
 
 def norm(s:str)->str:
@@ -130,10 +135,6 @@ class SportsCardEntityMatcher:
             diag["set_coverage"]=round(cov,3)
             score += 8*cov
 
-            # Distinct product-line names are identity evidence, not merely score boosts.
-            # If a target names one (Bowman, Prizm, Select, etc.), the listing must
-            # confirm it. Conversely, an explicit conflicting product line in the
-            # listing fails closed even when player/year/card number all match.
             target_set_markers=DISTINCTIVE_SET_MARKERS & set_tokens
             title_set_markers=DISTINCTIVE_SET_MARKERS & title_tokens
             diag["target_set_markers"]=sorted(target_set_markers)
@@ -144,8 +145,6 @@ class SportsCardEntityMatcher:
             if conflicting_set_markers:
                 return MatchDecision(False,25.0,"wrong_set_family",{**diag,"conflicting_set_markers":sorted(conflicting_set_markers)})
 
-            # Chrome and Chrome Update are different collectible families. When the
-            # title explicitly says Chrome, Update presence must agree with target.
             if "chrome" in set_tokens and "chrome" in title_tokens:
                 target_update="update" in set_tokens
                 title_update="update" in title_tokens
@@ -178,14 +177,25 @@ class SportsCardEntityMatcher:
 
         if parallel and parallel not in {"base","base card"}:
             palias=aliases_for_parallel(parallel)
+            target_parallel_markers=PARALLEL_IDENTITY_MARKERS & toks(parallel)
+            title_parallel_markers=PARALLEL_IDENTITY_MARKERS & title_tokens
+            diag["target_parallel_markers"]=sorted(target_parallel_markers)
+            diag["title_parallel_markers"]=sorted(title_parallel_markers)
+
+            conflicting_parallel_markers=title_parallel_markers-target_parallel_markers
+            if conflicting_parallel_markers:
+                return MatchDecision(False,30.0,"wrong_parallel",{**diag,"conflicting_parallel_markers":sorted(conflicting_parallel_markers)})
+            if target_parallel_markers and not target_parallel_markers.issubset(title_parallel_markers):
+                return MatchDecision(False,70.0,"manual_review",{**diag,"review_reason":"parallel_not_confirmed"})
+
             pmatch=any(x in t for x in palias)
             diag["parallel_match"]=int(pmatch)
             if pmatch:
                 score += 10
+            elif "base" in title_tokens:
+                return MatchDecision(False,30.0,"base_vs_parallel_mismatch",diag)
             else:
-                if "base" in title_tokens:
-                    return MatchDecision(False,30.0,"base_vs_parallel_mismatch",diag)
-                score -= 14
+                return MatchDecision(False,70.0,"manual_review",{**diag,"review_reason":"parallel_not_confirmed"})
         else:
             named={"silver","refractor","gold","red","blue","green","orange","purple","xfractor","superfractor"}
             found=named & title_tokens
@@ -199,10 +209,8 @@ class SportsCardEntityMatcher:
             if has_auto:
                 score += 7
             else:
-                # Do not auto-accept an autograph target unless the listing confirms it.
                 return MatchDecision(False,70.0,"manual_review",{**diag,"review_reason":"autograph_not_confirmed"})
         elif has_auto:
-            # An autograph is a different collectible, never a discounted base comp.
             return MatchDecision(False,20.0,"unexpected_autograph",diag)
 
         if serial and serial not in {"0","None"}:
@@ -214,8 +222,6 @@ class SportsCardEntityMatcher:
             elif shown_denoms:
                 return MatchDecision(False,20.0,"wrong_serial_denominator",{**diag,"target_serial_denominator":serial})
             else:
-                # A numbered target without denominator evidence should be reviewed,
-                # not silently accepted into valuation.
                 return MatchDecision(False,70.0,"manual_review",{**diag,"serial_denominator_match":0,"review_reason":"serial_not_confirmed"})
 
         lot_hit=("lot of" in t or "bundle" in t or "set of" in t or bool(re.search(r"\blot\b",t)))
