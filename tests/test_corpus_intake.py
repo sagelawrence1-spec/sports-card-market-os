@@ -117,6 +117,47 @@ def test_duplicate_item_ids_are_deduped_deterministically():
     result = sanitize_product_research_rows([row, dict(row)])
     assert result["accepted_rows"] == 1
     assert result["duplicates"] == 1
+    assert result["conflicting_duplicates"] == 0
+    assert result["ready"] is True
+
+
+def test_conflicting_duplicate_item_id_fails_closed():
+    first = {
+        "Item ID": "123456789012",
+        "Title": "Shohei Ohtani PSA 10",
+        "Sold Price": "$125.00",
+        "Sold Date": "2026-08-01",
+        "Currency": "USD",
+    }
+    conflicting = {
+        **first,
+        "Sold Price": "$225.00",
+    }
+    result = sanitize_product_research_rows([first, conflicting])
+    assert result["accepted_rows"] == 1
+    assert result["rejected_rows"] == 1
+    assert result["duplicates"] == 0
+    assert result["conflicting_duplicates"] == 1
+    assert result["ready"] is False
+    assert "conflicting_duplicate_item_id" in result["rejected"][0]["reasons"]
+    assert "conflicting_duplicate_evidence" in result["blockers"]
+
+
+def test_same_item_id_with_conflicting_date_fails_closed():
+    first = {
+        "Item ID": "123456789012",
+        "Title": "Shohei Ohtani PSA 10",
+        "Sold Price": "$125.00",
+        "Sold Date": "2026-08-01",
+        "Currency": "USD",
+    }
+    conflicting = {
+        **first,
+        "Sold Date": "2026-08-02",
+    }
+    result = sanitize_product_research_rows([first, conflicting])
+    assert result["conflicting_duplicates"] == 1
+    assert result["ready"] is False
 
 
 def test_missing_core_fields_block_export_readiness():
