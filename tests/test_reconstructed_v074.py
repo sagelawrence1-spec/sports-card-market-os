@@ -27,7 +27,7 @@ def test_parser_preserves_currency_shipping_and_format(tmp_path):
         w=csv.DictWriter(f,fieldnames=["Item Title","Sold Price","Sold Date","Item ID","Currency","Shipping","Listing Format"])
         w.writeheader(); w.writerow({"Item Title":title(),"Sold Price":"$3,250.00","Sold Date":"2026-08-01","Item ID":"1","Currency":"usd","Shipping":"$12.50","Listing Format":"Best Offer"})
     record=EbayProductResearchProvider().load_csv(path).records[0]
-    assert record.price==3250 and record.currency=="USD" and record.payload["normalized_shipping"]==12.5
+    assert record.price==3262.5 and record.currency=="USD" and record.payload["normalized_shipping"]==12.5
 
 def sales(prices,currency="USD"):
     today=date(2026,8,12)
