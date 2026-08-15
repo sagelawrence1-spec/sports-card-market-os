@@ -174,6 +174,10 @@ class SportsCardEntityMatcher:
                 if other:
                     return MatchDecision(False,25.0,"wrong_grading_company",{**diag,"other_grader":sorted(other)})
                 return MatchDecision(False,28.0,"raw_vs_graded_mismatch",diag)
+        else:
+            other=GRADE_COMPANIES & title_tokens
+            if other:
+                return MatchDecision(False,28.0,"raw_vs_graded_mismatch",{**diag,"unexpected_grader":sorted(other)})
 
         if parallel and parallel not in {"base","base card"}:
             palias=aliases_for_parallel(parallel)
