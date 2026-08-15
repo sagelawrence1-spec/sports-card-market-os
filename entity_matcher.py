@@ -5,6 +5,10 @@ from typing import Dict, Any
 STOP={"the","a","an","card","sports","trading","mint","gem","graded","grade","rookie","rc"}
 HARD_EXCLUDE={"reprint","facsimile","digital","custom","proxy","reproduction","replica","you pick","pick your","break spot","case break","box break"}
 GRADE_COMPANIES={"psa","bgs","beckett","sgc","cgc","tag"}
+DISTINCTIVE_SET_MARKERS={
+    "bowman","prizm","select","optic","mosaic","finest","heritage","stadium",
+    "inception","museum","definitive","transcendent","immaculate","flawless",
+}
 
 
 def norm(s:str)->str:
@@ -125,6 +129,21 @@ class SportsCardEntityMatcher:
             cov=len(set_tokens & title_tokens)/len(set_tokens)
             diag["set_coverage"]=round(cov,3)
             score += 8*cov
+
+            # Distinct product-line names are identity evidence, not merely score boosts.
+            # If a target names one (Bowman, Prizm, Select, etc.), the listing must
+            # confirm it. Conversely, an explicit conflicting product line in the
+            # listing fails closed even when player/year/card number all match.
+            target_set_markers=DISTINCTIVE_SET_MARKERS & set_tokens
+            title_set_markers=DISTINCTIVE_SET_MARKERS & title_tokens
+            diag["target_set_markers"]=sorted(target_set_markers)
+            diag["title_set_markers"]=sorted(title_set_markers)
+            if target_set_markers and not (target_set_markers & title_set_markers):
+                return MatchDecision(False,25.0,"set_family_not_confirmed",diag)
+            conflicting_set_markers=title_set_markers-target_set_markers
+            if conflicting_set_markers:
+                return MatchDecision(False,25.0,"wrong_set_family",{**diag,"conflicting_set_markers":sorted(conflicting_set_markers)})
+
             # Chrome and Chrome Update are different collectible families. When the
             # title explicitly says Chrome, Update presence must agree with target.
             if "chrome" in set_tokens and "chrome" in title_tokens:
