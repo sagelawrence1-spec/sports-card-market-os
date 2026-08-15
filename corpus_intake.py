@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 import hashlib
 import json
 import re
@@ -28,6 +29,13 @@ CURRENCY_KEYS = ("currency", "currency_code")
 
 _PRICE_RANGE_RE = re.compile(r"\d[\d,.]*\s*[-–—]\s*[$€£]?\s*\d[\d,.]*")
 _HEADER_SEP_RE = re.compile(r"[^a-z0-9]+")
+_SOLD_DATE_FORMATS = (
+    "%Y-%m-%d",
+    "%m/%d/%Y",
+    "%m/%d/%y",
+    "%b %d, %Y",
+    "%B %d, %Y",
+)
 
 
 @dataclass(frozen=True)
@@ -75,6 +83,28 @@ def _parse_price(value: Any) -> float | None:
     return price if price > 0 else None
 
 
+def _parse_sold_date(value: Any) -> str | None:
+    text = _normalized_text(value)
+    if not text:
+        return None
+    for fmt in _SOLD_DATE_FORMATS:
+        try:
+            return datetime.strptime(text, fmt).date().isoformat()
+        except ValueError:
+            continue
+    return None
+
+
+def _currency(row: Mapping[str, Any], raw_price: Any) -> str | None:
+    explicit = _normalized_text(_first(row, CURRENCY_KEYS)).upper()
+    if explicit:
+        return explicit
+    price_text = _normalized_text(raw_price)
+    if "$" in price_text and "CAD" not in price_text.upper() and "AUD" not in price_text.upper():
+        return "USD"
+    return None
+
+
 def _stable_item_id(row: Mapping[str, Any]) -> str | None:
     value = _first(row, ID_KEYS)
     if value in (None, ""):
@@ -97,9 +127,9 @@ def sanitize_product_research_rows(
     """Normalize a genuine Product Research export into a reproducible corpus fixture.
 
     The sanitizer deliberately preserves only evidence needed for parser/matcher auditing.
-    Seller/buyer contact fields are removed. Ambiguous prices, missing core fields, and
-    non-USD rows (by default) fail closed into the rejected collection rather than being
-    silently coerced into usable evidence.
+    Seller/buyer contact fields are removed. Ambiguous prices, malformed sold dates,
+    unknown currency, missing core fields, and non-USD rows (by default) fail closed
+    instead of being silently coerced into usable evidence.
     """
     policy = policy or CorpusIntakePolicy()
     accepted: list[dict[str, Any]] = []
@@ -111,21 +141,27 @@ def sanitize_product_research_rows(
     for index, source in enumerate(input_rows):
         row = {_normalized_header(k): v for k, v in dict(source).items()}
         title = _normalized_text(_first(row, TITLE_KEYS))
-        sold_date = _normalized_text(_first(row, DATE_KEYS))
+        raw_sold_date = _first(row, DATE_KEYS)
+        sold_date = _parse_sold_date(raw_sold_date)
         item_id = _stable_item_id(row)
-        price = _parse_price(_first(row, PRICE_KEYS))
-        currency = _normalized_text(_first(row, CURRENCY_KEYS) or "USD").upper()
+        raw_price = _first(row, PRICE_KEYS)
+        price = _parse_price(raw_price)
+        currency = _currency(row, raw_price)
 
         reasons: list[str] = []
         if not title:
             reasons.append("missing_title")
-        if not sold_date:
+        if raw_sold_date in (None, ""):
             reasons.append("missing_sold_date")
+        elif sold_date is None:
+            reasons.append("invalid_sold_date")
         if price is None:
             reasons.append("invalid_or_ambiguous_price")
         if policy.require_item_id and not item_id:
             reasons.append("missing_item_id")
-        if policy.require_usd and currency != "USD":
+        if policy.require_usd and currency is None:
+            reasons.append("missing_currency")
+        elif policy.require_usd and currency != "USD":
             reasons.append("non_usd_currency")
 
         sanitized = {
