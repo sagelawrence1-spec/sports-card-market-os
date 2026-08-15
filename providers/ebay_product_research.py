@@ -6,8 +6,8 @@ publish an open Marketplace Insights endpoint for new users, so this adapter acc
 structured extracts captured from Product Research without changing downstream logic.
 
 Accepted input: CSV with flexible aliases for title, sold price, sold date, item ID and URL.
-Rows fail closed when sold date, price, USD currency evidence, or stable sold-item identity
-is ambiguous.
+Rows fail closed when title, sold date, price, USD currency evidence, or stable sold-item
+identity is ambiguous.
 """
 import csv, re
 from collections import Counter
@@ -86,11 +86,15 @@ class EbayProductResearchProvider:
         records=[]
         rejection_reasons=Counter()
         for r in rows:
+            title=" ".join(str(r.get(cols["title"]) or "").strip().split())
             raw_price=r.get(cols["price"])
             price=_money(raw_price)
             sold_date=_sold_date(r.get(cols["date"]))
             explicit_currency=r.get(cols["currency"]) if cols["currency"] else None
             currency=_currency(explicit_currency,raw_price)
+            if not title:
+                rejection_reasons["missing_title"]+=1
+                continue
             if price is None:
                 rejection_reasons["invalid_or_ambiguous_price"]+=1
                 continue
@@ -119,7 +123,7 @@ class EbayProductResearchProvider:
             payload["normalized_listing_format"] = r.get(cols["format"]) if cols["format"] else None
             records.append(EvidenceRecord(
                 provider=self.provider_name,record_type="sold",source_item_id=sid,
-                title=r.get(cols["title"]) or "",price=price,
+                title=title,price=price,
                 event_date=sold_date,
                 url=raw_url,currency=currency,payload=payload,
             ))
