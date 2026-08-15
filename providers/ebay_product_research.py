@@ -44,8 +44,6 @@ def _negative_money(text):
     stripped=" ".join(str(text or "").strip().split())
     if re.fullmatch(r"\(\s*(?:[A-Z]{3}\s*)?[$€£]?\s*\d[\d,.]*\s*\)",stripped,re.IGNORECASE):
         return True
-    # Normalize only leading currency decoration so both "-$125" and "$-125"
-    # remain visibly negative instead of becoming positive when punctuation is stripped.
     cleaned=re.sub(r"^(?:[A-Z]{3}\s*)?", "", stripped, flags=re.IGNORECASE)
     cleaned=re.sub(r"^([$€£])\s*", "", cleaned)
     if cleaned.startswith("-"):
@@ -57,9 +55,6 @@ def _negative_money(text):
 def _parsed_money_value(v):
     text=" ".join(str(v or "").strip().split())
     if not text or _PRICE_RANGE_RE.search(text) or _negative_money(text): return None
-    # Do not recover malformed evidence by deleting arbitrary text or punctuation.
-    # Accept only a single conventional monetary token with optional ISO code/symbol,
-    # well-formed thousands separators, and at most two decimal places.
     if not _MONEY_VALUE_RE.fullmatch(text): return None
     numeric=re.sub(r"^(?:[A-Z]{3}\s*)?[$€£]?\s*", "", text, flags=re.IGNORECASE).replace(",","")
     try: return float(numeric)
@@ -109,9 +104,6 @@ def _currency(explicit, raw_price):
         return "USD"
     if "$" not in price_text:
         return None
-    # Infer USD only from a truly unqualified dollar marker. Strings such as
-    # "NZD $100", "C$100", or "HKD$100" are ambiguous/foreign and must not
-    # be silently treated as USD when the export omits a currency column.
     if re.search(r"[A-Z]",upper):
         return None
     return "USD"
@@ -158,10 +150,6 @@ class EbayProductResearchProvider:
             if not title:
                 rejection_reasons["missing_title"]+=1
                 continue
-            # Preserve the stronger provenance failure when a declared/inferred
-            # currency contradicts a raw amount marker (for example USD + C$220).
-            # Strict money parsing must not downgrade that conflict into a generic
-            # malformed-price rejection simply because C$ is not a valid USD token.
             if _currency_conflicts(currency,raw_price):
                 rejection_reasons["conflicting_currency_evidence"]+=1
                 continue
@@ -220,7 +208,15 @@ class EbayProductResearchProvider:
         records=[]
         deduplicated_rows=0
         for group in grouped.values():
-            fingerprints={(r.title,r.price,r.event_date,r.currency) for r in group}
+            fingerprints={(
+                r.title,
+                r.price,
+                r.event_date,
+                r.currency,
+                r.payload.get("price_basis"),
+                r.payload.get("normalized_sold_price"),
+                r.payload.get("normalized_shipping"),
+            ) for r in group}
             if len(fingerprints)>1:
                 rejection_reasons["conflicting_duplicate_evidence"]+=len(group)
                 continue
