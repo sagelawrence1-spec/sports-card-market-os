@@ -22,19 +22,25 @@ with tempfile.TemporaryDirectory() as td:
         w=csv.DictWriter(f,fieldnames=fields)
         w.writeheader()
         w.writerow({'Item Title':'2018 Topps Chrome Update Shohei Ohtani HMT1 Refractor PSA 10','Sold Price':'$3,250.00','Sold Date':'08/01/2026','Item ID':'991','Item URL':'https://www.ebay.com/itm/991'})
+        w.writerow({'Item Title':'URL identity comp','Sold Price':'$250.00','Sold Date':'2026-08-02','Item URL':'https://www.ebay.com/itm/example-card/996?hash=abc'})
         w.writerow({'Item Title':'Bad date comp','Sold Price':'$100.00','Sold Date':'eventually','Item ID':'992'})
         w.writerow({'Item Title':'No currency evidence','Sold Price':'100.00','Sold Date':'2026-08-02','Item ID':'993'})
         w.writerow({'Item Title':'Canadian comp','Sold Price':'125.00','Sold Date':'2026-08-03','Item ID':'994','Currency':'CAD'})
         w.writerow({'Item Title':'Price range comp','Sold Price':'$100-$150','Sold Date':'2026-08-04','Item ID':'995'})
+        w.writerow({'Item Title':'Missing stable identity','Sold Price':'$175.00','Sold Date':'2026-08-05'})
+        w.writerow({'Item Title':'Conflicting identity','Sold Price':'$180.00','Sold Date':'2026-08-06','Item ID':'997','Item URL':'https://www.ebay.com/itm/998'})
     rr=EbayProductResearchProvider().load_csv(str(p),'ohtani')
-    assert len(rr.records)==1
+    assert len(rr.records)==2
     assert rr.records[0].price==3250.0 and rr.records[0].source_item_id=='991'
     assert rr.records[0].event_date=='2026-08-01' and rr.records[0].currency=='USD'
-    assert rr.metadata['accepted_rows']==1 and rr.metadata['rejected_rows']==4
+    assert rr.records[1].source_item_id=='996'
+    assert rr.metadata['accepted_rows']==2 and rr.metadata['rejected_rows']==6
     assert rr.metadata['rejection_reasons']=={
+        'conflicting_item_id':1,
         'invalid_or_ambiguous_price':1,
         'invalid_sold_date':1,
         'missing_currency':1,
+        'missing_stable_item_id':1,
         'non_usd_currency':1,
     }
 print('adapter tests: PASS')
