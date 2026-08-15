@@ -13,6 +13,7 @@ import csv, re
 from collections import Counter, defaultdict
 from datetime import datetime
 from pathlib import Path
+from urllib.parse import urlsplit
 from .base import EvidenceRecord, ProviderResult
 
 ALIASES={
@@ -122,7 +123,14 @@ def _canonical_item_id(v):
 def _item_id_from_url(v):
     text=str(v or "").strip()
     if not text: return None
-    match=_EBAY_ITEM_URL_RE.search(text)
+    try:
+        parsed=urlsplit(text)
+    except ValueError:
+        return None
+    host=(parsed.hostname or "").lower().rstrip(".")
+    if host!="ebay.com" and not host.endswith(".ebay.com"):
+        return None
+    match=_EBAY_ITEM_URL_RE.search(parsed.path)
     return match.group(1) if match else None
 
 class EbayProductResearchProvider:
