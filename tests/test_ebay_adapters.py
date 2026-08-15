@@ -17,9 +17,24 @@ assert len(r.records)==2 and r.records[0].source_item_id=='123' and r.records[0]
 
 with tempfile.TemporaryDirectory() as td:
     p=Path(td)/'research.csv'
+    fields=['Item Title','Sold Price','Sold Date','Item ID','Item URL','Currency']
     with p.open('w',newline='',encoding='utf-8') as f:
-        w=csv.DictWriter(f,fieldnames=['Item Title','Sold Price','Sold Date','Item ID','Item URL'])
-        w.writeheader();w.writerow({'Item Title':'2018 Topps Chrome Update Shohei Ohtani HMT1 Refractor PSA 10','Sold Price':'$3,250.00','Sold Date':'2026-08-01','Item ID':'991','Item URL':'https://www.ebay.com/itm/991'})
+        w=csv.DictWriter(f,fieldnames=fields)
+        w.writeheader()
+        w.writerow({'Item Title':'2018 Topps Chrome Update Shohei Ohtani HMT1 Refractor PSA 10','Sold Price':'$3,250.00','Sold Date':'08/01/2026','Item ID':'991','Item URL':'https://www.ebay.com/itm/991'})
+        w.writerow({'Item Title':'Bad date comp','Sold Price':'$100.00','Sold Date':'eventually','Item ID':'992'})
+        w.writerow({'Item Title':'No currency evidence','Sold Price':'100.00','Sold Date':'2026-08-02','Item ID':'993'})
+        w.writerow({'Item Title':'Canadian comp','Sold Price':'125.00','Sold Date':'2026-08-03','Item ID':'994','Currency':'CAD'})
+        w.writerow({'Item Title':'Price range comp','Sold Price':'$100-$150','Sold Date':'2026-08-04','Item ID':'995'})
     rr=EbayProductResearchProvider().load_csv(str(p),'ohtani')
-    assert len(rr.records)==1 and rr.records[0].price==3250.0 and rr.records[0].source_item_id=='991'
+    assert len(rr.records)==1
+    assert rr.records[0].price==3250.0 and rr.records[0].source_item_id=='991'
+    assert rr.records[0].event_date=='2026-08-01' and rr.records[0].currency=='USD'
+    assert rr.metadata['accepted_rows']==1 and rr.metadata['rejected_rows']==4
+    assert rr.metadata['rejection_reasons']=={
+        'invalid_or_ambiguous_price':1,
+        'invalid_sold_date':1,
+        'missing_currency':1,
+        'non_usd_currency':1,
+    }
 print('adapter tests: PASS')
