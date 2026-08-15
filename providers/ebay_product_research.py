@@ -150,14 +150,18 @@ class EbayProductResearchProvider:
             if not title:
                 rejection_reasons["missing_title"]+=1
                 continue
+            # Preserve the stronger provenance failure when a declared/inferred
+            # currency contradicts a raw amount marker (for example USD + C$220).
+            # Strict money parsing must not downgrade that conflict into a generic
+            # malformed-price rejection simply because C$ is not a valid USD token.
+            if _currency_conflicts(currency,raw_price):
+                rejection_reasons["conflicting_currency_evidence"]+=1
+                continue
             if sold_price is None:
                 rejection_reasons["invalid_or_ambiguous_price"]+=1
                 continue
             if sold_date is None:
                 rejection_reasons["invalid_sold_date"]+=1
-                continue
-            if _currency_conflicts(currency,raw_price):
-                rejection_reasons["conflicting_currency_evidence"]+=1
                 continue
             if currency is None:
                 rejection_reasons["missing_currency"]+=1
