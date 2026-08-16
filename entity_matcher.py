@@ -145,7 +145,16 @@ class SportsCardEntityMatcher:
             if conflicting_set_markers:
                 return MatchDecision(False,25.0,"wrong_set_family",{**diag,"conflicting_set_markers":sorted(conflicting_set_markers)})
 
-            if "chrome" in set_tokens and "chrome" in title_tokens:
+            target_chrome="chrome" in set_tokens
+            title_chrome="chrome" in title_tokens
+            diag["target_chrome"]=int(target_chrome)
+            diag["title_chrome"]=int(title_chrome)
+            if target_chrome and not title_chrome:
+                return MatchDecision(False,25.0,"set_family_not_confirmed",diag)
+            if title_chrome and not target_chrome:
+                return MatchDecision(False,25.0,"wrong_set_family",diag)
+
+            if target_chrome and title_chrome:
                 target_update="update" in set_tokens
                 title_update="update" in title_tokens
                 if target_update != title_update:
