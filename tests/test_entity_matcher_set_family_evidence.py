@@ -109,3 +109,25 @@ def test_matching_topps_now_family_still_accepts():
     decision=M.match(_asset("Topps Now"),"2024 Topps Now Shohei Ohtani #10 PSA 10")
     assert decision.accepted
     assert decision.reason == "accepted"
+
+
+def test_topps_update_target_requires_update_evidence():
+    decision=M.match(_asset("Topps Update"),"2024 Topps Shohei Ohtani #10 PSA 10")
+    assert not decision.accepted
+    assert decision.reason == "wrong_set_family"
+    assert decision.diagnostics["target_update"] == 1
+    assert decision.diagnostics["title_update"] == 0
+
+
+def test_topps_flagship_target_rejects_topps_update_listing():
+    decision=M.match(_asset("Topps"),"2024 Topps Update Shohei Ohtani #10 PSA 10")
+    assert not decision.accepted
+    assert decision.reason == "wrong_set_family"
+    assert decision.diagnostics["target_update"] == 0
+    assert decision.diagnostics["title_update"] == 1
+
+
+def test_matching_topps_update_family_still_accepts():
+    decision=M.match(_asset("Topps Update"),"2024 Topps Update Shohei Ohtani #10 PSA 10")
+    assert decision.accepted
+    assert decision.reason == "accepted"
