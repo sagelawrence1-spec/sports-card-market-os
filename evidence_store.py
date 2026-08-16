@@ -1,4 +1,4 @@
-import sqlite3, json, hashlib, uuid
+import sqlite3, json, hashlib, uuid, copy
 from datetime import datetime
 
 from entity_matcher import norm
@@ -261,7 +261,27 @@ class EvidenceStore:
         self.conn.commit()
 
     def save_market_state(self,run_id,state):
-        previous=self.previous_market_state(state["card_id"])
+        run=self.conn.execute(
+            "SELECT status FROM market_runs WHERE run_id=?",
+            (run_id,)
+        ).fetchone()
+        if run is None:
+            raise ValueError("market state requires a persisted market run")
+        if run["status"] != "running":
+            raise ValueError("market state can only be persisted while the market run is running")
+
+        card_id=str(state.get("card_id") or "").strip()
+        if not card_id:
+            raise ValueError("market state requires card_id")
+        existing=self.conn.execute(
+            "SELECT 1 FROM card_market_history WHERE run_id=? AND card_id=?",
+            (run_id,card_id)
+        ).fetchone()
+        if existing is not None:
+            raise ValueError("market history is append-only for each run/card pair")
+
+        state=copy.deepcopy(state)
+        previous=self.previous_market_state(card_id)
         reconstruction=build_reconstruction_delta(previous,state)
         state["reconstruction"]=reconstruction
         if reconstruction["unexplained_repricing"]:
@@ -274,11 +294,11 @@ class EvidenceStore:
             blockers.append("Reconstruction health failed: large valuation move lacks material evidence change")
 
         evidence_range=state.get("evidence_range") or {}
-        self.conn.execute('''INSERT OR REPLACE INTO card_market_history(
+        self.conn.execute('''INSERT INTO card_market_history(
           run_id,card_id,as_of,fair_value,range_low,range_high,evidence_grade,confidence,
           accepted_sales,accepted_active,review_count,rejected_count,lowest_ask,median_ask,state_json)
           VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',(
-            run_id,state["card_id"],state["last_updated"],state.get("fair_value"),
+            run_id,card_id,state["last_updated"],state.get("fair_value"),
             evidence_range.get("low"),evidence_range.get("high"),state["evidence_grade"],state["confidence"],
             state.get("accepted_sales_30d",0),state.get("accepted_active_count",0),state.get("review_count",0),
             state.get("excluded_count",0),state.get("lowest_ask"),state.get("median_ask"),
@@ -288,7 +308,7 @@ class EvidenceStore:
             self.conn.execute('''INSERT OR IGNORE INTO recommendation_journal(
               run_id,card_id,action,fair_value,confidence,evidence_grade,thesis)
               VALUES(?,?,?,?,?,?,?)''',(
-                run_id,state["card_id"],state["action"],state.get("fair_value"),state["confidence"],
+                run_id,card_id,state["action"],state.get("fair_value"),state["confidence"],
                 state["evidence_grade"],state.get("thesis")
             ))
         self.conn.commit()
