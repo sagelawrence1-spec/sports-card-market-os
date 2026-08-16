@@ -57,3 +57,35 @@ def test_panini_product_lines_do_not_cross_match():
 def test_generic_chrome_title_without_conflicting_family_is_not_over_rejected():
     decision=M.match(_asset("Chrome"),"2024 Topps Chrome Shohei Ohtani #10 PSA 10")
     assert decision.accepted
+
+
+def test_topps_flagship_target_rejects_topps_chrome_listing():
+    decision=M.match(_asset("Topps"),"2024 Topps Chrome Shohei Ohtani #10 PSA 10")
+    assert not decision.accepted
+    assert decision.reason == "wrong_set_family"
+    assert decision.diagnostics["target_chrome"] == 0
+    assert decision.diagnostics["title_chrome"] == 1
+
+
+def test_topps_chrome_target_requires_chrome_evidence():
+    decision=M.match(_asset("Topps Chrome"),"2024 Topps Shohei Ohtani #10 PSA 10")
+    assert not decision.accepted
+    assert decision.reason == "set_family_not_confirmed"
+    assert decision.diagnostics["target_chrome"] == 1
+    assert decision.diagnostics["title_chrome"] == 0
+
+
+def test_bowman_chrome_target_rejects_bowman_paper_listing():
+    decision=M.match(_asset("Bowman Chrome"),"2024 Bowman Shohei Ohtani #10 PSA 10")
+    assert not decision.accepted
+    assert decision.reason == "set_family_not_confirmed"
+    assert decision.diagnostics["target_chrome"] == 1
+    assert decision.diagnostics["title_chrome"] == 0
+
+
+def test_bowman_paper_target_rejects_bowman_chrome_listing():
+    decision=M.match(_asset("Bowman"),"2024 Bowman Chrome Shohei Ohtani #10 PSA 10")
+    assert not decision.accepted
+    assert decision.reason == "wrong_set_family"
+    assert decision.diagnostics["target_chrome"] == 0
+    assert decision.diagnostics["title_chrome"] == 1
