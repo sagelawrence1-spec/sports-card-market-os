@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import date
 from typing import Iterable
 
 
@@ -11,6 +12,8 @@ class CalibrationSafetyPolicy:
     min_segment_samples: int = 10
     required_evidence_grades: tuple[str, ...] = ("A", "B")
     required_confidence_bands: tuple[str, ...] = ("high", "medium")
+    min_history_checkpoints: int = 3
+    min_new_mature_samples_per_checkpoint: int = 5
 
 
 def _segment_observations(benchmark: dict, family: str, key: str) -> int:
@@ -86,7 +89,106 @@ def assess_calibration_safety(
             "min_segment_samples": policy.min_segment_samples,
             "required_evidence_grades": list(policy.required_evidence_grades),
             "required_confidence_bands": list(policy.required_confidence_bands),
+            "min_history_checkpoints": policy.min_history_checkpoints,
+            "min_new_mature_samples_per_checkpoint": policy.min_new_mature_samples_per_checkpoint,
         },
         "blockers": blockers,
         "warnings": warnings,
+    }
+
+
+def _run_date(run: dict) -> date | None:
+    value = run.get("evaluated_at")
+    if not value:
+        value = (run.get("result") or {}).get("evaluation_date")
+    if not value:
+        return None
+    try:
+        return date.fromisoformat(str(value)[:10])
+    except ValueError:
+        return None
+
+
+def _mature_count(run: dict) -> int | None:
+    try:
+        return int((run.get("result") or {}).get("mature_observations"))
+    except (TypeError, ValueError):
+        return None
+
+
+def assess_calibration_history(
+    runs: Iterable[dict],
+    *,
+    policy: CalibrationSafetyPolicy | None = None,
+) -> dict:
+    """Require repeated, newly matured out-of-sample evidence before calibration review.
+
+    A single favorable benchmark snapshot is not enough. The most recent checkpoints
+    must each pass the point-in-time safety gate, advance chronologically, and add a
+    minimum number of newly matured observations so repeated scoring of the same
+    outcomes cannot masquerade as stability.
+    """
+
+    policy = policy or CalibrationSafetyPolicy()
+    blockers: list[str] = []
+    rows = list(runs)
+
+    if policy.min_history_checkpoints < 1:
+        raise ValueError("min_history_checkpoints must be >= 1")
+    if policy.min_new_mature_samples_per_checkpoint < 1:
+        raise ValueError("min_new_mature_samples_per_checkpoint must be >= 1")
+
+    parsed: list[tuple[date, int, dict, dict]] = []
+    for index, run in enumerate(rows):
+        if not isinstance(run, dict) or not isinstance(run.get("result"), dict):
+            blockers.append(f"invalid_benchmark_run:{index}")
+            continue
+        evaluated_at = _run_date(run)
+        mature = _mature_count(run)
+        if evaluated_at is None:
+            blockers.append(f"invalid_evaluation_date:{index}")
+            continue
+        if mature is None or mature < 0:
+            blockers.append(f"invalid_mature_observations:{index}")
+            continue
+        safety = assess_calibration_safety(run["result"], policy=policy)
+        parsed.append((evaluated_at, mature, run, safety))
+
+    if len(parsed) < policy.min_history_checkpoints:
+        blockers.append("insufficient_calibration_checkpoints")
+
+    if parsed:
+        for previous, current in zip(parsed, parsed[1:]):
+            if current[0] <= previous[0]:
+                blockers.append("non_chronological_calibration_history")
+                break
+
+        window = parsed[-policy.min_history_checkpoints :]
+        for evaluated_at, _mature, _run, safety in window:
+            if not safety["calibration_review_allowed"]:
+                blockers.append(f"unsafe_checkpoint:{evaluated_at.isoformat()}")
+
+        for previous, current in zip(window, window[1:]):
+            new_mature = current[1] - previous[1]
+            if new_mature < policy.min_new_mature_samples_per_checkpoint:
+                blockers.append(
+                    f"insufficient_new_mature_samples:{current[0].isoformat()}"
+                )
+
+    blockers = list(dict.fromkeys(blockers))
+    review_allowed = not blockers
+    latest_date = parsed[-1][0].isoformat() if parsed else None
+    latest_mature = parsed[-1][1] if parsed else None
+
+    return {
+        "schema": "calibration-history.v1",
+        "calibration_review_allowed": review_allowed,
+        "automatic_threshold_changes_allowed": False,
+        "decision": "human_review_allowed" if review_allowed else "blocked",
+        "checkpoints_seen": len(parsed),
+        "required_checkpoints": policy.min_history_checkpoints,
+        "min_new_mature_samples_per_checkpoint": policy.min_new_mature_samples_per_checkpoint,
+        "latest_evaluation_date": latest_date,
+        "latest_mature_observations": latest_mature,
+        "blockers": blockers,
     }
