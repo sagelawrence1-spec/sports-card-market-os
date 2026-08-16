@@ -18,6 +18,7 @@ from providers.ebay_marketplace_insights import EbayMarketplaceInsightsProvider
 from providers.sold_comps import SoldCompsProvider
 from providers.the_card_api import TheCardApiSoldProvider
 from recommendation_journal import RecommendationJournal, capture_recommendations, settle_outcomes
+from run_integrity import audit_market_run_reconstruction
 
 
 PAID_CARD_API_PLANS={"starter","builder","pro","enterprise"}
@@ -99,6 +100,27 @@ def configured_sold_provider(oauth,marketplace):
     return None
 
 
+def enforce_completed_run_integrity(store,result,assets):
+    """Fail closed when a nominally complete run has incomplete durable history."""
+    if result.status != "complete":
+        return None
+    card_ids=[str(asset.get("card_id") or "").strip() for asset in assets]
+    audit=audit_market_run_reconstruction(store.conn,result.run_id,card_ids)
+    result.contract["run_integrity"]=audit
+    provenance=result.contract.setdefault("source",{}).setdefault("provenance",{})
+    provenance["run_integrity"]=audit
+    if audit["status"] == "healthy":
+        return audit
+
+    store.finish_market_run(result.run_id,"history_integrity_failed",{
+        "cards":len(card_ids),
+        "run_integrity":audit,
+    })
+    raise RuntimeError(
+        "The scheduled scan did not publish because persisted market history failed the run-integrity audit."
+    )
+
+
 def run(args):
     previous_contract=read_json(args.output,None)
     assets=load_registry(args.registry)
@@ -107,11 +129,13 @@ def run(args):
     marketplace=os.getenv("EBAY_MARKETPLACE_ID","EBAY_US")
     listing_provider=EbayBrowseProvider(oauth,marketplace) if configured else None
     sold_provider=configured_sold_provider(oauth,marketplace)
+    store=EvidenceStore(args.database)
     result=ScheduledMarketPipeline(
-        EvidenceStore(args.database),
+        store,
         sold_provider=sold_provider,
         listing_provider=listing_provider,
     ).run(assets,as_of=args.as_of)
+    enforce_completed_run_integrity(store,result,assets)
     if result.status!="complete" and not args.allow_blocked:
         raise RuntimeError(
             "The scheduled scan did not publish because sold-data access is unavailable. "
