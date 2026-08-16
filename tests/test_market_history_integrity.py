@@ -66,7 +66,9 @@ def test_persisting_history_does_not_mutate_caller_state(tmp_path):
     run_id=store.start_market_run("2026-08-16T10:00:00Z","test")
     state=market_state()
 
-    store.save_market_state(run_id,state)
+    persisted=store.save_market_state(run_id,state)
 
     assert "reconstruction" not in state
     assert "blockers" not in state
+    assert persisted is not state
+    assert persisted["reconstruction"]["has_previous"] is False
