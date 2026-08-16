@@ -312,6 +312,7 @@ class EvidenceStore:
                 state["evidence_grade"],state.get("thesis")
             ))
         self.conn.commit()
+        return state
 
     def previous_market_state(self,card_id):
         row=self.conn.execute('''SELECT state_json FROM card_market_history WHERE card_id=?
