@@ -98,6 +98,52 @@ def build_reconstruction_delta(
     }
 
 
+def build_reconstruction_record(
+    previous: Mapping[str, Any] | None,
+    current: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Return a stable, lineage-bearing record suitable for persistence.
+
+    The record captures which two immutable scan snapshots were compared so a
+    stored delta can be audited later without relying on whichever snapshot is
+    currently considered "latest". Missing or inconsistent lineage fails
+    closed instead of creating an ambiguous historical record.
+    """
+    card_id = str(current.get("card_id") or "").strip()
+    run_id = str(current.get("run_id") or "").strip()
+    as_of = str(current.get("last_updated") or "").strip()
+    if not card_id or not run_id or not as_of:
+        raise ValueError("current state requires card_id, run_id, and last_updated")
+
+    previous_run_id: str | None = None
+    previous_as_of: str | None = None
+    if previous is not None:
+        previous_card_id = str(previous.get("card_id") or "").strip()
+        previous_run_id = str(previous.get("run_id") or "").strip()
+        previous_as_of = str(previous.get("last_updated") or "").strip()
+        if not previous_card_id or not previous_run_id or not previous_as_of:
+            raise ValueError("previous state requires card_id, run_id, and last_updated")
+        if previous_card_id != card_id:
+            raise ValueError("reconstruction states must belong to the same card")
+        if previous_run_id == run_id:
+            raise ValueError("reconstruction states must belong to different runs")
+        if previous_as_of >= as_of:
+            raise ValueError("previous state must be strictly earlier than current state")
+
+    delta = build_reconstruction_delta(previous, current)
+    lineage_key = previous_run_id or "initial"
+    return {
+        "schema": "market-reconstruction.v1",
+        "record_id": f"{card_id}:{lineage_key}->{run_id}",
+        "card_id": card_id,
+        "run_id": run_id,
+        "as_of": as_of,
+        "previous_run_id": previous_run_id,
+        "previous_as_of": previous_as_of,
+        "delta": delta,
+    }
+
+
 def summarize_reconstruction_health(states: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
     """Summarize reconstruction integrity across the current card universe.
 

@@ -1,8 +1,12 @@
-from reconstruction import build_reconstruction_delta
+import pytest
+
+from reconstruction import build_reconstruction_delta, build_reconstruction_record
 
 
 def state(**overrides):
     base={
+        "card_id":"card-1",
+        "run_id":"run-2",
         "last_updated":"2026-08-12T12:00:00Z",
         "fair_value":100.0,
         "accepted_sales_total":10,
@@ -84,3 +88,47 @@ def test_evidence_grade_change_alone_cannot_explain_large_repricing():
     assert delta["quality_change_reasons"] == ["evidence_grade_changed"]
     assert delta["unexplained_repricing"] is True
     assert delta["reconstruction_health_failure"] is True
+
+
+def test_reconstruction_record_captures_stable_lineage():
+    previous=state(run_id="run-1",last_updated="2026-08-11T12:00:00Z")
+    current=state(run_id="run-2",last_updated="2026-08-12T12:00:00Z",fair_value=110.0,accepted_sales_total=11)
+    record=build_reconstruction_record(previous,current)
+    assert record["schema"] == "market-reconstruction.v1"
+    assert record["record_id"] == "card-1:run-1->run-2"
+    assert record["previous_run_id"] == "run-1"
+    assert record["run_id"] == "run-2"
+    assert record["previous_as_of"] == "2026-08-11T12:00:00Z"
+    assert record["as_of"] == "2026-08-12T12:00:00Z"
+    assert record["delta"]["accepted_sales_delta"] == 1
+
+
+def test_initial_reconstruction_record_has_explicit_initial_lineage():
+    record=build_reconstruction_record(None,state())
+    assert record["record_id"] == "card-1:initial->run-2"
+    assert record["previous_run_id"] is None
+    assert record["previous_as_of"] is None
+    assert record["delta"]["has_previous"] is False
+
+
+def test_reconstruction_record_rejects_cross_card_lineage():
+    previous=state(card_id="card-2",run_id="run-1",last_updated="2026-08-11T12:00:00Z")
+    with pytest.raises(ValueError,match="same card"):
+        build_reconstruction_record(previous,state())
+
+
+def test_reconstruction_record_rejects_same_run_lineage():
+    previous=state(run_id="run-2",last_updated="2026-08-11T12:00:00Z")
+    with pytest.raises(ValueError,match="different runs"):
+        build_reconstruction_record(previous,state())
+
+
+def test_reconstruction_record_rejects_nonchronological_lineage():
+    previous=state(run_id="run-1",last_updated="2026-08-13T12:00:00Z")
+    with pytest.raises(ValueError,match="strictly earlier"):
+        build_reconstruction_record(previous,state())
+
+
+def test_reconstruction_record_requires_current_lineage_fields():
+    with pytest.raises(ValueError,match="card_id, run_id, and last_updated"):
+        build_reconstruction_record(None,state(run_id=""))
