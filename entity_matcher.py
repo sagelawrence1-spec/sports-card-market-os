@@ -6,6 +6,7 @@ STOP={"the","a","an","card","sports","trading","mint","gem","graded","grade","ro
 HARD_EXCLUDE={"reprint","facsimile","digital","custom","proxy","reproduction","replica","you pick","pick your","break spot","case break","box break"}
 GRADE_COMPANIES={"psa","bgs","beckett","sgc","cgc","tag"}
 MANUFACTURER_IDENTITY_MARKERS={"topps","panini","upper deck","leaf","playoff","donruss","fleer"}
+BRAND_MANUFACTURER_EVIDENCE={"topps":{"bowman"}}
 DISTINCTIVE_SET_MARKERS={
     "bowman","prizm","select","optic","mosaic","finest","heritage","stadium",
     "inception","museum","definitive","transcendent","immaculate","flawless","now",
@@ -170,8 +171,14 @@ class SportsCardEntityMatcher:
 
             target_manufacturer_markers={m for m in MANUFACTURER_IDENTITY_MARKERS if m in manufacturer}
             title_manufacturer_markers={m for m in MANUFACTURER_IDENTITY_MARKERS if m in t}
+            implied_manufacturer_markers={
+                m for m,brand_markers in BRAND_MANUFACTURER_EVIDENCE.items()
+                if brand_markers & title_tokens
+            }
+            title_manufacturer_markers |= implied_manufacturer_markers
             diag["target_manufacturer_markers"]=sorted(target_manufacturer_markers)
             diag["title_manufacturer_markers"]=sorted(title_manufacturer_markers)
+            diag["implied_manufacturer_markers"]=sorted(implied_manufacturer_markers)
             if target_manufacturer_markers and not (target_manufacturer_markers & title_manufacturer_markers):
                 if title_manufacturer_markers:
                     return MatchDecision(False,25.0,"wrong_manufacturer",{**diag,"conflicting_manufacturer_markers":sorted(title_manufacturer_markers)})
