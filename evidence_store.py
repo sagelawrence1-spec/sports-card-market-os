@@ -260,9 +260,18 @@ class EvidenceStore:
         ))
         self.conn.commit()
 
+    def _previous_market_snapshot(self,card_id,before_as_of=None):
+        q="SELECT run_id,as_of,state_json FROM card_market_history WHERE card_id=?"
+        args=[card_id]
+        if before_as_of is not None:
+            q+=" AND as_of < ?"
+            args.append(before_as_of)
+        q+=" ORDER BY as_of DESC,rowid DESC LIMIT 1"
+        return self.conn.execute(q,args).fetchone()
+
     def save_market_state(self,run_id,state):
         run=self.conn.execute(
-            "SELECT status FROM market_runs WHERE run_id=?",
+            "SELECT status,as_of FROM market_runs WHERE run_id=?",
             (run_id,)
         ).fetchone()
         if run is None:
@@ -273,6 +282,9 @@ class EvidenceStore:
         card_id=str(state.get("card_id") or "").strip()
         if not card_id:
             raise ValueError("market state requires card_id")
+        state_as_of=str(state.get("last_updated") or "").strip()
+        if state_as_of != str(run["as_of"]):
+            raise ValueError("market state last_updated must match market run as_of")
         existing=self.conn.execute(
             "SELECT 1 FROM card_market_history WHERE run_id=? AND card_id=?",
             (run_id,card_id)
@@ -281,9 +293,16 @@ class EvidenceStore:
             raise ValueError("market history is append-only for each run/card pair")
 
         state=copy.deepcopy(state)
-        previous=self.previous_market_state(card_id)
+        previous_snapshot=self._previous_market_snapshot(card_id,before_as_of=run["as_of"])
+        previous=json.loads(previous_snapshot["state_json"]) if previous_snapshot else None
         reconstruction=build_reconstruction_delta(previous,state)
         state["reconstruction"]=reconstruction
+        state["lineage"]={
+            "run_id":run_id,
+            "as_of":run["as_of"],
+            "previous_run_id":previous_snapshot["run_id"] if previous_snapshot else None,
+            "previous_as_of":previous_snapshot["as_of"] if previous_snapshot else None,
+        }
         if reconstruction["unexplained_repricing"]:
             blockers=state.setdefault("blockers",[])
             blockers.append("Unexplained scan-to-scan repricing requires review")
@@ -298,7 +317,7 @@ class EvidenceStore:
           run_id,card_id,as_of,fair_value,range_low,range_high,evidence_grade,confidence,
           accepted_sales,accepted_active,review_count,rejected_count,lowest_ask,median_ask,state_json)
           VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',(
-            run_id,card_id,state["last_updated"],state.get("fair_value"),
+            run_id,card_id,run["as_of"],state.get("fair_value"),
             evidence_range.get("low"),evidence_range.get("high"),state["evidence_grade"],state["confidence"],
             state.get("accepted_sales_30d",0),state.get("accepted_active_count",0),state.get("review_count",0),
             state.get("excluded_count",0),state.get("lowest_ask"),state.get("median_ask"),
@@ -314,9 +333,8 @@ class EvidenceStore:
         self.conn.commit()
         return state
 
-    def previous_market_state(self,card_id):
-        row=self.conn.execute('''SELECT state_json FROM card_market_history WHERE card_id=?
-          ORDER BY as_of DESC,rowid DESC LIMIT 1''',(card_id,)).fetchone()
+    def previous_market_state(self,card_id,before_as_of=None):
+        row=self._previous_market_snapshot(card_id,before_as_of=before_as_of)
         return json.loads(row["state_json"]) if row else None
 
     def market_history(self,card_id):
