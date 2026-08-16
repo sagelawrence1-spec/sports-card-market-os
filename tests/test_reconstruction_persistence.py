@@ -26,10 +26,16 @@ def state(as_of, **overrides):
     return value
 
 
+def persist(store,current):
+    run_id=store.start_market_run(current["last_updated"],"test")
+    store.save_market_state(run_id,current)
+    return run_id
+
+
 def test_first_persisted_state_records_initial_reconstruction(tmp_path):
     store=EvidenceStore(tmp_path/"evidence.sqlite")
     current=state("2026-08-12T12:00:00Z")
-    store.save_market_state("run-1",current)
+    persist(store,current)
 
     persisted=store.market_history(CARD_ID)[0]
     assert persisted["reconstruction"]["has_previous"] is False
@@ -38,7 +44,7 @@ def test_first_persisted_state_records_initial_reconstruction(tmp_path):
 
 def test_large_unexplained_repricing_persists_and_fails_closed(tmp_path):
     store=EvidenceStore(tmp_path/"evidence.sqlite")
-    store.save_market_state("run-1",state("2026-08-12T12:00:00Z"))
+    persist(store,state("2026-08-12T12:00:00Z"))
 
     current=state(
         "2026-08-13T12:00:00Z",
@@ -46,7 +52,7 @@ def test_large_unexplained_repricing_persists_and_fails_closed(tmp_path):
         evidence_range={"low":114.0,"high":126.0},
         action="BUY",
     )
-    store.save_market_state("run-2",current)
+    persist(store,current)
 
     persisted=store.market_history(CARD_ID)[-1]
     reconstruction=persisted["reconstruction"]
@@ -59,7 +65,7 @@ def test_large_unexplained_repricing_persists_and_fails_closed(tmp_path):
 
 def test_material_evidence_change_allows_large_repricing(tmp_path):
     store=EvidenceStore(tmp_path/"evidence.sqlite")
-    store.save_market_state("run-1",state("2026-08-12T12:00:00Z"))
+    persist(store,state("2026-08-12T12:00:00Z"))
 
     current=state(
         "2026-08-13T12:00:00Z",
@@ -69,7 +75,7 @@ def test_material_evidence_change_allows_large_repricing(tmp_path):
         accepted_sales_total=11,
         latest_sale_date="2026-08-13",
     )
-    store.save_market_state("run-2",current)
+    persist(store,current)
 
     persisted=store.market_history(CARD_ID)[-1]
     reconstruction=persisted["reconstruction"]
