@@ -281,9 +281,9 @@ class SportsCardEntityMatcher:
         elif has_auto:
             return MatchDecision(False,20.0,"unexpected_autograph",diag)
 
+        shown_denoms=re.findall(r"/\s*(\d+)\b",t)
+        diag["explicit_serial_denominators"]=shown_denoms
         if serial and serial not in {"0","None"}:
-            shown_denoms=re.findall(r"/\s*(\d+)\b",t)
-            diag["explicit_serial_denominators"]=shown_denoms
             if serial in shown_denoms:
                 score += 7
                 diag["serial_denominator_match"]=1
@@ -291,6 +291,8 @@ class SportsCardEntityMatcher:
                 return MatchDecision(False,20.0,"wrong_serial_denominator",{**diag,"target_serial_denominator":serial})
             else:
                 return MatchDecision(False,70.0,"manual_review",{**diag,"serial_denominator_match":0,"review_reason":"serial_not_confirmed"})
+        elif shown_denoms:
+            return MatchDecision(False,20.0,"unexpected_serial_numbering",{**diag,"unexpected_serial_denominators":shown_denoms})
 
         lot_hit=("lot of" in t or "bundle" in t or "set of" in t or bool(re.search(r"\blot\b",t)))
         if lot_hit:
