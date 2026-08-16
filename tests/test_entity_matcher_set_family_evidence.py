@@ -89,3 +89,23 @@ def test_bowman_paper_target_rejects_bowman_chrome_listing():
     assert decision.reason == "wrong_set_family"
     assert decision.diagnostics["target_chrome"] == 0
     assert decision.diagnostics["title_chrome"] == 1
+
+
+def test_topps_now_target_requires_now_evidence():
+    decision=M.match(_asset("Topps Now"),"2024 Topps Shohei Ohtani #10 PSA 10")
+    assert not decision.accepted
+    assert decision.reason == "set_family_not_confirmed"
+    assert decision.diagnostics["target_set_markers"] == ["now"]
+
+
+def test_topps_flagship_target_rejects_topps_now_listing():
+    decision=M.match(_asset("Topps"),"2024 Topps Now Shohei Ohtani #10 PSA 10")
+    assert not decision.accepted
+    assert decision.reason == "wrong_set_family"
+    assert decision.diagnostics["conflicting_set_markers"] == ["now"]
+
+
+def test_matching_topps_now_family_still_accepts():
+    decision=M.match(_asset("Topps Now"),"2024 Topps Now Shohei Ohtani #10 PSA 10")
+    assert decision.accepted
+    assert decision.reason == "accepted"
