@@ -21,7 +21,7 @@ DISTINCTIVE_SET_MARKERS={
 PARALLEL_IDENTITY_MARKERS={
     "silver","gold","red","blue","green","orange","purple","black","pink","aqua","teal",
     "sepia","negative","xfractor","superfractor","wave","shimmer","sapphire","atomic","speckle",
-    "raywave","lava",
+    "raywave","lava","variation",
 }
 
 
