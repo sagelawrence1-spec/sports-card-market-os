@@ -40,12 +40,16 @@ def _require_snapshot(conn: sqlite3.Connection, run_id: str, card_id: str, as_of
 def persist_reconstruction_record(
     conn: sqlite3.Connection,
     record: Mapping[str, Any],
+    *,
+    commit: bool = True,
 ) -> str:
     """Persist one immutable reconstruction record after validating its lineage.
 
     Records are append-only. Both the current and predecessor references must
     already exist in ``card_market_history`` so a delta can never outlive or
-    point at an unpersisted snapshot.
+    point at an unpersisted snapshot. ``commit=False`` lets a caller persist the
+    snapshot, reconstruction record, and any recommendation journal row in one
+    atomic transaction.
     """
     ensure_reconstruction_history_schema(conn)
 
@@ -84,7 +88,8 @@ def persist_reconstruction_record(
         )
     except sqlite3.IntegrityError as exc:
         raise ValueError("reconstruction history is append-only for each run/card pair") from exc
-    conn.commit()
+    if commit:
+        conn.commit()
     return record_id
 
 

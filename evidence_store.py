@@ -2,7 +2,12 @@ import sqlite3, json, hashlib, uuid, copy
 from datetime import datetime
 
 from entity_matcher import norm
-from reconstruction import build_reconstruction_delta
+from reconstruction import build_reconstruction_delta, build_reconstruction_record
+from reconstruction_history import (
+    ensure_reconstruction_history_schema,
+    persist_reconstruction_record,
+    reconstruction_history as load_reconstruction_history,
+)
 
 PROVIDER_PRIORITY={
     "ebay_product_research":500,
@@ -102,6 +107,7 @@ class EvidenceStore:
         self.conn=sqlite3.connect(str(path))
         self.conn.row_factory=sqlite3.Row
         self.conn.executescript(SCHEMA)
+        ensure_reconstruction_history_schema(self.conn)
         columns={row["name"] for row in self.conn.execute("PRAGMA table_info(source_evidence)")}
         if "run_id" not in columns:
             self.conn.execute("ALTER TABLE source_evidence ADD COLUMN run_id TEXT")
@@ -293,8 +299,11 @@ class EvidenceStore:
             raise ValueError("market history is append-only for each run/card pair")
 
         state=copy.deepcopy(state)
+        state["run_id"]=run_id
         previous_snapshot=self._previous_market_snapshot(card_id,before_as_of=run["as_of"])
         previous=json.loads(previous_snapshot["state_json"]) if previous_snapshot else None
+        if previous is not None:
+            previous["run_id"]=previous_snapshot["run_id"]
         reconstruction=build_reconstruction_delta(previous,state)
         state["reconstruction"]=reconstruction
         state["lineage"]={
@@ -313,24 +322,30 @@ class EvidenceStore:
             blockers.append("Reconstruction health failed: large valuation move lacks material evidence change")
 
         evidence_range=state.get("evidence_range") or {}
-        self.conn.execute('''INSERT INTO card_market_history(
-          run_id,card_id,as_of,fair_value,range_low,range_high,evidence_grade,confidence,
-          accepted_sales,accepted_active,review_count,rejected_count,lowest_ask,median_ask,state_json)
-          VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',(
-            run_id,card_id,run["as_of"],state.get("fair_value"),
-            evidence_range.get("low"),evidence_range.get("high"),state["evidence_grade"],state["confidence"],
-            state.get("accepted_sales_30d",0),state.get("accepted_active_count",0),state.get("review_count",0),
-            state.get("excluded_count",0),state.get("lowest_ask"),state.get("median_ask"),
-            json.dumps(state,sort_keys=True)
-        ))
-        if state.get("action"):
-            self.conn.execute('''INSERT OR IGNORE INTO recommendation_journal(
-              run_id,card_id,action,fair_value,confidence,evidence_grade,thesis)
-              VALUES(?,?,?,?,?,?,?)''',(
-                run_id,card_id,state["action"],state.get("fair_value"),state["confidence"],
-                state["evidence_grade"],state.get("thesis")
+        try:
+            self.conn.execute('''INSERT INTO card_market_history(
+              run_id,card_id,as_of,fair_value,range_low,range_high,evidence_grade,confidence,
+              accepted_sales,accepted_active,review_count,rejected_count,lowest_ask,median_ask,state_json)
+              VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',(
+                run_id,card_id,run["as_of"],state.get("fair_value"),
+                evidence_range.get("low"),evidence_range.get("high"),state["evidence_grade"],state["confidence"],
+                state.get("accepted_sales_30d",0),state.get("accepted_active_count",0),state.get("review_count",0),
+                state.get("excluded_count",0),state.get("lowest_ask"),state.get("median_ask"),
+                json.dumps(state,sort_keys=True)
             ))
-        self.conn.commit()
+            record=build_reconstruction_record(previous,state)
+            persist_reconstruction_record(self.conn,record,commit=False)
+            if state.get("action"):
+                self.conn.execute('''INSERT OR IGNORE INTO recommendation_journal(
+                  run_id,card_id,action,fair_value,confidence,evidence_grade,thesis)
+                  VALUES(?,?,?,?,?,?,?)''',(
+                    run_id,card_id,state["action"],state.get("fair_value"),state["confidence"],
+                    state["evidence_grade"],state.get("thesis")
+                ))
+            self.conn.commit()
+        except Exception:
+            self.conn.rollback()
+            raise
         return state
 
     def previous_market_state(self,card_id,before_as_of=None):
@@ -341,6 +356,9 @@ class EvidenceStore:
         return [json.loads(row["state_json"]) for row in self.conn.execute(
             "SELECT state_json FROM card_market_history WHERE card_id=? ORDER BY as_of, rowid",(card_id,)
         )]
+
+    def reconstruction_history(self,card_id):
+        return load_reconstruction_history(self.conn,card_id)
 
     def counts(self):
         return dict(self.conn.execute("SELECT match_status,COUNT(*) FROM source_evidence GROUP BY match_status").fetchall())

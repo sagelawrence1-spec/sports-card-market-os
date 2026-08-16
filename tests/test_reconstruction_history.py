@@ -50,36 +50,30 @@ def test_reconstruction_record_persists_with_exact_snapshot_lineage(tmp_path):
         latest_sale_date="2026-08-11",
     )
 
-    first["run_id"] = first_run
-    second["run_id"] = second_run
     record = build_reconstruction_record(first, second)
-    persist_reconstruction_record(store.conn, record)
-
     rows = reconstruction_history(store.conn, CARD_ID)
-    assert rows == [record]
-    assert rows[0]["previous_run_id"] == first_run
-    assert rows[0]["run_id"] == second_run
+
+    assert len(rows) == 2
+    assert rows[-1] == record
+    assert rows[-1]["previous_run_id"] == first_run
+    assert rows[-1]["run_id"] == second_run
 
 
 def test_reconstruction_history_is_append_only(tmp_path):
     store = EvidenceStore(tmp_path / "evidence.sqlite")
     first_run, first = persist_state(store, "2026-08-10T12:00:00Z")
     second_run, second = persist_state(store, "2026-08-11T12:00:00Z")
-    first["run_id"] = first_run
-    second["run_id"] = second_run
     record = build_reconstruction_record(first, second)
 
-    persist_reconstruction_record(store.conn, record)
     with pytest.raises(ValueError, match="append-only"):
         persist_reconstruction_record(store.conn, record)
 
-    assert len(reconstruction_history(store.conn, CARD_ID)) == 1
+    assert len(reconstruction_history(store.conn, CARD_ID)) == 2
 
 
 def test_reconstruction_record_cannot_reference_unpersisted_snapshot(tmp_path):
     store = EvidenceStore(tmp_path / "evidence.sqlite")
     run_id, current = persist_state(store, "2026-08-11T12:00:00Z")
-    current["run_id"] = run_id
     record = build_reconstruction_record(None, current)
     record["previous_run_id"] = "missing-run"
     record["previous_as_of"] = "2026-08-10T12:00:00Z"
@@ -90,8 +84,7 @@ def test_reconstruction_record_cannot_reference_unpersisted_snapshot(tmp_path):
 
 def test_reconstruction_record_rejects_wrong_schema(tmp_path):
     store = EvidenceStore(tmp_path / "evidence.sqlite")
-    run_id, current = persist_state(store, "2026-08-11T12:00:00Z")
-    current["run_id"] = run_id
+    _, current = persist_state(store, "2026-08-11T12:00:00Z")
     record = build_reconstruction_record(None, current)
     record["schema"] = "market-reconstruction.v0"
 
@@ -102,9 +95,7 @@ def test_reconstruction_record_rejects_wrong_schema(tmp_path):
 def test_stored_record_json_is_canonical_and_queryable(tmp_path):
     store = EvidenceStore(tmp_path / "evidence.sqlite")
     run_id, current = persist_state(store, "2026-08-11T12:00:00Z")
-    current["run_id"] = run_id
     record = build_reconstruction_record(None, current)
-    persist_reconstruction_record(store.conn, record)
 
     row = store.conn.execute(
         "SELECT record_id,card_id,run_id,as_of,record_json FROM market_reconstruction_history"
