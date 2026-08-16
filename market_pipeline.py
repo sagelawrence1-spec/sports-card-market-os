@@ -345,8 +345,8 @@ class ScheduledMarketPipeline:
                     "excluded_total":excluded_total,
                 },
             }
-            self.store.save_market_state(run_id,state)
-            states.append(state)
+            persisted_state=self.store.save_market_state(run_id,state)
+            states.append(persisted_state)
 
         reconstruction_health=summarize_reconstruction_health(states)
         if self.sold_provider is None or (sold_queries_failed and not sold_queries_completed):
