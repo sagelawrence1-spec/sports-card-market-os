@@ -4,7 +4,14 @@ from typing import Dict, Any
 
 STOP={"the","a","an","card","sports","trading","mint","gem","graded","grade","rookie","rc"}
 HARD_EXCLUDE={"reprint","facsimile","digital","custom","proxy","reproduction","replica","you pick","pick your","break spot","case break","box break"}
-GRADE_COMPANIES={"psa","bgs","beckett","sgc","cgc","tag"}
+GRADER_ALIASES={
+    "psa":{"psa"},
+    "bgs":{"bgs","beckett"},
+    "sgc":{"sgc"},
+    "cgc":{"cgc"},
+    "tag":{"tag"},
+}
+GRADE_COMPANIES=set().union(*GRADER_ALIASES.values())
 MANUFACTURER_IDENTITY_MARKERS={"topps","panini","upper deck","leaf","playoff","donruss","fleer"}
 BRAND_MANUFACTURER_EVIDENCE={"topps":{"bowman"}}
 DISTINCTIVE_SET_MARKERS={
@@ -44,6 +51,22 @@ def aliases_for_parallel(p:str)->set:
     if "/" in p:
         out.add(p.split("/")[0].strip())
     return {x for x in out if x}
+
+
+def canonical_grader(value:str) -> str:
+    value=norm(value)
+    for canonical,aliases in GRADER_ALIASES.items():
+        if value in aliases:
+            return canonical
+    return value
+
+
+def observed_graders(title_tokens:set) -> set[str]:
+    return {
+        canonical
+        for canonical,aliases in GRADER_ALIASES.items()
+        if aliases & title_tokens
+    }
 
 
 def card_number_evidence(cardnum:str, title:str) -> tuple[bool,list[str]]:
@@ -188,26 +211,38 @@ class SportsCardEntityMatcher:
                 return MatchDecision(False,25.0,"wrong_manufacturer",{**diag,"conflicting_manufacturer_markers":sorted(conflicting_manufacturer_markers)})
 
         if grade_company:
-            company_present=grade_company in title_tokens
-            grade_patterns=[rf"\b{re.escape(grade_company)}\s*{re.escape(grade)}\b",rf"\b{re.escape(grade_company)}\s*gem\s*mint\s*{re.escape(grade)}\b"]
+            canonical_target=canonical_grader(grade_company)
+            target_aliases=GRADER_ALIASES.get(canonical_target,{grade_company})
+            observed=observed_graders(title_tokens)
+            company_present=canonical_target in observed
+            grade_patterns=[
+                rf"\b{re.escape(alias)}\s*{re.escape(grade)}\b"
+                for alias in target_aliases
+            ] + [
+                rf"\b{re.escape(alias)}\s*gem\s*mint\s*{re.escape(grade)}\b"
+                for alias in target_aliases
+            ]
             exact=any(re.search(p,t) for p in grade_patterns)
             diag["grade_exact"]=int(exact)
+            diag["target_grader"]=canonical_target
+            diag["observed_graders"]=sorted(observed)
             if exact:
                 score += 12
             elif company_present:
-                shown=re.findall(rf"\b{re.escape(grade_company)}\s*(\d+(?:\.\d+)?)\b",t)
+                shown=[]
+                for alias in target_aliases:
+                    shown.extend(re.findall(rf"\b{re.escape(alias)}\s*(\d+(?:\.\d+)?)\b",t))
                 if shown and grade not in shown:
                     return MatchDecision(False,25.0,"wrong_grade",{**diag,"explicit_grades":shown})
                 score -= 12
             else:
-                other=GRADE_COMPANIES & title_tokens
-                if other:
-                    return MatchDecision(False,25.0,"wrong_grading_company",{**diag,"other_grader":sorted(other)})
+                if observed:
+                    return MatchDecision(False,25.0,"wrong_grading_company",{**diag,"other_grader":sorted(observed)})
                 return MatchDecision(False,28.0,"raw_vs_graded_mismatch",diag)
         else:
-            other=GRADE_COMPANIES & title_tokens
-            if other:
-                return MatchDecision(False,28.0,"raw_vs_graded_mismatch",{**diag,"unexpected_grader":sorted(other)})
+            observed=observed_graders(title_tokens)
+            if observed:
+                return MatchDecision(False,28.0,"raw_vs_graded_mismatch",{**diag,"unexpected_grader":sorted(observed)})
 
         if parallel and parallel not in {"base","base card"}:
             palias=aliases_for_parallel(parallel)
