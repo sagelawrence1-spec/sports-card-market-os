@@ -154,11 +154,12 @@ class SportsCardEntityMatcher:
             if title_chrome and not target_chrome:
                 return MatchDecision(False,25.0,"wrong_set_family",diag)
 
-            if target_chrome and title_chrome:
-                target_update="update" in set_tokens
-                title_update="update" in title_tokens
-                if target_update != title_update:
-                    return MatchDecision(False,25.0,"wrong_set_family",{**diag,"target_update":target_update,"title_update":title_update})
+            target_update="update" in set_tokens
+            title_update="update" in title_tokens
+            diag["target_update"]=int(target_update)
+            diag["title_update"]=int(title_update)
+            if target_update != title_update:
+                return MatchDecision(False,25.0,"wrong_set_family",diag)
 
         man_tokens=toks(manufacturer)
         if man_tokens:
