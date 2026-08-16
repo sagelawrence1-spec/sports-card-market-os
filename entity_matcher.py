@@ -201,8 +201,7 @@ class SportsCardEntityMatcher:
             else:
                 return MatchDecision(False,70.0,"manual_review",{**diag,"review_reason":"parallel_not_confirmed"})
         else:
-            named={"silver","refractor","gold","red","blue","green","orange","purple","xfractor","superfractor"}
-            found=named & title_tokens
+            found=(PARALLEL_IDENTITY_MARKERS | {"refractor"}) & title_tokens
             if found:
                 return MatchDecision(False,30.0,"unexpected_parallel",{**diag,"unexpected_parallel":sorted(found)})
 
