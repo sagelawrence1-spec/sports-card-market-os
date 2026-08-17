@@ -28,18 +28,22 @@ def test_live_radar_batch_builds_reviewable_scan_artifact():
     assert [row["rank"] for row in artifact["candidates"]] == [1, 2, 3, 4]
     assert all(row["decision"] == "WATCH_FOR_COMPS" for row in artifact["candidates"])
     assert all(row["blocking_reason"] == "authoritative_market_repricing_unverified" for row in artifact["candidates"])
+    assert all(row["observed_at"] for row in artifact["candidates"])
     assert all(row["source_urls"] for row in artifact["candidates"])
     assert all(row["cards"] for row in artifact["candidates"])
 
 
 def test_scan_artifact_preserves_ranked_card_and_thesis_evidence():
-    report = scan_live_observations(json.loads(FIXTURE.read_text()))
+    payloads = json.loads(FIXTURE.read_text())
+    report = scan_live_observations(payloads)
     artifact = build_radar_scan_artifact(report, generated_at="2026-08-17T07:05:00Z")
     by_player = {row["player_id"]: row for row in artifact["candidates"]}
+    source_by_player = {row["player_id"]: row for row in payloads}
 
     baez = by_player["mlb-joshua-baez"]
     assert baez["stage"] == "ACCELERATION"
     assert baez["market_price_verified"] is False
+    assert baez["observed_at"] == source_by_player["mlb-joshua-baez"]["observed_at"]
     assert baez["falsification"]
     assert baez["cards"][0]["card_id"] == "2022-bowman-chrome-prospects-bcp-112-joshua-baez"
     assert any("reuters.com" in url for url in baez["source_urls"])
