@@ -6,27 +6,28 @@ from opportunity_feed_cli import main
 
 
 def _feed(*, generated_at: str = "2026-08-17T12:00:00Z", verified: bool = False) -> dict:
+    observation = {
+        "player_id": "player-1",
+        "player": "Prospect One",
+        "sport": "baseball",
+        "signal_kind": "CALL_UP_WATCH",
+        "signal_description": "Club is considering a near-term promotion.",
+        "observed_at": "2026-08-17T11:00:00Z",
+        "headline": "Promotion watch",
+        "why_now": "Rotation opening plus public club comments.",
+        "thesis": "Attention can move before the formal transaction.",
+        "falsification": ["Player remains in the minors after the roster need resolves."],
+        "source_urls": ["https://example.com/source"],
+        "cards": [{"card_id": "card-1", "label": "2025 Bowman Chrome Prospect Auto"}],
+        "market_price_verified": verified,
+    }
+    if verified:
+        observation["market_repricing_pct"] = 8.0
     return {
         "schema": "opportunity-radar-feed.v1",
         "publisher": "cli-test",
         "generated_at": generated_at,
-        "observations": [
-            {
-                "player_id": "player-1",
-                "player": "Prospect One",
-                "sport": "baseball",
-                "signal_kind": "CALL_UP_WATCH",
-                "signal_description": "Club is considering a near-term promotion.",
-                "observed_at": "2026-08-17T11:00:00Z",
-                "headline": "Promotion watch",
-                "why_now": "Rotation opening plus public club comments.",
-                "thesis": "Attention can move before the formal transaction.",
-                "falsification": ["Player remains in the minors after the roster need resolves."],
-                "source_urls": ["https://example.com/source"],
-                "cards": [{"card_id": "card-1", "label": "2025 Bowman Chrome Prospect Auto"}],
-                "market_price_verified": verified,
-            }
-        ],
+        "observations": [observation],
     }
 
 
