@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, Sequence
 
 from opportunity_feed import process_opportunity_feed
+from opportunity_scan_delta import build_radar_scan_delta
 
 
 def _read_json(path: str) -> Any:
@@ -31,17 +32,35 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("input", nargs="?", default="-", help="Input feed JSON path, or - for stdin")
     parser.add_argument("-o", "--output", default="-", help="Output scan JSON path, or - for stdout")
+    parser.add_argument(
+        "--previous-scan",
+        help="Optional prior opportunity-radar-scan.v1 JSON used to compute scan-to-scan movement.",
+    )
+    parser.add_argument(
+        "--delta-output",
+        help="Where to write opportunity-radar-delta.v1 when --previous-scan is supplied.",
+    )
     return parser
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
+        if bool(args.previous_scan) != bool(args.delta_output):
+            raise ValueError("--previous-scan and --delta-output must be supplied together")
         feed = _read_json(args.input)
         if not isinstance(feed, dict):
             raise ValueError("feed JSON must be an object")
         artifact = process_opportunity_feed(feed)
+        delta = None
+        if args.previous_scan:
+            previous_scan = _read_json(args.previous_scan)
+            if not isinstance(previous_scan, dict):
+                raise ValueError("previous scan JSON must be an object")
+            delta = build_radar_scan_delta(previous_scan, artifact)
         _write_json(artifact, args.output)
+        if delta is not None:
+            _write_json(delta, args.delta_output)
     except (OSError, json.JSONDecodeError, ValueError, TypeError) as exc:
         sys.stderr.write(f"opportunity-feed error: {exc}\n")
         return 2
