@@ -17,6 +17,7 @@ def _row(
     confidence=0.85,
     entry=100.0,
     realized=110.0,
+    realized_at=date(2026, 2, 1),
 ):
     return Recommendation(
         observation_id=f"obs-{idx}",
@@ -30,7 +31,7 @@ def _row(
         thesis="test",
         horizon_days=30,
         realized_price=realized,
-        realized_at=date(2026, 2, 1),
+        realized_at=realized_at,
     )
 
 
@@ -132,3 +133,42 @@ def test_hold_does_not_receive_incremental_capital(tmp_path):
     assert result["ready"] is False
     assert result["allocation"] == 0
     assert "non_deploy_action" in result["blockers"]
+
+
+def test_pre_horizon_realizations_do_not_count_as_mature_track_record(tmp_path):
+    rows = [
+        _row(i, realized=120, realized_at=date(2026, 1, 15))
+        for i in range(1, 7)
+    ]
+    journal = _journal(tmp_path, rows)
+    candidate = AllocationCandidate("new", "BUY", 100, 130, 0.90, "A")
+
+    result = allocation_readiness(journal, candidate, policy=_policy())
+
+    assert result["ready"] is False
+    assert result["overall"]["settled"] == 0
+    assert "overall_sample_too_small" in result["blockers"]
+
+
+def test_cost_adjusted_outcomes_can_block_gross_positive_track_record(tmp_path):
+    rows = [_row(i, realized=104) for i in range(1, 7)]
+    journal = _journal(tmp_path, rows)
+    candidate = AllocationCandidate("new", "BUY", 100, 130, 0.90, "A")
+    policy = AllocationPolicy(
+        min_overall_settled=6,
+        min_action_settled=4,
+        min_segment_settled=3,
+        min_hit_rate=0.60,
+        min_median_return=0.02,
+        max_position_pct=0.10,
+        max_total_deployment_pct=0.25,
+        exit_fee_rate=0.02,
+        liquidity_haircut_rate=0.02,
+    )
+
+    result = allocation_readiness(journal, candidate, policy=policy)
+
+    assert result["ready"] is False
+    assert result["overall"]["median_return"] < 0
+    assert "overall_hit_rate_below_floor" in result["blockers"]
+    assert result["cost_basis"] == "realized_after_exit_fees_and_liquidity_haircut"

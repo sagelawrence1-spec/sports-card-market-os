@@ -7,6 +7,7 @@ import statistics
 from typing import Any
 
 from recommendation_journal import Recommendation, RecommendationJournal
+from recommendation_outcomes import OutcomePolicy, grade_recommendation
 
 
 DEPLOY_ACTIONS = {"BUY", "ACCUMULATE"}
@@ -20,13 +21,6 @@ def confidence_band(confidence: float) -> str:
     return "low"
 
 
-def signed_return(row: Recommendation) -> float:
-    if row.realized_price is None:
-        raise ValueError("Outcome must be settled before grading.")
-    raw = (row.realized_price - row.entry_price) / row.entry_price
-    return -raw if row.action in {"TRIM", "SELL"} else raw
-
-
 @dataclass(frozen=True)
 class AllocationPolicy:
     min_overall_settled: int = 20
@@ -36,6 +30,8 @@ class AllocationPolicy:
     min_median_return: float = 0.02
     max_position_pct: float = 0.10
     max_total_deployment_pct: float = 0.50
+    exit_fee_rate: float = 0.0
+    liquidity_haircut_rate: float = 0.0
 
     def __post_init__(self) -> None:
         if self.min_overall_settled < 1:
@@ -50,6 +46,10 @@ class AllocationPolicy:
             raise ValueError("max_total_deployment_pct must be between 0 and 1.")
         if self.max_position_pct > self.max_total_deployment_pct:
             raise ValueError("position cap cannot exceed deployment cap.")
+        if not 0 <= self.exit_fee_rate <= 1:
+            raise ValueError("exit_fee_rate must be between 0 and 1.")
+        if not 0 <= self.liquidity_haircut_rate <= 1:
+            raise ValueError("liquidity_haircut_rate must be between 0 and 1.")
 
 
 @dataclass(frozen=True)
@@ -68,21 +68,33 @@ class AllocationCandidate:
         return (self.fair_value - self.entry_price) / self.entry_price
 
 
-def _settled_deploy_rows(journal: RecommendationJournal) -> list[Recommendation]:
+def _matured_deploy_rows(journal: RecommendationJournal) -> list[Recommendation]:
+    """Return only realized deploy outcomes that reached their original horizon."""
     return [
         row
         for row in journal.load()
-        if row.realized_price is not None and row.action in DEPLOY_ACTIONS
+        if row.realized_price is not None
+        and row.realized_at is not None
+        and row.realized_at >= row.horizon_end
+        and row.action in DEPLOY_ACTIONS
     ]
 
 
-def _metrics(rows: list[Recommendation]) -> dict[str, Any]:
+def _outcome_policy(policy: AllocationPolicy) -> OutcomePolicy:
+    return OutcomePolicy(
+        exit_fee_rate=policy.exit_fee_rate,
+        liquidity_haircut_rate=policy.liquidity_haircut_rate,
+    )
+
+
+def _metrics(rows: list[Recommendation], *, outcome_policy: OutcomePolicy) -> dict[str, Any]:
     if not rows:
         return {"settled": 0, "hit_rate": None, "median_return": None}
-    returns = [signed_return(row) for row in rows]
+    outcomes = [grade_recommendation(row, policy=outcome_policy) for row in rows]
+    returns = [float(outcome["action_adjusted_return"]) for outcome in outcomes]
     return {
-        "settled": len(rows),
-        "hit_rate": sum(value > 0 for value in returns) / len(returns),
+        "settled": len(outcomes),
+        "hit_rate": sum(bool(outcome["hit"]) for outcome in outcomes) / len(outcomes),
         "median_return": float(statistics.median(returns)),
     }
 
@@ -93,7 +105,7 @@ def allocation_readiness(
     *,
     policy: AllocationPolicy | None = None,
 ) -> dict[str, Any]:
-    """Require realized proof before allowing new capital to be deployed."""
+    """Require matured, cost-adjusted realized proof before deploying new capital."""
     policy = policy or AllocationPolicy()
     blockers: list[str] = []
 
@@ -104,7 +116,7 @@ def allocation_readiness(
     if candidate.upside <= 0:
         blockers.append("no_positive_upside")
 
-    all_rows = _settled_deploy_rows(journal)
+    all_rows = _matured_deploy_rows(journal)
     action_rows = [row for row in all_rows if row.action == candidate.action]
     band = confidence_band(candidate.confidence)
     segment_rows = [
@@ -113,11 +125,12 @@ def allocation_readiness(
         if row.evidence_grade == candidate.evidence_grade
         and confidence_band(row.confidence) == band
     ]
+    outcome_policy = _outcome_policy(policy)
 
     views = {
-        "overall": (_metrics(all_rows), policy.min_overall_settled),
-        "action": (_metrics(action_rows), policy.min_action_settled),
-        "segment": (_metrics(segment_rows), policy.min_segment_settled),
+        "overall": (_metrics(all_rows, outcome_policy=outcome_policy), policy.min_overall_settled),
+        "action": (_metrics(action_rows, outcome_policy=outcome_policy), policy.min_action_settled),
+        "segment": (_metrics(segment_rows, outcome_policy=outcome_policy), policy.min_segment_settled),
     }
 
     for name, (metrics, sample_floor) in views.items():
@@ -139,6 +152,9 @@ def allocation_readiness(
         "overall": views["overall"][0],
         "action": views["action"][0],
         "segment": views["segment"][0],
+        "cost_basis": "realized_after_exit_fees_and_liquidity_haircut",
+        "exit_fee_rate": policy.exit_fee_rate,
+        "liquidity_haircut_rate": policy.liquidity_haircut_rate,
     }
 
 
@@ -206,6 +222,9 @@ def size_candidates(
                 "overall": readiness["overall"],
                 "action": readiness["action"],
                 "segment": readiness["segment"],
+                "cost_basis": readiness["cost_basis"],
+                "exit_fee_rate": readiness["exit_fee_rate"],
+                "liquidity_haircut_rate": readiness["liquidity_haircut_rate"],
             },
         })
 
