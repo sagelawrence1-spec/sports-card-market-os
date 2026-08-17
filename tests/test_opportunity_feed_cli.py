@@ -81,6 +81,32 @@ def test_cli_writes_scan_delta_against_previous_scan(tmp_path):
     assert "REPRICING_VERIFIED" in delta["movements"][0]["changes"]
 
 
+def test_cli_writes_attention_brief_for_changed_opportunity(tmp_path):
+    previous_feed_path = tmp_path / "previous-feed.json"
+    previous_scan_path = tmp_path / "previous-scan.json"
+    current_feed_path = tmp_path / "current-feed.json"
+    current_scan_path = tmp_path / "current-scan.json"
+    delta_path = tmp_path / "delta.json"
+    attention_path = tmp_path / "attention.json"
+
+    previous_feed_path.write_text(json.dumps(_feed(generated_at="2026-08-17T12:00:00Z")), encoding="utf-8")
+    assert main([str(previous_feed_path), "--output", str(previous_scan_path)]) == 0
+    current_feed_path.write_text(json.dumps(_feed(generated_at="2026-08-17T13:00:00Z", verified=True)), encoding="utf-8")
+
+    assert main([
+        str(current_feed_path),
+        "--output", str(current_scan_path),
+        "--previous-scan", str(previous_scan_path),
+        "--delta-output", str(delta_path),
+        "--attention-output", str(attention_path),
+    ]) == 0
+    attention = json.loads(attention_path.read_text(encoding="utf-8"))
+    assert attention["schema"] == "opportunity-radar-attention.v1"
+    assert attention["summary"]["attention_count"] == 1
+    assert attention["items"][0]["player_id"] == "player-1"
+    assert "REPRICING_VERIFIED" in attention["items"][0]["changes"]
+
+
 def test_cli_requires_previous_scan_and_delta_output_together(tmp_path):
     input_path = tmp_path / "feed.json"
     input_path.write_text(json.dumps(_feed()), encoding="utf-8")
@@ -88,6 +114,15 @@ def test_cli_requires_previous_scan_and_delta_output_together(tmp_path):
     with redirect_stderr(error):
         assert main([str(input_path), "--previous-scan", "missing.json"]) == 2
     assert "--previous-scan and --delta-output must be supplied together" in error.getvalue()
+
+
+def test_cli_rejects_attention_output_without_previous_scan(tmp_path):
+    input_path = tmp_path / "feed.json"
+    input_path.write_text(json.dumps(_feed()), encoding="utf-8")
+    error = io.StringIO()
+    with redirect_stderr(error):
+        assert main([str(input_path), "--attention-output", str(tmp_path / "attention.json")]) == 2
+    assert "--attention-output requires --previous-scan" in error.getvalue()
 
 
 def test_cli_fails_closed_on_invalid_feed(tmp_path):
