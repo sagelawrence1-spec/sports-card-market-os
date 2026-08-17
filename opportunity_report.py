@@ -30,6 +30,7 @@ def build_radar_scan_artifact(report: RadarBatchReport, *, generated_at: str | N
     candidates: list[dict[str, Any]] = []
     for rank, candidate in enumerate(report.candidates, start=1):
         thesis = candidate.thesis
+        observed_at = thesis.signals[-1].observed_at if thesis.signals else None
         candidates.append(
             {
                 "rank": rank,
@@ -42,6 +43,7 @@ def build_radar_scan_artifact(report: RadarBatchReport, *, generated_at: str | N
                 "decision": candidate.decision,
                 "blocking_reason": candidate.blocking_reason,
                 "market_price_verified": candidate.market_price_verified,
+                "observed_at": observed_at,
                 "headline": thesis.headline,
                 "why_now": thesis.why_now,
                 "thesis": thesis.thesis,
