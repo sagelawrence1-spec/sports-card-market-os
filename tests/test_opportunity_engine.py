@@ -35,6 +35,23 @@ def test_weak_signal_edge_can_precede_mature_evidence():
     assert asymmetry == 90
 
 
+def test_call_up_watch_is_catalyst_thesis_before_catalyst_occurs():
+    engine = OpportunityEngine()
+    thesis = engine.spark(
+        player_id="pecko",
+        player="Ethan Pecko",
+        sport="MLB",
+        signal=Signal("pecko", "Ethan Pecko", "MLB", SignalKind.CALL_UP_WATCH, "Scratched while club discusses possible MLB start", "news"),
+        headline="Possible call-up is visible before the transaction",
+        why_now="Rotation uncertainty and a scratched Triple-A start create a credible near-term catalyst.",
+        thesis="The market may not fully price a debut until the roster move is official.",
+        falsification=["No call-up", "Rotation spot closes"],
+        factors=factors(evidence_maturity=44, attention_velocity=35),
+    )
+    assert thesis.thesis_type == ThesisType.CATALYST
+    assert thesis.stage == OpportunityStage.PRE_CATALYST
+
+
 def test_signing_creates_entry_catalyst_and_timestamped_ledger():
     engine = OpportunityEngine()
     thesis = engine.spark(
