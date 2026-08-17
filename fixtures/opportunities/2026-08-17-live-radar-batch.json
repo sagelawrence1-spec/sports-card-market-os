@@ -1,0 +1,145 @@
+[
+  {
+    "player_id": "mlb-joshua-baez",
+    "player": "Joshua Baez",
+    "sport": "MLB",
+    "signal_kind": "PERFORMANCE",
+    "signal_description": "Historic MLB debut: three home runs in his first game, the first three-homer debut in major-league history.",
+    "observed_at": "2026-08-16T23:30:00+00:00",
+    "headline": "Historic debut creates an immediate attention shock",
+    "why_now": "The debut is an acceleration event; the opportunity question is whether Bowman prices lagged the attention spike enough to leave a narrow entry window.",
+    "thesis": "Joshua Baez has a nationally legible MLB catalyst. Monitor established Bowman prospect cards immediately, but authorize no capital action until authoritative post-event sold comps establish the actual repricing.",
+    "falsification": [
+      "Post-debut sold comps show target cards already repriced beyond the chase threshold.",
+      "Follow-on playing time or performance does not sustain attention.",
+      "Target-card liquidity is too thin to establish a trustworthy entry level."
+    ],
+    "importance": 98,
+    "novelty": 100,
+    "market_impact": 92,
+    "factors": {
+      "situation_change": 100,
+      "narrative_potential": 98,
+      "collectibility": 77,
+      "hobby_lag": 55,
+      "attention_velocity": 100,
+      "evidence_maturity": 62,
+      "upside_asymmetry": 68
+    },
+    "market_price_verified": false,
+    "market_repricing_pct": null,
+    "source_urls": [
+      "https://www.reuters.com/sports/mlb-roundup-cards-joshua-baez-first-debut-with-3-hr-game--flm-2026-08-16/"
+    ],
+    "cards": [
+      {
+        "card_id": "2022-bowman-chrome-prospects-bcp-112-joshua-baez",
+        "label": "2022 Bowman Chrome Prospects BCP-112 Joshua Baez",
+        "priority": 1,
+        "rationale": "Liquid, recognizable Bowman Chrome prospect expression; refresh sold comps before action."
+      },
+      {
+        "card_id": "2022-bowman-chrome-prospect-auto-cpa-jb-joshua-baez",
+        "label": "2022 Bowman Chrome Prospect Autograph CPA-JB Joshua Baez",
+        "priority": 2,
+        "rationale": "Higher-conviction autograph expression; requires fresh post-catalyst price discovery."
+      }
+    ]
+  },
+  {
+    "player_id": "mlb-kaelen-culpepper",
+    "player": "Kaelen Culpepper",
+    "sport": "MLB",
+    "signal_kind": "PERFORMANCE",
+    "signal_description": "Twins prospect Kaelen Culpepper homered in his MLB debut after a midseason promotion into a playoff race.",
+    "observed_at": "2026-08-08T00:00:00+00:00",
+    "headline": "Debut homer turns a call-up into an early acceleration signal",
+    "why_now": "Culpepper entered MLB as a top-30 prospect and immediately produced a simple hobby narrative: first-rounder, premium position, debut home run, playoff context.",
+    "thesis": "Kaelen Culpepper has moved from prospect anticipation into early MLB validation. His 2024 Bowman Draft 1st Chrome and Chrome auto deserve immediate repricing checks before broader rookie-card attention arrives.",
+    "falsification": [
+      "Authoritative sold comps show the Bowman market already fully repriced the debut catalyst.",
+      "Playing time falls materially after the initial promotion.",
+      "MLB production fails to sustain attention beyond the debut window."
+    ],
+    "importance": 79,
+    "novelty": 82,
+    "market_impact": 72,
+    "factors": {
+      "situation_change": 86,
+      "narrative_potential": 80,
+      "collectibility": 74,
+      "hobby_lag": 67,
+      "attention_velocity": 76,
+      "evidence_maturity": 58,
+      "upside_asymmetry": 72
+    },
+    "market_price_verified": false,
+    "market_repricing_pct": null,
+    "source_urls": [
+      "https://www.reuters.com/sports/report-twins-promote-no-2-prospect-search-offensive-boost--flm-2026-08-07/",
+      "https://www.beckett.com/news/2024-bowman-draft-baseball-cards/"
+    ],
+    "cards": [
+      {
+        "card_id": "2024-bowman-draft-chrome-bdc-98-kaelen-culpepper",
+        "label": "2024 Bowman Draft Chrome BDC-98 Kaelen Culpepper",
+        "priority": 1,
+        "rationale": "Primary 1st Bowman Chrome prospect expression with broad parallel depth."
+      },
+      {
+        "card_id": "2024-bowman-draft-chrome-prospect-auto-cpa-kc-kaelen-culpepper",
+        "label": "2024 Bowman Draft Chrome Prospect Autograph CPA-KC Kaelen Culpepper",
+        "priority": 2,
+        "rationale": "Core 1st Bowman autograph expression; verify post-debut sold depth before action."
+      }
+    ]
+  },
+  {
+    "player_id": "mlb-george-lombard-jr",
+    "player": "George Lombard Jr.",
+    "sport": "MLB",
+    "signal_kind": "CALL_UP",
+    "signal_description": "The Yankees promoted top prospect George Lombard Jr. to the majors and installed him at shortstop after declining to add one at the trade deadline.",
+    "observed_at": "2026-08-04T00:00:00+00:00",
+    "headline": "Yankees promotion creates a high-attention catalyst for a premium-position prospect",
+    "why_now": "A Yankees starting-role promotion creates national visibility, but the card market was already carrying a prospect premium before the call-up, so the thesis requires especially strict repricing discipline.",
+    "thesis": "George Lombard Jr. has a legitimate catalyst but may have less unpriced upside than a colder prospect because his 1st Bowman market was already expensive. Radar should verify whether the call-up created acceleration or merely confirmed consensus.",
+    "falsification": [
+      "Authoritative sold comps show the call-up was fully anticipated and already priced.",
+      "He loses regular shortstop playing time.",
+      "The Yankees catalyst produces attention without incremental card-market demand."
+    ],
+    "importance": 85,
+    "novelty": 73,
+    "market_impact": 83,
+    "factors": {
+      "situation_change": 90,
+      "narrative_potential": 92,
+      "collectibility": 86,
+      "hobby_lag": 34,
+      "attention_velocity": 84,
+      "evidence_maturity": 63,
+      "upside_asymmetry": 46
+    },
+    "market_price_verified": false,
+    "market_repricing_pct": null,
+    "source_urls": [
+      "https://www.reuters.com/sports/yankees-top-prospect-george-lombard-jr-promoted-start-ss--flm-2026-08-04/",
+      "https://www.beckett.com/news/2025-bowman-draft-baseball-cards/"
+    ],
+    "cards": [
+      {
+        "card_id": "2024-bowman-draft-chrome-bdc-118-george-lombard-jr",
+        "label": "2024 Bowman Draft Chrome BDC-118 George Lombard Jr.",
+        "priority": 1,
+        "rationale": "Established Bowman Chrome prospect expression; use repricing verification to distinguish catalyst from consensus."
+      },
+      {
+        "card_id": "2025-bowman-chrome-mega-box-prospect-auto-bmagl-george-lombard-jr",
+        "label": "2025 Bowman Chrome Mega Box Prospect Autograph BMAGL George Lombard Jr.",
+        "priority": 2,
+        "rationale": "Autograph expression with verified checklist identity; liquidity must be proven before action."
+      }
+    ]
+  }
+]
