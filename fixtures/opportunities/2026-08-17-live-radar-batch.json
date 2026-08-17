@@ -141,5 +141,47 @@
         "rationale": "Autograph expression with verified checklist identity; liquidity must be proven before action."
       }
     ]
+  },
+  {
+    "player_id": "mlb-ethan-pecko",
+    "player": "Ethan Pecko",
+    "sport": "MLB",
+    "signal_kind": "CALL_UP_WATCH",
+    "signal_description": "Houston scratched Ethan Pecko from his scheduled Triple-A start while the club discusses using him for a possible MLB start this week.",
+    "observed_at": "2026-08-16T23:54:03+00:00",
+    "headline": "Possible Astros call-up is visible before the roster move",
+    "why_now": "The Astros have unsettled rotation spots, Pecko was scratched from his scheduled Triple-A start, and the general manager publicly acknowledged a possible debut this week. That creates a pre-catalyst window before an official transaction or first MLB appearance.",
+    "thesis": "Ethan Pecko is a genuine pre-catalyst Radar candidate rather than a post-breakout chase. His 2025 Bowman Chrome 1st prospect autograph can be monitored before a possible MLB debut, but no capital action is authorized until authoritative sold comps establish the current market and the call-up probability strengthens.",
+    "falsification": [
+      "Houston announces a different starter and Pecko remains in Triple-A.",
+      "The rotation opportunity closes without an MLB promotion.",
+      "Authoritative sold comps show the prospect-auto market already repriced the call-up speculation beyond an attractive entry."
+    ],
+    "importance": 72,
+    "novelty": 91,
+    "market_impact": 58,
+    "factors": {
+      "situation_change": 81,
+      "narrative_potential": 61,
+      "collectibility": 52,
+      "hobby_lag": 88,
+      "attention_velocity": 39,
+      "evidence_maturity": 48,
+      "upside_asymmetry": 79
+    },
+    "market_price_verified": false,
+    "market_repricing_pct": null,
+    "source_urls": [
+      "https://www.houstonchronicle.com/sports/astros/article/ethan-pecko-possible-call-up-22390787.php",
+      "https://www.beckett.com/news/2025-bowman-chrome-baseball-cards/"
+    ],
+    "cards": [
+      {
+        "card_id": "2025-bowman-chrome-prospect-auto-cpa-epe-ethan-pecko",
+        "label": "2025 Bowman Chrome Prospect Autograph CPA-EPE Ethan Pecko",
+        "priority": 1,
+        "rationale": "Verified 1st Bowman Chrome prospect autograph and the clearest hobby expression if a debut catalyst materializes."
+      }
+    ]
   }
 ]
