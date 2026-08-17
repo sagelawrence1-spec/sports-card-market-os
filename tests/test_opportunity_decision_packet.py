@@ -9,6 +9,7 @@ def _observation():
         "player": "Player One",
         "sport": "baseball",
         "signal_kind": "CALL_UP",
+        "signal_description": "Player One was called up to the major-league roster.",
         "observed_at": "2026-08-10T12:00:00+00:00",
         "headline": "Player One call-up creates a hobby catalyst",
         "why_now": "Attention can outrun repricing after the promotion.",
