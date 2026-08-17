@@ -46,6 +46,7 @@ class OpportunityAction(str, Enum):
 
 class SignalKind(str, Enum):
     USER_SPARK = "USER_SPARK"
+    CALL_UP_WATCH = "CALL_UP_WATCH"
     SIGNING = "SIGNING"
     TRADE = "TRADE"
     CALL_UP = "CALL_UP"
@@ -120,7 +121,7 @@ class LedgerEntry:
     reason: str
 
 
-_CATALYST = {SignalKind.SIGNING, SignalKind.TRADE, SignalKind.CALL_UP, SignalKind.MILESTONE, SignalKind.RETIREMENT, SignalKind.HOF}
+_CATALYST = {SignalKind.CALL_UP_WATCH, SignalKind.SIGNING, SignalKind.TRADE, SignalKind.CALL_UP, SignalKind.MILESTONE, SignalKind.RETIREMENT, SignalKind.HOF}
 _QUANT = {SignalKind.SALES_VELOCITY, SignalKind.PRICE}
 _ACCELERATION = {SignalKind.PERFORMANCE, SignalKind.MEDIA, SignalKind.SEARCH, SignalKind.SALES_VELOCITY, SignalKind.PRICE}
 _STAGE_ORDER = {OpportunityStage.PRE_CATALYST: 0, OpportunityStage.ENTRY: 1, OpportunityStage.ACCELERATION: 2, OpportunityStage.CONSENSUS: 3, OpportunityStage.BROKEN: 99}
@@ -135,6 +136,8 @@ def classify_type(kind: SignalKind) -> ThesisType:
 
 
 def candidate_stage(kind: SignalKind) -> OpportunityStage:
+    if kind == SignalKind.CALL_UP_WATCH:
+        return OpportunityStage.PRE_CATALYST
     if kind in _CATALYST or kind == SignalKind.PLAYING_TIME:
         return OpportunityStage.ENTRY
     if kind in _ACCELERATION:
