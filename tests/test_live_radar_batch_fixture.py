@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 
+from opportunity_engine import OpportunityStage, ThesisType
 from opportunity_radar import scan_live_observations
 
 
@@ -12,8 +13,8 @@ def test_sourced_live_radar_batch_surfaces_multiple_candidates_without_forcing_a
     report = scan_live_observations(payloads)
 
     assert report.schema == "opportunity-radar-batch.v1"
-    assert report.input_count == 3
-    assert report.candidate_count == 3
+    assert report.input_count == 4
+    assert report.candidate_count == 4
     assert report.duplicate_count == 0
     assert report.failures == ()
     assert report.actionable_count == 0
@@ -21,6 +22,7 @@ def test_sourced_live_radar_batch_surfaces_multiple_candidates_without_forcing_a
         "mlb-joshua-baez",
         "mlb-kaelen-culpepper",
         "mlb-george-lombard-jr",
+        "mlb-ethan-pecko",
     }
     assert all(candidate.decision == "WATCH_FOR_COMPS" for candidate in report.candidates)
     assert all(candidate.blocking_reason == "authoritative_market_repricing_unverified" for candidate in report.candidates)
@@ -42,3 +44,10 @@ def test_sourced_live_radar_batch_preserves_card_expressions_and_source_provenan
     lombard = by_player["mlb-george-lombard-jr"]
     assert lombard.thesis.cards[0].card_id == "2024-bowman-draft-chrome-bdc-118-george-lombard-jr"
     assert lombard.market_price_verified is False
+
+    pecko = by_player["mlb-ethan-pecko"]
+    assert pecko.thesis.thesis_type == ThesisType.CATALYST
+    assert pecko.thesis.stage == OpportunityStage.PRE_CATALYST
+    assert pecko.thesis.cards[0].card_id == "2025-bowman-chrome-prospect-auto-cpa-epe-ethan-pecko"
+    assert any("houstonchronicle.com" in url for url in pecko.source_urls)
+    assert any("beckett.com" in url for url in pecko.source_urls)
