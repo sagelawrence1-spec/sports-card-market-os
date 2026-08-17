@@ -15,6 +15,7 @@ def _scan() -> dict:
                 "stage": "ENTRY",
                 "decision": "START_POSITION",
                 "blocking_reason": None,
+                "observed_at": "2026-08-17T13:45:00+00:00",
                 "headline": "Promotion confirmed",
                 "why_now": "Attention is moving before broader repricing.",
                 "thesis": "Entry remains open after verified modest repricing.",
@@ -29,6 +30,7 @@ def _scan() -> dict:
                 "stage": "PRE_CATALYST",
                 "decision": "WATCH_FOR_COMPS",
                 "blocking_reason": "authoritative_market_repricing_unverified",
+                "observed_at": "2026-08-17T14:10:00+00:00",
                 "headline": "Call-up watch",
                 "why_now": "Club comments indicate promotion risk.",
                 "thesis": "Attention may move before the transaction.",
@@ -83,8 +85,10 @@ def test_attention_brief_surfaces_actionable_and_dropped_only():
     }
     assert [item["player_id"] for item in brief["items"]] == ["p1", "p3"]
     assert brief["items"][0]["decision"] == "START_POSITION"
+    assert brief["items"][0]["observed_at"] == "2026-08-17T13:45:00+00:00"
     assert brief["items"][0]["cards"][0]["card_id"] == "c1"
     assert brief["items"][1]["status"] == "DROPPED"
+    assert brief["items"][1]["observed_at"] is None
 
 
 def test_attention_brief_rejects_misaligned_delta():
