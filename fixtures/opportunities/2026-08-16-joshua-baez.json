@@ -1,0 +1,49 @@
+{
+  "player_id": "mlb-joshua-baez",
+  "player": "Joshua Baez",
+  "sport": "MLB",
+  "signal_kind": "PERFORMANCE",
+  "signal_description": "Historic MLB debut: three home runs in first three at-bats, becoming the first player in MLB history to homer three times in his debut.",
+  "observed_at": "2026-08-16T23:30:00+00:00",
+  "headline": "Historic debut creates an immediate attention shock",
+  "why_now": "The performance is already an acceleration event, so the opportunity question is whether card prices have lagged the attention spike enough to leave a narrow entry window.",
+  "thesis": "Joshua Baez has a sudden, nationally legible MLB narrative catalyst. His established Bowman prospect cards should be monitored immediately for a temporary attention-versus-price dislocation, but no capital action is authorized until post-event sold comps establish the actual repricing.",
+  "falsification": [
+    "Post-debut sold comps show the target cards have already repriced beyond the acceptable chase threshold.",
+    "Follow-on playing time or performance does not support sustained MLB attention.",
+    "Available target-card liquidity is too thin to establish a trustworthy entry level."
+  ],
+  "importance": 98,
+  "novelty": 100,
+  "market_impact": 92,
+  "factors": {
+    "situation_change": 100,
+    "narrative_potential": 98,
+    "collectibility": 77,
+    "hobby_lag": 55,
+    "attention_velocity": 100,
+    "evidence_maturity": 62,
+    "upside_asymmetry": 68
+  },
+  "market_price_verified": false,
+  "market_repricing_pct": null,
+  "source_urls": [
+    "https://www.reuters.com/sports/mlb-roundup-cards-joshua-baez-first-debut-with-3-hr-game--flm-2026-08-16/",
+    "https://www.psacard.com/cert/89544196/psa",
+    "https://www.hobbyscan.com/card/121047"
+  ],
+  "cards": [
+    {
+      "card_id": "2022-bowman-chrome-prospects-bcp-112-joshua-baez",
+      "label": "2022 Bowman Chrome Prospects BCP-112 Joshua Baez",
+      "priority": 1,
+      "rationale": "Recognizable Bowman Chrome prospect expression with an existing graded/raw market; use only after fresh post-debut sold comps are ingested."
+    },
+    {
+      "card_id": "2022-bowman-chrome-prospect-auto-cpa-jb-joshua-baez",
+      "label": "2022 Bowman Chrome Prospect Autograph CPA-JB Joshua Baez",
+      "priority": 2,
+      "rationale": "Higher-conviction autograph expression verified in PSA catalog data; price discovery must be refreshed before action."
+    }
+  ]
+}
