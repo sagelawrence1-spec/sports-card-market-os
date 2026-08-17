@@ -18,14 +18,14 @@ def test_live_radar_batch_builds_reviewable_scan_artifact():
     assert artifact["source_schema"] == "opportunity-radar-batch.v1"
     assert artifact["generated_at"] == "2026-08-17T07:05:00+00:00"
     assert artifact["summary"] == {
-        "input_count": 3,
-        "candidate_count": 3,
+        "input_count": 4,
+        "candidate_count": 4,
         "actionable_count": 0,
         "duplicate_count": 0,
         "failure_count": 0,
-        "waiting_for_comps_count": 3,
+        "waiting_for_comps_count": 4,
     }
-    assert [row["rank"] for row in artifact["candidates"]] == [1, 2, 3]
+    assert [row["rank"] for row in artifact["candidates"]] == [1, 2, 3, 4]
     assert all(row["decision"] == "WATCH_FOR_COMPS" for row in artifact["candidates"])
     assert all(row["blocking_reason"] == "authoritative_market_repricing_unverified" for row in artifact["candidates"])
     assert all(row["source_urls"] for row in artifact["candidates"])
