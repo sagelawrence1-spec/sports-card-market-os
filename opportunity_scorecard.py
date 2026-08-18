@@ -123,7 +123,7 @@ def build_opportunity_scorecard(
 
     return {
         "schema": SCORECARD_SCHEMA,
-        "status": "PROVEN" if not blockers else "INSUFFICIENT_PROOF",
+        "status": "EVIDENCE_THRESHOLD_MET" if not blockers else "INSUFFICIENT_EVIDENCE",
         "proof_blockers": blockers,
         "settled_outcomes": settled,
         "distinct_players": len(players),
