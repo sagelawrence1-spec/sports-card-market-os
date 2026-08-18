@@ -4,12 +4,38 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 from opportunity_repricing_apply import apply_repricing_collection
 
 _ACTIONABLE = {"START_POSITION", "ADD"}
+
+
+def _aware(value: Any, *, field: str) -> datetime:
+    try:
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise ValueError(f"{field} must be ISO datetime") from exc
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        raise ValueError(f"{field} must be timezone-aware")
+    return parsed.astimezone(timezone.utc)
+
+
+def _decision_latency(observed_at: Any, as_of: Any) -> tuple[str, float, str]:
+    observed = _aware(observed_at, field="observed_at")
+    decision_at = _aware(as_of, field="as_of")
+    lag_minutes = (decision_at - observed).total_seconds() / 60.0
+    if lag_minutes < 0:
+        raise ValueError("observed_at cannot be after decision as_of")
+    if lag_minutes <= 360:
+        bucket = "UNDER_6H"
+    elif lag_minutes <= 1440:
+        bucket = "6_TO_24H"
+    else:
+        bucket = "OVER_24H"
+    return observed.isoformat(), lag_minutes, bucket
 
 
 def build_opportunity_decision_packet(
@@ -44,6 +70,9 @@ def build_opportunity_decision_packet(
     if selected_card is None:
         raise ValueError("repricing card must resolve to an observation card expression")
 
+    observed_at, decision_lag_minutes, latency_bucket = _decision_latency(
+        observation.get("observed_at"), update["as_of"]
+    )
     decision = str(update["decision"])
     return {
         "schema": "opportunity-decision-packet.v1",
@@ -53,7 +82,10 @@ def build_opportunity_decision_packet(
         "headline": headline,
         "signal_kind": str(observation.get("signal_kind", "")).strip(),
         "catalyst_at": update["catalyst_at"],
+        "observed_at": observed_at,
         "as_of": update["as_of"],
+        "observation_to_decision_lag_minutes": decision_lag_minutes,
+        "decision_latency_bucket": latency_bucket,
         "why_now": why_now,
         "thesis": thesis,
         "falsification": [str(item) for item in falsification],
