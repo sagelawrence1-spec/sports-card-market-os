@@ -11,7 +11,10 @@ def _packet():
         "player_id": "player-1",
         "card": {"card_id": "card-10", "label": "2026 Bowman Chrome Player One #10"},
         "catalyst_at": "2026-08-10T12:00:00+00:00",
+        "observed_at": "2026-08-10T12:00:00+00:00",
         "as_of": "2026-08-18T10:00:00+00:00",
+        "observation_to_decision_lag_minutes": 11400.0,
+        "decision_latency_bucket": "OVER_24H",
         "decision": "START_POSITION",
         "actionable": True,
     }
@@ -48,6 +51,9 @@ def test_grades_actionable_decision_from_original_authoritative_entry():
     assert outcome["net_return"] == pytest.approx(0.25)
     assert outcome["grade"] == "A"
     assert outcome["hit"] is True
+    assert outcome["observed_at"] == "2026-08-10T12:00:00+00:00"
+    assert outcome["observation_to_decision_lag_minutes"] == 11400.0
+    assert outcome["decision_latency_bucket"] == "OVER_24H"
 
 
 def test_applies_exit_costs_before_grading():
@@ -119,6 +125,32 @@ def test_rejects_hindsight_substitution_of_collection_timestamp():
             realized_price=125.0,
             realized_at="2026-09-20T10:00:00+00:00",
         )
+
+
+def test_rejects_inconsistent_decision_latency_provenance():
+    packet = _packet()
+    packet["observation_to_decision_lag_minutes"] = 1.0
+    with pytest.raises(ValueError, match="latency is inconsistent"):
+        grade_opportunity_decision(
+            packet,
+            _collection(),
+            realized_price=125.0,
+            realized_at="2026-09-20T10:00:00+00:00",
+        )
+
+
+def test_legacy_packet_without_latency_remains_gradable():
+    packet = _packet()
+    packet.pop("observed_at")
+    packet.pop("observation_to_decision_lag_minutes")
+    packet.pop("decision_latency_bucket")
+    outcome = grade_opportunity_decision(
+        packet,
+        _collection(),
+        realized_price=125.0,
+        realized_at="2026-09-20T10:00:00+00:00",
+    )
+    assert "decision_latency_bucket" not in outcome
 
 
 def test_validates_policy():
