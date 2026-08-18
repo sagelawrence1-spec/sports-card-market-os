@@ -40,4 +40,4 @@ def test_kaytron_allen_fixture_preserves_nfl_sources_and_primary_card_expression
     assert any("reuters.com" in url for url in candidate.source_urls)
     assert any("nfl.com/players/kaytron-allen" in url for url in candidate.source_urls)
     assert any("beckett.com" in url for url in candidate.source_urls)
-    assert "regular season" in candidate.thesis.why_now
+    assert "regular-season" in candidate.thesis.why_now
