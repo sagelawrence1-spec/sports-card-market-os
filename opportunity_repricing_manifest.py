@@ -20,9 +20,9 @@ def build_collection_manifest(
 ) -> dict[str, Any]:
     """Convert a repricing plan into a short, ordered Product Research work queue.
 
-    This artifact is deliberately operational only. It does not alter Radar ranking,
-    repricing verification, or capital decisions. The collector is instructed to export
-    the full search result set so manual cherry-picking cannot contaminate proof.
+    The manifest is both human-executable and machine-round-trippable: each selected
+    item preserves the exact repricing request that generated its collection window.
+    This prevents a later collector from reconstructing or guessing request fields.
     """
     if plan.get("schema") != "opportunity-repricing-plan.v1":
         raise ValueError("unsupported repricing plan schema")
@@ -95,6 +95,7 @@ def build_collection_manifest(
                 "sold_window_end": row["queryable_post_end"],
                 "window_status": row.get("status"),
                 "expected_export_filename": filename,
+                "repricing_request": dict(row),
                 "collection_instruction": (
                     "In eBay Product Research, search the exact canonical card identity, set the sold-date "
                     "window shown here, and export the complete result set without hand-filtering rows. "
