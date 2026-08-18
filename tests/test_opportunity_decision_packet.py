@@ -75,8 +75,8 @@ def test_packet_buckets_fast_decision_latency_without_changing_decision_logic():
     assert packet["decision_latency_bucket"] == "UNDER_6H"
 
 
-def test_packet_rejects_observation_after_decision_timestamp():
-    with pytest.raises(ValueError, match="observed_at cannot be after decision as_of"):
+def test_packet_rejects_decision_before_bound_catalyst_timestamp():
+    with pytest.raises(ValueError, match="repricing as_of cannot precede catalyst_at"):
         build_opportunity_decision_packet(
             _observation(), _collection(as_of="2026-08-10T11:59:00+00:00")
         )
