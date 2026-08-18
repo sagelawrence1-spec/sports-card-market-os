@@ -17,7 +17,7 @@ def outcome(player, card, decision_as_of, net_return, grade, decision="START_POS
     }
 
 
-def test_scorecard_proves_repeated_positive_track_record():
+def test_scorecard_meets_repeated_positive_evidence_threshold():
     rows = [
         outcome("p1", "c1", "2026-08-02T00:00:00+00:00", 0.20, "A"),
         outcome("p2", "c2", "2026-08-03T00:00:00+00:00", 0.12, "B"),
@@ -27,7 +27,7 @@ def test_scorecard_proves_repeated_positive_track_record():
     ]
     scorecard = build_opportunity_scorecard(rows)
     assert scorecard["schema"] == "opportunity-scorecard.v1"
-    assert scorecard["status"] == "PROVEN"
+    assert scorecard["status"] == "EVIDENCE_THRESHOLD_MET"
     assert scorecard["settled_outcomes"] == 5
     assert scorecard["distinct_players"] == 5
     assert scorecard["hit_rate"] == pytest.approx(0.8)
@@ -36,10 +36,10 @@ def test_scorecard_proves_repeated_positive_track_record():
     assert scorecard["by_decision"]["ADD"]["count"] == 1
 
 
-def test_scorecard_does_not_call_thin_sample_proven():
+def test_scorecard_does_not_overclaim_thin_sample():
     rows = [outcome("p1", "c1", "2026-08-02T00:00:00+00:00", 0.40, "A")]
     scorecard = build_opportunity_scorecard(rows)
-    assert scorecard["status"] == "INSUFFICIENT_PROOF"
+    assert scorecard["status"] == "INSUFFICIENT_EVIDENCE"
     assert "insufficient_settled_outcomes" in scorecard["proof_blockers"]
     assert "insufficient_distinct_players" in scorecard["proof_blockers"]
 
@@ -50,7 +50,7 @@ def test_scorecard_requires_breadth_even_with_enough_rows():
         for i in range(5)
     ]
     scorecard = build_opportunity_scorecard(rows)
-    assert scorecard["status"] == "INSUFFICIENT_PROOF"
+    assert scorecard["status"] == "INSUFFICIENT_EVIDENCE"
     assert scorecard["proof_blockers"] == ["insufficient_distinct_players"]
 
 
@@ -74,7 +74,7 @@ def test_scorecard_rejects_non_actionable_outcome():
         build_opportunity_scorecard([row])
 
 
-def test_scorecard_policy_can_raise_proof_bar():
+def test_scorecard_policy_can_raise_evidence_bar():
     rows = [
         outcome(f"p{i}", f"c{i}", f"2026-08-{i+2:02d}T00:00:00+00:00", value, grade)
         for i, (value, grade) in enumerate([(0.2, "A"), (0.1, "B"), (0.05, "C"), (-0.01, "D"), (-0.02, "D")], start=1)
@@ -83,7 +83,7 @@ def test_scorecard_policy_can_raise_proof_bar():
         rows,
         policy=OpportunityScorecardPolicy(min_hit_rate=0.9, min_median_net_return=0.1),
     )
-    assert scorecard["status"] == "INSUFFICIENT_PROOF"
+    assert scorecard["status"] == "INSUFFICIENT_EVIDENCE"
     assert "hit_rate_below_threshold" in scorecard["proof_blockers"]
     assert "median_net_return_below_threshold" in scorecard["proof_blockers"]
 
