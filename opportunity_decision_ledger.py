@@ -11,7 +11,7 @@ import hashlib
 import json
 import sqlite3
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Mapping, Sequence
 
 SCHEMA = "opportunity-decision-ledger.v1"
 PACKET_SCHEMA = "opportunity-decision-packet.v1"
@@ -38,6 +38,17 @@ def decision_packet_id(packet: Mapping[str, Any]) -> str:
     """Return a stable content digest for the exact packet presented for review."""
     _packet_identity(packet)
     return hashlib.sha256(_canonical_json(dict(packet)).encode("utf-8")).hexdigest()
+
+
+def _validated_record(packet: Mapping[str, Any]) -> tuple[str, tuple[str, str, str, str], str, str, bool]:
+    player_id, card_id, catalyst_at, as_of = _packet_identity(packet)
+    decision = str(packet.get("decision", "")).strip()
+    actionable = packet.get("actionable")
+    if not decision or not isinstance(actionable, bool):
+        raise ValueError("decision packet requires decision and boolean actionable")
+    payload = _canonical_json(dict(packet))
+    packet_id = decision_packet_id(packet)
+    return packet_id, (player_id, card_id, catalyst_at, as_of), payload, decision, actionable
 
 
 class OpportunityDecisionLedger:
@@ -70,50 +81,70 @@ class OpportunityDecisionLedger:
             )
 
     def persist_packet(self, packet: Mapping[str, Any]) -> str:
-        player_id, card_id, catalyst_at, as_of = _packet_identity(packet)
-        decision = str(packet.get("decision", "")).strip()
-        actionable = packet.get("actionable")
-        if not decision or not isinstance(actionable, bool):
-            raise ValueError("decision packet requires decision and boolean actionable")
+        return self.persist_packets_atomic((packet,))[0]
 
-        payload = _canonical_json(dict(packet))
-        packet_id = decision_packet_id(packet)
-        natural_key = (player_id, card_id, catalyst_at, as_of)
+    def persist_packets_atomic(self, packets: Sequence[Mapping[str, Any]]) -> tuple[str, ...]:
+        """Persist a decision batch in one transaction or write nothing.
+
+        Exact retries are idempotent. If any packet conflicts with immutable history
+        or the batch itself contains two different packets for the same natural key,
+        the entire batch fails and no new packet is committed.
+        """
+        if isinstance(packets, (str, bytes)) or not isinstance(packets, Sequence):
+            raise ValueError("packets must be a sequence")
+        if not packets:
+            return ()
+
+        records = []
+        seen: dict[tuple[str, str, str, str], tuple[str, str]] = {}
+        for packet in packets:
+            if not isinstance(packet, Mapping):
+                raise ValueError("each decision packet must be an object")
+            record = _validated_record(packet)
+            packet_id, natural_key, payload, decision, actionable = record
+            prior = seen.get(natural_key)
+            if prior is not None and prior != (packet_id, payload):
+                raise ValueError("decision batch contains conflicting immutable decision packets")
+            seen[natural_key] = (packet_id, payload)
+            records.append((packet_id, natural_key, payload, decision, actionable))
 
         with self._connect() as db:
-            existing = db.execute(
-                """
-                SELECT decision_id, packet_json
-                FROM opportunity_decisions
-                WHERE player_id = ? AND card_id = ? AND catalyst_at = ? AND as_of = ?
-                """,
-                natural_key,
-            ).fetchone()
-            if existing is not None:
-                if existing["decision_id"] == packet_id and existing["packet_json"] == payload:
-                    return packet_id
-                raise ValueError("opportunity decision is immutable and cannot be rewritten")
+            for packet_id, natural_key, payload, _, _ in records:
+                existing = db.execute(
+                    """
+                    SELECT decision_id, packet_json
+                    FROM opportunity_decisions
+                    WHERE player_id = ? AND card_id = ? AND catalyst_at = ? AND as_of = ?
+                    """,
+                    natural_key,
+                ).fetchone()
+                if existing is not None and not (
+                    existing["decision_id"] == packet_id and existing["packet_json"] == payload
+                ):
+                    raise ValueError("opportunity decision is immutable and cannot be rewritten")
 
-            db.execute(
-                """
-                INSERT INTO opportunity_decisions (
-                    decision_id, schema_version, player_id, card_id, catalyst_at,
-                    as_of, decision, actionable, packet_json
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    packet_id,
-                    SCHEMA,
-                    player_id,
-                    card_id,
-                    catalyst_at,
-                    as_of,
-                    decision,
-                    int(actionable),
-                    payload,
-                ),
-            )
-        return packet_id
+            for packet_id, natural_key, payload, decision, actionable in records:
+                player_id, card_id, catalyst_at, as_of = natural_key
+                db.execute(
+                    """
+                    INSERT OR IGNORE INTO opportunity_decisions (
+                        decision_id, schema_version, player_id, card_id, catalyst_at,
+                        as_of, decision, actionable, packet_json
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        packet_id,
+                        SCHEMA,
+                        player_id,
+                        card_id,
+                        catalyst_at,
+                        as_of,
+                        decision,
+                        int(actionable),
+                        payload,
+                    ),
+                )
+        return tuple(record[0] for record in records)
 
     def get_packet(self, packet_id: str) -> dict[str, Any] | None:
         with self._connect() as db:
