@@ -32,6 +32,18 @@ def _index_current_candidates(scan: Mapping[str, Any]) -> dict[str, Mapping[str,
     return out
 
 
+def _discovery_age_bucket(lag_minutes: Any) -> str:
+    if lag_minutes is None:
+        return "UNKNOWN"
+    if not isinstance(lag_minutes, (int, float)) or isinstance(lag_minutes, bool) or lag_minutes < 0:
+        raise ValueError("observation_to_scan_lag_minutes must be a non-negative number or null")
+    if lag_minutes <= 360:
+        return "UNDER_6H"
+    if lag_minutes <= 1440:
+        return "6_TO_24H"
+    return "OVER_24H"
+
+
 def build_attention_brief(scan: Mapping[str, Any], delta: Mapping[str, Any]) -> dict[str, Any]:
     """Return only Radar movements that merit immediate human review."""
     if delta.get("schema") != _DELTA_SCHEMA:
@@ -78,6 +90,8 @@ def build_attention_brief(scan: Mapping[str, Any], delta: Mapping[str, Any]) -> 
                     "decision": None,
                     "blocking_reason": None,
                     "observed_at": None,
+                    "observation_to_scan_lag_minutes": None,
+                    "discovery_age_bucket": "UNKNOWN",
                     "headline": None,
                     "why_now": None,
                     "thesis": None,
@@ -88,6 +102,7 @@ def build_attention_brief(scan: Mapping[str, Any], delta: Mapping[str, Any]) -> 
             )
             continue
 
+        lag_minutes = candidate.get("observation_to_scan_lag_minutes")
         items.append(
             {
                 "player_id": player_id,
@@ -100,6 +115,8 @@ def build_attention_brief(scan: Mapping[str, Any], delta: Mapping[str, Any]) -> 
                 "decision": candidate.get("decision"),
                 "blocking_reason": candidate.get("blocking_reason"),
                 "observed_at": candidate.get("observed_at"),
+                "observation_to_scan_lag_minutes": lag_minutes,
+                "discovery_age_bucket": _discovery_age_bucket(lag_minutes),
                 "headline": candidate.get("headline"),
                 "why_now": candidate.get("why_now"),
                 "thesis": candidate.get("thesis"),
@@ -125,6 +142,9 @@ def build_attention_brief(scan: Mapping[str, Any], delta: Mapping[str, Any]) -> 
             "became_actionable_count": sum(item["became_actionable"] for item in items),
             "dropped_count": sum(item["status"] == "DROPPED" for item in items),
             "waiting_for_comps_count": sum(item["decision"] == "WATCH_FOR_COMPS" for item in items),
+            "under_6h_discovery_count": sum(item["discovery_age_bucket"] == "UNDER_6H" for item in items),
+            "same_day_discovery_count": sum(item["discovery_age_bucket"] == "6_TO_24H" for item in items),
+            "over_24h_discovery_count": sum(item["discovery_age_bucket"] == "OVER_24H" for item in items),
         },
         "items": items,
     }
