@@ -7,10 +7,14 @@ def _scan() -> dict:
         "generated_at": "2026-08-17T17:00:00+00:00",
         "candidates": [
             {
+                "rank": 1,
                 "thesis_id": "thesis-1",
                 "player_id": "mlb-player-1",
                 "player": "Player One",
+                "stage": "ENTRY",
+                "decision": "WATCH_FOR_COMPS",
                 "observed_at": "2026-08-16T12:00:00+00:00",
+                "observation_to_scan_lag_minutes": 120.0,
                 "cards": [
                     {"card_id": "card-auto", "label": "Chrome Auto", "priority": 2},
                     {"card_id": "card-base", "label": "Chrome Base", "priority": 1},
@@ -33,6 +37,8 @@ def test_plan_anchors_windows_to_catalyst_not_scan_time():
     assert request["queryable_post_end"] == "2026-08-17T17:00:00+00:00"
     assert request["status"] == "COLLECTION_OPEN"
     assert request["source_type"] == "EBAY_PRODUCT_RESEARCH"
+    assert request["collection_priority"] == "P0"
+    assert plan["priority_counts"] == {"P0": 2, "P1": 0, "P2": 0}
 
 
 def test_plan_marks_post_window_mature_without_extending_evidence_window():
@@ -42,6 +48,39 @@ def test_plan_marks_post_window_mature_without_extending_evidence_window():
     assert request["queryable_post_end"] == "2026-08-23T12:00:00+00:00"
     assert plan["mature_count"] == 2
     assert plan["open_count"] == 0
+
+
+def test_plan_prioritizes_fresh_early_stage_manual_comp_work():
+    scan = _scan()
+    scan["candidates"].append(
+        {
+            "rank": 2,
+            "thesis_id": "thesis-2",
+            "player_id": "mlb-player-2",
+            "player": "Player Two",
+            "stage": "ACCELERATION",
+            "decision": "WATCH_FOR_COMPS",
+            "observed_at": "2026-08-10T12:00:00+00:00",
+            "observation_to_scan_lag_minutes": 7 * 24 * 60,
+            "cards": [{"card_id": "older-card", "label": "Older Auto", "priority": 1}],
+        }
+    )
+    plan = build_repricing_plan(scan)
+    assert [row["player_id"] for row in plan["requests"]] == [
+        "mlb-player-1",
+        "mlb-player-1",
+        "mlb-player-2",
+    ]
+    assert [row["collection_priority"] for row in plan["requests"]] == ["P0", "P0", "P1"]
+    assert plan["priority_counts"] == {"P0": 2, "P1": 1, "P2": 0}
+
+
+def test_plan_does_not_promote_already_actionable_candidate_to_collection_priority():
+    scan = _scan()
+    scan["candidates"][0]["decision"] = "START_POSITION"
+    plan = build_repricing_plan(scan)
+    assert {row["collection_priority"] for row in plan["requests"]} == {"P2"}
+    assert plan["priority_counts"] == {"P0": 0, "P1": 0, "P2": 2}
 
 
 def test_plan_rejects_missing_catalyst_time():
