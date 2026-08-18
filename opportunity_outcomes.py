@@ -3,12 +3,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+from math import isfinite
 from typing import Any, Mapping
 
 PACKET_SCHEMA = "opportunity-decision-packet.v1"
 COLLECTION_SCHEMA = "opportunity-repricing-collection.v1"
 OUTCOME_SCHEMA = "opportunity-outcome.v1"
 _ACTIONABLE = {"START_POSITION", "ADD"}
+_LATENCY_BUCKETS = {"UNDER_6H", "6_TO_24H", "OVER_24H"}
 
 
 @dataclass(frozen=True)
@@ -58,6 +60,36 @@ def _letter_grade(score: float, policy: OpportunityOutcomePolicy) -> str:
     if score >= policy.grade_d_min:
         return "D"
     return "F"
+
+
+def _decision_latency(packet: Mapping[str, Any], decision_at: datetime) -> dict[str, Any]:
+    """Preserve timing provenance when present while remaining compatible with legacy packets."""
+    present = {
+        "observed_at": packet.get("observed_at"),
+        "observation_to_decision_lag_minutes": packet.get("observation_to_decision_lag_minutes"),
+        "decision_latency_bucket": packet.get("decision_latency_bucket"),
+    }
+    if not any(value is not None for value in present.values()):
+        return {}
+    if any(value is None for value in present.values()):
+        raise ValueError("decision packet latency provenance is incomplete")
+
+    observed_at = _aware(present["observed_at"], field="observed_at")
+    lag_minutes = float(present["observation_to_decision_lag_minutes"])
+    if not isfinite(lag_minutes) or lag_minutes < 0.0:
+        raise ValueError("decision packet latency must be finite and non-negative")
+    actual_lag = (decision_at - observed_at).total_seconds() / 60.0
+    if actual_lag < 0.0 or abs(actual_lag - lag_minutes) > 1e-9:
+        raise ValueError("decision packet latency is inconsistent with observed_at and as_of")
+
+    bucket = str(present["decision_latency_bucket"]).strip()
+    if bucket not in _LATENCY_BUCKETS:
+        raise ValueError("decision packet latency bucket is invalid")
+    return {
+        "observed_at": observed_at.isoformat(),
+        "observation_to_decision_lag_minutes": lag_minutes,
+        "decision_latency_bucket": bucket,
+    }
 
 
 def grade_opportunity_decision(
@@ -115,6 +147,7 @@ def grade_opportunity_decision(
         raise ValueError("realized_price must be positive")
 
     decision_at = _aware(as_of, field="as_of")
+    latency = _decision_latency(packet, decision_at)
     outcome_at = _aware(realized_at, field="realized_at")
     horizon_end = decision_at + timedelta(days=int(policy.min_horizon_days))
     if outcome_at < horizon_end:
@@ -133,6 +166,7 @@ def grade_opportunity_decision(
         "card_id": card_id,
         "catalyst_at": catalyst_at,
         "decision_as_of": as_of,
+        **latency,
         "decision": decision,
         "entry_price": entry_price,
         "entry_price_basis": "authoritative_post_catalyst_median_available_at_decision_time",
