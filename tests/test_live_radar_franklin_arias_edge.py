@@ -32,7 +32,9 @@ def test_franklin_arias_fixture_preserves_point_in_time_sources_and_target_card(
     payloads = json.loads(FIXTURE.read_text())
     candidate = scan_live_observations(payloads).candidates[0]
 
-    assert candidate.observed_at.isoformat() == "2026-08-14T14:30:00+00:00"
+    # observed_at belongs to the sourced intake event; RadarCandidate intentionally
+    # carries the evaluated thesis/decision rather than duplicating intake fields.
+    assert payloads[0]["observed_at"] == "2026-08-14T14:30:00+00:00"
     assert [card.card_id for card in candidate.thesis.cards] == [
         "2025-bowman-chrome-prospect-auto-cpa-fa-franklin-arias"
     ]
