@@ -1,5 +1,7 @@
 import json
 
+import pytest
+
 from opportunity_decision_packet import build_opportunity_decision_packet, main
 
 
@@ -32,7 +34,7 @@ def _observation():
     }
 
 
-def _collection(*, verified=True, repricing_pct=8.0, blocker=None):
+def _collection(*, verified=True, repricing_pct=8.0, blocker=None, as_of="2026-08-18T10:00:00+00:00"):
     return {
         "schema": "opportunity-repricing-collection.v1",
         "player_id": "player-1",
@@ -44,7 +46,7 @@ def _collection(*, verified=True, repricing_pct=8.0, blocker=None):
             "repricing_pct": repricing_pct if verified else None,
             "evidence_ids": ["EBAY_PRODUCT_RESEARCH:1", "EBAY_PRODUCT_RESEARCH:2"],
             "catalyst_at": "2026-08-10T12:00:00+00:00",
-            "as_of": "2026-08-18T10:00:00+00:00",
+            "as_of": as_of,
         },
     }
 
@@ -59,6 +61,25 @@ def test_packet_surfaces_actionable_call_with_evidence_and_falsification():
     assert packet["card"]["card_id"] == "card-10"
     assert packet["falsification"]
     assert packet["source_urls"]
+    assert packet["observed_at"] == "2026-08-10T12:00:00+00:00"
+    assert packet["observation_to_decision_lag_minutes"] == 11400.0
+    assert packet["decision_latency_bucket"] == "OVER_24H"
+
+
+def test_packet_buckets_fast_decision_latency_without_changing_decision_logic():
+    packet = build_opportunity_decision_packet(
+        _observation(), _collection(as_of="2026-08-10T15:00:00+00:00")
+    )
+    assert packet["decision"] == "START_POSITION"
+    assert packet["observation_to_decision_lag_minutes"] == 180.0
+    assert packet["decision_latency_bucket"] == "UNDER_6H"
+
+
+def test_packet_rejects_observation_after_decision_timestamp():
+    with pytest.raises(ValueError, match="observed_at cannot be after decision as_of"):
+        build_opportunity_decision_packet(
+            _observation(), _collection(as_of="2026-08-10T11:59:00+00:00")
+        )
 
 
 def test_packet_preserves_non_actionable_pricing_blocker():
@@ -93,3 +114,4 @@ def test_cli_writes_reviewable_packet(tmp_path):
     payload = json.loads(output_path.read_text(encoding="utf-8"))
     assert payload["schema"] == "opportunity-decision-packet.v1"
     assert payload["decision"] == "START_POSITION"
+    assert payload["decision_latency_bucket"] == "OVER_24H"
