@@ -1,0 +1,92 @@
+[
+  {
+    "player_id": "mlb-ethan-pecko",
+    "player": "Ethan Pecko",
+    "sport": "MLB",
+    "signal_kind": "CALL_UP",
+    "signal_description": "Houston plans to call up Ethan Pecko to start Wednesday against the Angels in what would be his MLB debut.",
+    "observed_at": "2026-08-17T00:00:00+00:00",
+    "headline": "Pecko moves from call-up watch to confirmed promotion path",
+    "why_now": "A credible pre-catalyst watch has advanced: Houston now plans to promote Pecko for a specific MLB start. The hobby question is whether his thin 1st Bowman Chrome autograph market remains underpriced before the debut itself.",
+    "thesis": "Ethan Pecko has advanced from PRE_CATALYST to an ENTRY-stage call-up catalyst. Monitor his 2025 Bowman Chrome 1st prospect autograph immediately, but authorize no capital action until authoritative Product Research comps establish whether speculation already repriced the card.",
+    "falsification": [
+      "Houston reverses the plan before Pecko is added to the roster.",
+      "Authoritative sold comps show the prospect-auto market already repriced the call-up beyond an attractive entry.",
+      "The debut does not lead to a sustained rotation opportunity."
+    ],
+    "importance": 82,
+    "novelty": 74,
+    "market_impact": 67,
+    "factors": {
+      "situation_change": 94,
+      "narrative_potential": 64,
+      "collectibility": 52,
+      "hobby_lag": 82,
+      "attention_velocity": 55,
+      "evidence_maturity": 72,
+      "upside_asymmetry": 76
+    },
+    "market_price_verified": false,
+    "market_repricing_pct": null,
+    "source_urls": [
+      "https://www.houstonchronicle.com/sports/astros/article/ethan-pecko-callup-angels-start-22392253.php",
+      "https://www.beckett.com/news/2025-bowman-chrome-baseball-cards/"
+    ],
+    "cards": [
+      {
+        "card_id": "2025-bowman-chrome-prospect-auto-cpa-epe-ethan-pecko",
+        "label": "2025 Bowman Chrome Prospect Autograph CPA-EPE Ethan Pecko",
+        "priority": 1,
+        "rationale": "Verified 1st Bowman Chrome prospect autograph; repricing must be checked before the scheduled MLB debut."
+      }
+    ]
+  },
+  {
+    "player_id": "mlb-matt-wilkinson",
+    "player": "Matt Wilkinson",
+    "sport": "MLB",
+    "signal_kind": "CALL_UP",
+    "signal_description": "The Giants are calling up left-hander Matt 'Tugboat' Wilkinson for what is expected to be his MLB debut.",
+    "observed_at": "2026-08-17T18:52:36+00:00",
+    "headline": "Tugboat Wilkinson call-up creates a fresh, low-consensus MLB catalyst",
+    "why_now": "Wilkinson has a memorable nickname, strikeout-heavy prospect profile, WBC visibility and a same-day MLB promotion. His hobby footprint is substantially colder than top hitting prospects, which makes this an asymmetric but liquidity-sensitive catalyst rather than a consensus chase.",
+    "thesis": "Matt Wilkinson is a fresh ENTRY-stage call-up candidate. His 2025 Bowman Chrome BCP-145 and CPA-MW are the clearest expressions, but pitcher hobby risk and likely thin liquidity require authoritative sold-comp verification before any capital action.",
+    "falsification": [
+      "The reported call-up does not result in an MLB roster addition or debut opportunity.",
+      "Authoritative sold comps show insufficient liquidity to establish a trustworthy entry level.",
+      "The call-up produces no measurable hobby demand despite the nickname and debut narrative."
+    ],
+    "importance": 75,
+    "novelty": 94,
+    "market_impact": 61,
+    "factors": {
+      "situation_change": 96,
+      "narrative_potential": 78,
+      "collectibility": 49,
+      "hobby_lag": 91,
+      "attention_velocity": 58,
+      "evidence_maturity": 68,
+      "upside_asymmetry": 81
+    },
+    "market_price_verified": false,
+    "market_repricing_pct": null,
+    "source_urls": [
+      "https://www.reuters.com/sports/reports-giants-call-up-lhp-matt-tugboat-wilkinson--flm-2026-08-17/",
+      "https://www.beckett.com/news/2025-bowman-baseball-cards/"
+    ],
+    "cards": [
+      {
+        "card_id": "2025-bowman-chrome-prospects-bcp-145-matt-wilkinson",
+        "label": "2025 Bowman Chrome Prospects BCP-145 Matt Wilkinson",
+        "priority": 1,
+        "rationale": "Verified Bowman Chrome prospect identity with broader liquidity than the autograph; use as the first repricing check."
+      },
+      {
+        "card_id": "2025-bowman-chrome-prospect-auto-cpa-mw-matt-wilkinson",
+        "label": "2025 Bowman Chrome Prospect Autograph CPA-MW Matt Wilkinson",
+        "priority": 2,
+        "rationale": "Verified Bowman Chrome prospect autograph and higher-conviction expression if actual sold depth exists."
+      }
+    ]
+  }
+]
