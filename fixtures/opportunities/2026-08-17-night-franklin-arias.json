@@ -1,0 +1,45 @@
+[
+  {
+    "player_id": "mlb-franklin-arias",
+    "player": "Franklin Arias",
+    "sport": "MLB",
+    "signal_kind": "PERFORMANCE",
+    "signal_description": "Triple-A Worcester shortstop Franklin Arias went 3-for-4 with a double, home run, three runs and two RBI on Aug. 13, giving him 23 home runs and 70 RBI in 90 combined minor-league games while promotion chatter increased around Boston's top prospect.",
+    "observed_at": "2026-08-14T14:30:00+00:00",
+    "headline": "Franklin Arias' Triple-A power surge creates a pre-call-up hobby acceleration watch",
+    "why_now": "Arias is MLB Pipeline's No. 7 overall prospect, reached Triple-A on July 24 and has continued producing there. The combination of elite prospect status, proximity to the Majors and a fresh power spike creates a pre-call-up attention signal before any roster transaction forces broader hobby repricing.",
+    "thesis": "Franklin Arias is an ACCELERATION-stage EDGE candidate: a consensus elite prospect is sustaining unexpected power at Triple-A while remaining pre-debut. His 2025 Bowman Chrome 1st Prospect Autograph CPA-FA is the cleanest hobby expression, but no capital action is permitted until authoritative Product Research comps establish whether the recent surge is already priced in.",
+    "falsification": [
+      "Arias' Triple-A production materially regresses and the power spike proves transient.",
+      "Authoritative sold comps show the 1st Bowman Chrome autograph already repriced beyond an attractive entry.",
+      "Boston keeps Arias outside a credible MLB opportunity window despite continued Triple-A production."
+    ],
+    "importance": 78,
+    "novelty": 72,
+    "market_impact": 67,
+    "factors": {
+      "situation_change": 76,
+      "narrative_potential": 82,
+      "collectibility": 82,
+      "hobby_lag": 74,
+      "attention_velocity": 75,
+      "evidence_maturity": 78,
+      "upside_asymmetry": 73
+    },
+    "market_price_verified": false,
+    "market_repricing_pct": null,
+    "source_urls": [
+      "https://www.overthemonster.com/red-sox-prospects/106551/red-sox-minor-lines-franklin-arias-shines-again-stirs-promotion-talk",
+      "https://www.mlb.com/news/red-sox-promoting-franklin-arias-to-triple-a",
+      "https://www.psacard.com/cert/115836442/psa"
+    ],
+    "cards": [
+      {
+        "card_id": "2025-bowman-chrome-prospect-auto-cpa-fa-franklin-arias",
+        "label": "2025 Bowman Chrome Prospect Autograph CPA-FA Franklin Arias",
+        "priority": 1,
+        "rationale": "Verified 1st Bowman Chrome prospect autograph and the cleanest hobby expression for a pre-debut elite-prospect thesis."
+      }
+    ]
+  }
+]
