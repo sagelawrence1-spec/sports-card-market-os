@@ -10,6 +10,7 @@ from typing import Any, Iterable, Mapping
 OUTCOME_SCHEMA = "opportunity-outcome.v1"
 SCORECARD_SCHEMA = "opportunity-scorecard.v1"
 _ACTIONABLE = {"START_POSITION", "ADD"}
+_LATENCY_BUCKETS = {"UNDER_6H", "6_TO_24H", "OVER_24H", "UNKNOWN"}
 
 
 @dataclass(frozen=True)
@@ -65,6 +66,7 @@ def build_opportunity_scorecard(
     grades: Counter[str] = Counter()
     by_decision: dict[str, list[float]] = defaultdict(list)
     by_player: dict[str, list[float]] = defaultdict(list)
+    by_latency: dict[str, list[float]] = defaultdict(list)
 
     for outcome in rows:
         if outcome.get("schema") != OUTCOME_SCHEMA:
@@ -91,6 +93,10 @@ def build_opportunity_scorecard(
         if grade not in {"A", "B", "C", "D", "F"}:
             raise ValueError("opportunity outcome grade is invalid")
 
+        latency_bucket = str(outcome.get("decision_latency_bucket") or "UNKNOWN").strip().upper()
+        if latency_bucket not in _LATENCY_BUCKETS:
+            raise ValueError("opportunity outcome decision latency bucket is invalid")
+
         player_id = identity[0]
         players.add(player_id)
         net_returns.append(net_return)
@@ -98,6 +104,7 @@ def build_opportunity_scorecard(
         grades[grade] += 1
         by_decision[decision].append(net_return)
         by_player[player_id].append(net_return)
+        by_latency[latency_bucket].append(net_return)
 
     settled = len(rows)
     hit_rate = hits / settled
@@ -115,8 +122,11 @@ def build_opportunity_scorecard(
         blockers.append("median_net_return_below_threshold")
 
     def summarize(values: list[float]) -> dict[str, Any]:
+        bucket_hits = sum(value >= 0.0 for value in values)
         return {
             "count": len(values),
+            "hits": bucket_hits,
+            "hit_rate": bucket_hits / len(values),
             "mean_net_return": sum(values) / len(values),
             "median_net_return": median(values),
         }
@@ -135,6 +145,7 @@ def build_opportunity_scorecard(
         "grade_distribution": {grade: grades.get(grade, 0) for grade in ("A", "B", "C", "D", "F")},
         "by_decision": {key: summarize(by_decision[key]) for key in sorted(by_decision)},
         "by_player": {key: summarize(by_player[key]) for key in sorted(by_player)},
+        "by_decision_latency": {key: summarize(by_latency[key]) for key in sorted(by_latency)},
         "policy": {
             "min_settled_outcomes": int(policy.min_settled_outcomes),
             "min_distinct_players": int(policy.min_distinct_players),

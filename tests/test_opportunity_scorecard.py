@@ -3,8 +3,8 @@ import pytest
 from opportunity_scorecard import OpportunityScorecardPolicy, build_opportunity_scorecard
 
 
-def outcome(player, card, decision_as_of, net_return, grade, decision="START_POSITION"):
-    return {
+def outcome(player, card, decision_as_of, net_return, grade, decision="START_POSITION", latency_bucket=None):
+    row = {
         "schema": "opportunity-outcome.v1",
         "player_id": player,
         "card_id": card,
@@ -15,15 +15,18 @@ def outcome(player, card, decision_as_of, net_return, grade, decision="START_POS
         "grade": grade,
         "hit": net_return >= 0.0,
     }
+    if latency_bucket is not None:
+        row["decision_latency_bucket"] = latency_bucket
+    return row
 
 
 def test_scorecard_meets_repeated_positive_evidence_threshold():
     rows = [
-        outcome("p1", "c1", "2026-08-02T00:00:00+00:00", 0.20, "A"),
-        outcome("p2", "c2", "2026-08-03T00:00:00+00:00", 0.12, "B"),
-        outcome("p3", "c3", "2026-08-04T00:00:00+00:00", 0.05, "C"),
-        outcome("p4", "c4", "2026-08-05T00:00:00+00:00", -0.03, "D"),
-        outcome("p5", "c5", "2026-08-06T00:00:00+00:00", 0.08, "C", decision="ADD"),
+        outcome("p1", "c1", "2026-08-02T00:00:00+00:00", 0.20, "A", latency_bucket="UNDER_6H"),
+        outcome("p2", "c2", "2026-08-03T00:00:00+00:00", 0.12, "B", latency_bucket="UNDER_6H"),
+        outcome("p3", "c3", "2026-08-04T00:00:00+00:00", 0.05, "C", latency_bucket="6_TO_24H"),
+        outcome("p4", "c4", "2026-08-05T00:00:00+00:00", -0.03, "D", latency_bucket="OVER_24H"),
+        outcome("p5", "c5", "2026-08-06T00:00:00+00:00", 0.08, "C", decision="ADD", latency_bucket="OVER_24H"),
     ]
     scorecard = build_opportunity_scorecard(rows)
     assert scorecard["schema"] == "opportunity-scorecard.v1"
@@ -34,6 +37,24 @@ def test_scorecard_meets_repeated_positive_evidence_threshold():
     assert scorecard["median_net_return"] == pytest.approx(0.08)
     assert scorecard["grade_distribution"]["A"] == 1
     assert scorecard["by_decision"]["ADD"]["count"] == 1
+    assert scorecard["by_decision_latency"]["UNDER_6H"]["count"] == 2
+    assert scorecard["by_decision_latency"]["UNDER_6H"]["hit_rate"] == 1.0
+    assert scorecard["by_decision_latency"]["OVER_24H"]["median_net_return"] == pytest.approx(0.025)
+
+
+def test_scorecard_marks_legacy_outcome_latency_unknown():
+    scorecard = build_opportunity_scorecard(
+        [outcome("p1", "c1", "2026-08-02T00:00:00+00:00", 0.1, "B")]
+    )
+    assert scorecard["by_decision_latency"]["UNKNOWN"]["count"] == 1
+
+
+def test_scorecard_rejects_invalid_latency_bucket():
+    row = outcome(
+        "p1", "c1", "2026-08-02T00:00:00+00:00", 0.1, "B", latency_bucket="FASTISH"
+    )
+    with pytest.raises(ValueError, match="latency bucket"):
+        build_opportunity_scorecard([row])
 
 
 def test_scorecard_does_not_overclaim_thin_sample():
