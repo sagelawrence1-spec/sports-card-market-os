@@ -1,0 +1,45 @@
+[
+  {
+    "player_id": "mlb-bo-davidson",
+    "player": "Bo Davidson",
+    "sport": "MLB",
+    "signal_kind": "PERFORMANCE",
+    "signal_description": "Triple-A Sacramento outfielder Bo Davidson was named Pacific Coast League Player of the Week after a 14-for-22 five-game surge that included four home runs; on Sunday he went 4-for-5 with two homers, two doubles and eight RBI.",
+    "observed_at": "2026-08-17T22:43:14+00:00",
+    "headline": "Bo Davidson's Triple-A breakout creates a pre-call-up hobby acceleration watch",
+    "why_now": "Davidson is now producing at Triple-A after a slow first 22 games at the level, while remaining outside the consensus MLB call-up cycle. That creates an early performance signal worth repricing before any promotion catalyst arrives.",
+    "thesis": "Bo Davidson is an ACCELERATION-stage EDGE candidate driven by a sudden Triple-A performance inflection. His 2025 Bowman Chrome 1st prospect autograph is the clearest hobby expression, but no capital action is permitted until authoritative Product Research comps establish whether the market already repriced the breakout.",
+    "falsification": [
+      "Davidson's Triple-A surge immediately mean-reverts without sustained underlying production.",
+      "Authoritative sold comps show the 1st Bowman Chrome autograph already repriced beyond an attractive entry.",
+      "The Giants keep Davidson outside a credible 2026-27 MLB opportunity window despite continued Triple-A production."
+    ],
+    "importance": 70,
+    "novelty": 82,
+    "market_impact": 58,
+    "factors": {
+      "situation_change": 72,
+      "narrative_potential": 67,
+      "collectibility": 63,
+      "hobby_lag": 83,
+      "attention_velocity": 69,
+      "evidence_maturity": 66,
+      "upside_asymmetry": 78
+    },
+    "market_price_verified": false,
+    "market_repricing_pct": null,
+    "source_urls": [
+      "https://www.mccoveychronicles.com/san-francisco-giants-prospects/110492/giants-minors-news-scores-prospects-josuar-gonzalez-bo-davidson",
+      "https://www.mlb.com/milb/prospects/giants/bo-davidson-815589",
+      "https://www.sportscardspro.com/game/baseball-cards-2025-bowman-chrome-prospect-autograph/bo-davidson-cpa-bd"
+    ],
+    "cards": [
+      {
+        "card_id": "2025-bowman-chrome-prospect-auto-cpa-bd-bo-davidson",
+        "label": "2025 Bowman Chrome Prospect Autograph CPA-BD Bo Davidson",
+        "priority": 1,
+        "rationale": "Verified 1st Bowman Chrome prospect autograph and the cleanest hobby expression for a breakout-to-call-up thesis."
+      }
+    ]
+  }
+]
