@@ -1,0 +1,45 @@
+[
+  {
+    "player_id": "nfl-kaytron-allen",
+    "player": "Kaytron Allen",
+    "sport": "NFL",
+    "signal_kind": "PERFORMANCE",
+    "signal_description": "Washington rookie running back Kaytron Allen rushed for 85 yards and a touchdown in the Commanders' preseason win, creating an early role-and-attention signal before the regular season.",
+    "observed_at": "2026-08-15T23:00:00+00:00",
+    "headline": "Kaytron Allen's productive preseason showing creates an early football hobby edge watch",
+    "why_now": "Allen is a sixth-round rookie competing for a role in Washington's backfield, and an 85-yard preseason performance with a touchdown is the kind of usage-plus-production catalyst that can move attention before regular-season touches establish a durable market narrative. This gives Radar a live NFL test rather than relying only on baseball prospect promotions.",
+    "thesis": "Kaytron Allen is an ACCELERATION-stage EDGE candidate: meaningful preseason production can pull forward role expectations and hobby attention before the regular season. His 2025 Bowman Chrome University Prospect Autograph BCA-KA is a verified early autograph expression, but no capital action is permitted until authoritative Product Research comps establish whether the performance has already been priced in.",
+    "falsification": [
+      "Allen fails to earn a meaningful regular-season offensive role after the preseason performance.",
+      "Authoritative sold comps show the Bowman Chrome University autograph already repriced beyond an attractive entry.",
+      "Washington's backfield usage makes Allen primarily a low-volume short-yardage option without a credible path to hobby-relevant production."
+    ],
+    "importance": 72,
+    "novelty": 76,
+    "market_impact": 67,
+    "factors": {
+      "situation_change": 72,
+      "narrative_potential": 74,
+      "collectibility": 68,
+      "hobby_lag": 78,
+      "attention_velocity": 72,
+      "evidence_maturity": 68,
+      "upside_asymmetry": 74
+    },
+    "market_price_verified": false,
+    "market_repricing_pct": null,
+    "source_urls": [
+      "https://www.reuters.com/sports/nfl-preseason-roundup-new-look-dolphins-offense-finds-stride--flm-2026-08-15/",
+      "https://www.nfl.com/players/kaytron-allen/",
+      "https://www.beckett.com/football/2025/bowman-chrome-university-autographs-orange-refractors/bcaka-kaytron-allen-32106972"
+    ],
+    "cards": [
+      {
+        "card_id": "2025-bowman-chrome-university-prospect-auto-bca-ka-kaytron-allen",
+        "label": "2025 Bowman Chrome University Prospect Autograph BCA-KA Kaytron Allen",
+        "priority": 1,
+        "rationale": "Verified Bowman Chrome University prospect autograph and the cleanest broadly identifiable early autograph expression for the preseason role thesis."
+      }
+    ]
+  }
+]
