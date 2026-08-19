@@ -16,7 +16,7 @@ MANUFACTURER_IDENTITY_MARKERS={"topps","panini","upper deck","leaf","playoff","d
 BRAND_MANUFACTURER_EVIDENCE={"topps":{"bowman"}}
 DISTINCTIVE_SET_MARKERS={
     "bowman","prizm","select","optic","mosaic","finest","heritage","stadium",
-    "inception","museum","definitive","transcendent","immaculate","flawless","now",
+    "inception","museum","definitive","transcendent","immaculate","flawless","now","cosmic",
 }
 PARALLEL_IDENTITY_MARKERS={
     "silver","gold","red","blue","green","orange","purple","black","pink","aqua","teal",
