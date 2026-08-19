@@ -40,5 +40,5 @@ def test_george_wolkow_fixture_preserves_single_source_catalyst_and_target_card(
     assert any("beckett.com/news/2024-bowman-baseball-cards" in url for url in candidate.source_urls)
     assert candidate.source_quality == "SINGLE_SOURCE"
     assert candidate.source_host_count == 1
-    assert "two-homer" in candidate.thesis.why_now
+    assert "multi-homer" in candidate.thesis.why_now
     assert "pre-MLB" in candidate.thesis.why_now
