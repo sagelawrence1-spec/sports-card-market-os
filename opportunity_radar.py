@@ -45,6 +45,27 @@ class RadarBatchReport:
         return sum(candidate.decision not in {"WATCH", "WATCH_FOR_COMPS", "DO_NOT_CHASE"} for candidate in self.candidates)
 
 
+# Event-status catalysts are especially vulnerable to rumor contamination. A single
+# unconfirmed blog/social source may surface in Radar, but it should not unlock
+# capital merely because sold comps are already available.
+_CONFIRMATION_REQUIRED = {
+    SignalKind.CALL_UP_WATCH,
+    SignalKind.SIGNING,
+    SignalKind.TRADE,
+    SignalKind.CALL_UP,
+    SignalKind.RETIREMENT,
+    SignalKind.HOF,
+}
+_OFFICIAL_CATALYST_DOMAINS = {
+    "mlb.com",
+    "milb.com",
+    "nfl.com",
+    "nba.com",
+    "wnba.com",
+    "nhl.com",
+}
+
+
 def _source_urls(payload: Mapping[str, Any]) -> tuple[str, ...]:
     values = tuple(str(value).strip() for value in payload.get("source_urls", ()) if str(value).strip())
     if not values:
@@ -54,6 +75,33 @@ def _source_urls(payload: Mapping[str, Any]) -> tuple[str, ...]:
         if parsed.scheme not in {"http", "https"} or not parsed.netloc:
             raise ValueError(f"invalid source URL: {value}")
     return values
+
+
+def _source_host(value: str) -> str:
+    host = (urlparse(value).hostname or "").casefold().strip(".")
+    return host[4:] if host.startswith("www.") else host
+
+
+def _is_official_catalyst_host(host: str) -> bool:
+    return any(host == domain or host.endswith(f".{domain}") for domain in _OFFICIAL_CATALYST_DOMAINS)
+
+
+def _catalyst_source_confirmed(kind: SignalKind, urls: tuple[str, ...]) -> bool:
+    """Require official confirmation or independent corroboration for event catalysts.
+
+    Performance/attention signals intentionally remain eligible from one credible
+    source because Radar is supposed to surface weak signals early. Event-status
+    claims such as a trade or call-up are different: one unconfirmed source can move
+    the hobby while still being wrong, so pricing evidence alone cannot validate the
+    underlying event.
+    """
+    if kind not in _CONFIRMATION_REQUIRED:
+        return True
+    hosts = {_source_host(value) for value in urls}
+    hosts.discard("")
+    if any(_is_official_catalyst_host(host) for host in hosts):
+        return True
+    return len(hosts) >= 2
 
 
 def _observation_key(payload: Mapping[str, Any]) -> tuple[str, str, str, str]:
@@ -71,6 +119,8 @@ def evaluate_live_observation(payload: Mapping[str, Any], *, engine: Opportunity
 
     Lifecycle classification is allowed before pricing is verified. Capital actions are
     not. A candidate without verified repricing is explicitly held at WATCH_FOR_COMPS.
+    Event-status catalysts also require credible source confirmation before pricing can
+    unlock capital.
     """
     radar = engine or OpportunityEngine()
     urls = _source_urls(payload)
@@ -128,6 +178,14 @@ def evaluate_live_observation(payload: Mapping[str, Any], *, engine: Opportunity
             decision="WATCH_FOR_COMPS",
             market_price_verified=False,
             blocking_reason="authoritative_market_repricing_unverified",
+            source_urls=urls,
+        )
+    if not _catalyst_source_confirmed(kind, urls):
+        return RadarCandidate(
+            thesis=thesis,
+            decision="WATCH",
+            market_price_verified=True,
+            blocking_reason="catalyst_source_unconfirmed",
             source_urls=urls,
         )
     return RadarCandidate(

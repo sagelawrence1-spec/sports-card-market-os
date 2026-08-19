@@ -19,7 +19,7 @@ def _observation():
         "why_now": "The roster move creates immediate attention before pricing is proven.",
         "thesis": "If attention outruns card repricing, the first Bowman remains an entry expression.",
         "falsification": ["Role disappears", "Market reprices beyond the chase threshold"],
-        "source_urls": ["https://example.com/player-one-call-up"],
+        "source_urls": ["https://www.mlb.com/news/player-one-called-up"],
         "factors": {
             "situation_change": 90,
             "narrative_potential": 90,
