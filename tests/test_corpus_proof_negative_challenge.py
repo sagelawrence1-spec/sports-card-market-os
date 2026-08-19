@@ -29,6 +29,7 @@ def raw_rows():
             "Sold Date": "2026-08-01",
             "Sold Price": "100",
             "Currency": "USD",
+            "Shipping": "$0.00",
         })
     for i in range(4):
         rows.append({
@@ -37,6 +38,7 @@ def raw_rows():
             "Sold Date": "2026-08-01",
             "Sold Price": "100",
             "Currency": "USD",
+            "Shipping": "$0.00",
         })
     return rows
 
