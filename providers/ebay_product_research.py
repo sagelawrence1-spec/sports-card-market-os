@@ -5,9 +5,11 @@ Product Research is eBay's own historical sales-data surface. eBay currently doe
 publish an open Marketplace Insights endpoint for new users, so this adapter accepts
 structured extracts captured from Product Research without changing downstream logic.
 
-Accepted input: CSV with flexible aliases for title, sold price, sold date, item ID and URL.
-Rows fail closed when title, sold date, price, USD currency evidence, stable sold-item
-identity, an explicitly exported shipping amount, or duplicate sold evidence is ambiguous.
+Accepted input: CSV with flexible aliases for title, sold price, sold date, item ID, URL,
+and shipping. Rows fail closed when title, sold date, price, USD currency evidence,
+stable sold-item identity, an explicitly exported shipping amount, or duplicate sold
+evidence is ambiguous. Shipping provenance is required so authoritative comps always
+share the same landed-price basis.
 """
 import csv, re
 from collections import Counter, defaultdict
@@ -136,8 +138,8 @@ class EbayProductResearchProvider:
             return ProviderResult([],query,self.provider_name,{"path":str(p),"rows":0,"accepted_rows":0,"deduplicated_rows":0,"rejected_rows":0,"rejection_reasons":{}})
         headers=list(rows[0].keys())
         cols={k:_find(headers,v) for k,v in ALIASES.items()}
-        if not cols["title"] or not cols["price"] or not cols["date"]:
-            raise ValueError(f"Could not locate title/price/date columns. Headers={headers}")
+        if not cols["title"] or not cols["price"] or not cols["date"] or not cols["shipping"]:
+            raise ValueError(f"Could not locate required title/price/date/shipping columns. Headers={headers}")
         candidates=[]
         rejection_reasons=Counter()
         for r in rows:
@@ -179,18 +181,16 @@ class EbayProductResearchProvider:
             if not sid:
                 rejection_reasons["missing_stable_item_id"]+=1
                 continue
-            shipping=None
-            if cols["shipping"]:
-                raw_shipping=r.get(cols["shipping"])
-                if _currency_conflicts(currency,raw_shipping):
-                    rejection_reasons["conflicting_shipping_currency"]+=1
-                    continue
-                shipping=_shipping_amount(raw_shipping)
-                if shipping is None:
-                    rejection_reasons["invalid_or_missing_shipping"]+=1
-                    continue
-            price=round(sold_price+(shipping or 0),2)
-            price_basis="sold_price_plus_shipping" if cols["shipping"] else "sold_price_only"
+            raw_shipping=r.get(cols["shipping"])
+            if _currency_conflicts(currency,raw_shipping):
+                rejection_reasons["conflicting_shipping_currency"]+=1
+                continue
+            shipping=_shipping_amount(raw_shipping)
+            if shipping is None:
+                rejection_reasons["invalid_or_missing_shipping"]+=1
+                continue
+            price=round(sold_price+shipping,2)
+            price_basis="sold_price_plus_shipping"
             payload=dict(r)
             payload["price_basis"] = price_basis
             payload["normalized_sold_price"] = sold_price
@@ -230,7 +230,7 @@ class EbayProductResearchProvider:
         rejected_rows=sum(rejection_reasons.values())
         return ProviderResult(records,query,self.provider_name,{
             "path":str(p),"rows":len(rows),"columns":cols,
-            "price_basis":"sold_price_plus_shipping" if cols["shipping"] else "sold_price_only",
+            "price_basis":"sold_price_plus_shipping",
             "accepted_rows":len(records),"deduplicated_rows":deduplicated_rows,"rejected_rows":rejected_rows,
             "rejection_reasons":dict(sorted(rejection_reasons.items())),
         })
