@@ -94,6 +94,30 @@ def test_grades_from_authoritative_forward_median_not_caller_price(tmp_path):
     assert result["outcome"]["grade"] == "A"
 
 
+def test_forward_evidence_identity_preserves_multi_quantity_sales_on_distinct_days(tmp_path):
+    rows = [
+        _row(1234567890, "2026-09-18", 120),
+        _row(1234567890, "2026-09-19", 130),
+        _row(1234567890, "2026-09-20", 140),
+    ]
+    result = grade_authoritative_market_outcome(
+        _packet(),
+        _entry_collection(),
+        asset=_asset(),
+        csv_path=_write(tmp_path, rows),
+        as_of="2026-09-21T18:00:00+00:00",
+    )
+
+    assert result["graded"] is True
+    assert result["forward_count"] == 3
+    assert len(set(result["evidence_ids"])) == 3
+    assert result["evidence_ids"] == [
+        "ebay_product_research:1234567890:2026-09-18",
+        "ebay_product_research:1234567890:2026-09-19",
+        "ebay_product_research:1234567890:2026-09-20",
+    ]
+
+
 def test_blocks_when_forward_authoritative_depth_is_thin(tmp_path):
     rows = [_row(1, "2026-09-18", 120), _row(2, "2026-09-19", 130)]
     result = grade_authoritative_market_outcome(
