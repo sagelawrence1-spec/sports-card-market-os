@@ -49,6 +49,7 @@ def _row(item_id, sold_date, price, title="2026 Topps Chrome Player One #10"):
     return {
         "Title": title,
         "Sold Price": f"${price}",
+        "Shipping": "$0.00",
         "Sold Date": sold_date,
         "Item ID": str(item_id),
         "Currency": "USD",
@@ -58,7 +59,7 @@ def _row(item_id, sold_date, price, title="2026 Topps Chrome Player One #10"):
 def _write(tmp_path, rows):
     path = tmp_path / "forward.csv"
     with path.open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=["Title", "Sold Price", "Sold Date", "Item ID", "Currency"])
+        writer = csv.DictWriter(handle, fieldnames=["Title", "Sold Price", "Shipping", "Sold Date", "Item ID", "Currency"])
         writer.writeheader()
         writer.writerows(rows)
     return path
@@ -66,21 +67,16 @@ def _write(tmp_path, rows):
 
 def test_grades_from_authoritative_forward_median_not_caller_price(tmp_path):
     rows = [
-        _row(1, "2026-09-17", 999),  # exact 30-day horizon day: ambiguous, excluded
+        _row(1, "2026-09-17", 999),
         _row(2, "2026-09-18", 120),
         _row(3, "2026-09-19", 130),
         _row(4, "2026-09-20", 140),
-        _row(5, "2026-09-21", 999),  # as_of day: ambiguous, excluded
+        _row(5, "2026-09-21", 999),
         _row(6, "2026-09-19", 1000, "2026 Topps Chrome Player One #11"),
     ]
     result = grade_authoritative_market_outcome(
-        _packet(),
-        _entry_collection(),
-        asset=_asset(),
-        csv_path=_write(tmp_path, rows),
-        as_of="2026-09-21T18:00:00+00:00",
+        _packet(), _entry_collection(), asset=_asset(), csv_path=_write(tmp_path, rows), as_of="2026-09-21T18:00:00+00:00"
     )
-
     assert result["schema"] == "opportunity-authoritative-outcome.v1"
     assert result["graded"] is True
     assert result["forward_count"] == 3
@@ -95,19 +91,10 @@ def test_grades_from_authoritative_forward_median_not_caller_price(tmp_path):
 
 
 def test_forward_evidence_identity_preserves_multi_quantity_sales_on_distinct_days(tmp_path):
-    rows = [
-        _row(1234567890, "2026-09-18", 120),
-        _row(1234567890, "2026-09-19", 130),
-        _row(1234567890, "2026-09-20", 140),
-    ]
+    rows = [_row(1234567890, "2026-09-18", 120), _row(1234567890, "2026-09-19", 130), _row(1234567890, "2026-09-20", 140)]
     result = grade_authoritative_market_outcome(
-        _packet(),
-        _entry_collection(),
-        asset=_asset(),
-        csv_path=_write(tmp_path, rows),
-        as_of="2026-09-21T18:00:00+00:00",
+        _packet(), _entry_collection(), asset=_asset(), csv_path=_write(tmp_path, rows), as_of="2026-09-21T18:00:00+00:00"
     )
-
     assert result["graded"] is True
     assert result["forward_count"] == 3
     assert len(set(result["evidence_ids"])) == 3
@@ -121,11 +108,7 @@ def test_forward_evidence_identity_preserves_multi_quantity_sales_on_distinct_da
 def test_blocks_when_forward_authoritative_depth_is_thin(tmp_path):
     rows = [_row(1, "2026-09-18", 120), _row(2, "2026-09-19", 130)]
     result = grade_authoritative_market_outcome(
-        _packet(),
-        _entry_collection(),
-        asset=_asset(),
-        csv_path=_write(tmp_path, rows),
-        as_of="2026-09-21T18:00:00+00:00",
+        _packet(), _entry_collection(), asset=_asset(), csv_path=_write(tmp_path, rows), as_of="2026-09-21T18:00:00+00:00"
     )
     assert result["graded"] is False
     assert result["blocking_reason"] == "insufficient_forward_authoritative_comps"
@@ -135,11 +118,7 @@ def test_blocks_when_forward_authoritative_depth_is_thin(tmp_path):
 def test_applies_costs_to_authoritative_forward_median(tmp_path):
     rows = [_row(1, "2026-09-18", 110), _row(2, "2026-09-19", 110), _row(3, "2026-09-20", 110)]
     result = grade_authoritative_market_outcome(
-        _packet(),
-        _entry_collection(),
-        asset=_asset(),
-        csv_path=_write(tmp_path, rows),
-        as_of="2026-09-21T18:00:00+00:00",
+        _packet(), _entry_collection(), asset=_asset(), csv_path=_write(tmp_path, rows), as_of="2026-09-21T18:00:00+00:00",
         policy=OpportunityOutcomePolicy(exit_fee_rate=0.05, liquidity_haircut_rate=0.05),
     )
     assert result["outcome"]["net_realized_price"] == pytest.approx(99.275)
@@ -150,11 +129,6 @@ def test_rejects_mismatched_asset_or_premature_cutoff(tmp_path):
     asset = _asset()
     asset["card_id"] = "wrong"
     with pytest.raises(ValueError, match="asset card_id"):
-        grade_authoritative_market_outcome(
-            _packet(), _entry_collection(), asset=asset, csv_path=tmp_path / "missing.csv", as_of="2026-09-21T18:00:00+00:00"
-        )
-
+        grade_authoritative_market_outcome(_packet(), _entry_collection(), asset=asset, csv_path=tmp_path / "missing.csv", as_of="2026-09-21T18:00:00+00:00")
     with pytest.raises(ValueError, match="minimum decision horizon"):
-        grade_authoritative_market_outcome(
-            _packet(), _entry_collection(), asset=_asset(), csv_path=tmp_path / "missing.csv", as_of="2026-09-01T18:00:00+00:00"
-        )
+        grade_authoritative_market_outcome(_packet(), _entry_collection(), asset=_asset(), csv_path=tmp_path / "missing.csv", as_of="2026-09-01T18:00:00+00:00")
