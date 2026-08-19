@@ -20,6 +20,7 @@ def _valid_rows():
                 "Sold Date": "2026-08-01",
                 "Sold Price": "100",
                 "Currency": "USD",
+                "Shipping": "$0.00",
             })
     return rows
 
@@ -58,13 +59,15 @@ def test_rejected_rows_cannot_disappear_from_proof_denominator():
             "Sold Date": "2026-08-01",
             "Sold Price": "$100 - $150",
             "Currency": "USD",
+            "Shipping": "$0.00",
         },
         {
             "Item ID": "999999992",
             "Title": "non usd row",
             "Sold Date": "2026-08-01",
-            "Sold Price": "100",
+            "Sold Price": "EUR 100",
             "Currency": "EUR",
+            "Shipping": "EUR 0.00",
         },
     ]
     report = build_corpus_proof_report(rows, _candidates(), _labels(), policy=_policy())

@@ -44,6 +44,7 @@ def raw_rows():
                 "Sold Date": "2026-08-01",
                 "Sold Price": "100",
                 "Currency": "USD",
+                "Shipping": "$0.00",
             })
     return rows
 
@@ -246,9 +247,9 @@ def test_load_delimited_export_handles_tsv(tmp_path):
     path = tmp_path / "export.tsv"
     tab = chr(9)
     path.write_text(
-        tab.join(["Item ID", "Title", "Sold Date", "Sold Price", "Currency"])
+        tab.join(["Item ID", "Title", "Sold Date", "Sold Price", "Currency", "Shipping"])
         + "\n"
-        + tab.join(["123456789", "2025 Shohei Ohtani #1", "2026-08-01", "100", "USD"])
+        + tab.join(["123456789", "2025 Shohei Ohtani #1", "2026-08-01", "100", "USD", "$0.00"])
         + "\n"
     )
     rows = load_delimited_export(path)
