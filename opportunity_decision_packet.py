@@ -90,6 +90,8 @@ def build_opportunity_decision_packet(
         "thesis": thesis,
         "falsification": [str(item) for item in falsification],
         "source_urls": [str(item) for item in source_urls],
+        "source_quality": update["source_quality"],
+        "source_host_count": update["source_host_count"],
         "card": selected_card,
         "pricing": {
             "verified": update["market_price_verified"],
