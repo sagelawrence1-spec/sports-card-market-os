@@ -120,7 +120,14 @@ class EvidenceStore:
         if source_platform=="ebay" and source_item_id.lower().startswith(("ebay:","ebay-")):
             source_item_id=source_item_id[5:]
         if (record.provider.startswith("ebay_") or source_platform=="ebay") and source_item_id and not source_item_id.startswith("row-"):
-            base=f"ebay|{record.record_type}|{source_item_id}"
+            # eBay listing IDs are stable listing identities, not necessarily unique
+            # sale identities. Product Research can report multiple legitimate sales
+            # from one multi-quantity listing on different sold days, so sold evidence
+            # must include the authoritative sold day in its persistent identity.
+            if record.record_type=="sold" and record.event_date:
+                base=f"ebay|{record.record_type}|{source_item_id}|{record.event_date}"
+            else:
+                base=f"ebay|{record.record_type}|{source_item_id}"
         else:
             base=f"{record.provider}|{record.record_type}|{source_item_id}|{record.event_date}|{record.title}|{record.price}"
         eid=hashlib.sha256(base.encode()).hexdigest()[:32]
