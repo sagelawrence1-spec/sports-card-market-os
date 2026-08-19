@@ -99,7 +99,10 @@ def grade_authoritative_market_outcome(
             continue
 
         prices.append(float(record.price))
-        evidence_ids.append(f"{record.provider}:{record.source_item_id}")
+        # Product Research can contain distinct transactions from a single
+        # multi-quantity listing on different sold days. Keep forward-proof audit
+        # identity aligned with entry repricing and persistent evidence identity.
+        evidence_ids.append(f"{record.provider}:{record.source_item_id}:{record.event_date}")
         accepted += 1
 
     if len(prices) < int(min_forward_comps):
