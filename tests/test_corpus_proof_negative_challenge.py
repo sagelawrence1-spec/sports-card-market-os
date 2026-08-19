@@ -20,11 +20,16 @@ def candidates():
     ]
 
 
+def evidence_ids():
+    return [f"1234567890{i:02d}" for i in range(8)]
+
+
 def raw_rows():
+    ids = evidence_ids()
     rows = []
     for i in range(4):
         rows.append({
-            "Item ID": f"A{i}",
+            "Item ID": ids[i],
             "Title": "2025 Shohei Ohtani #1",
             "Sold Date": "2026-08-01",
             "Sold Price": "100",
@@ -33,7 +38,7 @@ def raw_rows():
         })
     for i in range(4):
         rows.append({
-            "Item ID": f"B{i}",
+            "Item ID": ids[i + 4],
             "Title": "2025 Stephen Curry #2",
             "Sold Date": "2026-08-01",
             "Sold Price": "100",
@@ -45,7 +50,7 @@ def raw_rows():
 
 def labels(negative_count=0):
     out = []
-    ids = [f"A{i}" for i in range(4)] + [f"B{i}" for i in range(4)]
+    ids = evidence_ids()
     cards = ["A"] * 4 + ["B"] * 4
     for index, (evidence_id, card_id) in enumerate(zip(ids, cards)):
         if index < negative_count:

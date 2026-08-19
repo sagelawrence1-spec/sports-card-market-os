@@ -18,7 +18,6 @@ def test_sanitizer_removes_sensitive_fields_and_preserves_landed_evidence():
     result = sanitize_product_research_rows([
         _row(
             **{
-                "Item ID": "v1|123456789012|0",
                 "Title": "2017 Topps Chrome Aaron Judge #169 PSA 10",
                 "Sold Price": "$250.00",
                 "Shipping": "$7.50",
@@ -38,6 +37,45 @@ def test_sanitizer_removes_sensitive_fields_and_preserves_landed_evidence():
     assert row["sold_date"] == "2026-08-01"
     assert "seller_username" not in row
     assert "buyer_name" not in row
+
+
+def test_malformed_explicit_item_id_fails_closed_like_production_provider():
+    result = sanitize_product_research_rows([_row(**{"Item ID": "row-1004"})])
+    assert result["accepted_rows"] == 0
+    assert "invalid_item_id" in result["rejected"][0]["reasons"]
+
+
+def test_legacy_wrapped_explicit_item_id_is_not_silently_normalized():
+    result = sanitize_product_research_rows([_row(**{"Item ID": "v1|123456789012|0"})])
+    assert result["accepted_rows"] == 0
+    assert "invalid_item_id" in result["rejected"][0]["reasons"]
+
+
+def test_ebay_url_can_supply_stable_item_identity_when_required():
+    result = sanitize_product_research_rows(
+        [_row(**{"Item ID": "", "URL": "https://www.ebay.com/itm/123456789012"})],
+        policy=CorpusIntakePolicy(require_item_id=True),
+    )
+    assert result["accepted_rows"] == 1
+    assert result["accepted"][0]["item_id"] == "123456789012"
+
+
+def test_non_ebay_url_cannot_supply_stable_item_identity():
+    result = sanitize_product_research_rows(
+        [_row(**{"Item ID": "", "URL": "https://example.com/itm/123456789012"})],
+        policy=CorpusIntakePolicy(require_item_id=True),
+    )
+    assert result["accepted_rows"] == 0
+    assert "missing_stable_item_id" in result["rejected"][0]["reasons"]
+
+
+def test_conflicting_explicit_and_url_item_identity_fails_closed():
+    result = sanitize_product_research_rows(
+        [_row(**{"URL": "https://www.ebay.com/itm/999999999999"})],
+        policy=CorpusIntakePolicy(require_item_id=True),
+    )
+    assert result["accepted_rows"] == 0
+    assert "conflicting_item_id" in result["rejected"][0]["reasons"]
 
 
 def test_ambiguous_price_range_fails_closed():
