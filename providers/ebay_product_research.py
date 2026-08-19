@@ -204,7 +204,11 @@ class EbayProductResearchProvider:
 
         grouped=defaultdict(list)
         for record in candidates:
-            grouped[record.source_item_id].append(record)
+            # Product Research reports item sales. Multi-quantity eBay listings can
+            # therefore produce legitimate sales on different dates under the same
+            # listing ID. Item + sold day is the conservative transaction identity at
+            # the day granularity available in the authoritative export.
+            grouped[(record.source_item_id,record.event_date)].append(record)
         records=[]
         deduplicated_rows=0
         for group in grouped.values():
