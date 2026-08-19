@@ -11,6 +11,7 @@ from typing import Any, Mapping
 _SCAN_SCHEMA = "opportunity-radar-scan.v1"
 _DELTA_SCHEMA = "opportunity-radar-delta.v1"
 _BRIEF_SCHEMA = "opportunity-radar-attention.v1"
+_SOURCE_QUALITIES = {"OFFICIAL", "CORROBORATED", "SINGLE_SOURCE"}
 
 
 def _index_current_candidates(scan: Mapping[str, Any]) -> dict[str, Mapping[str, Any]]:
@@ -42,6 +43,16 @@ def _discovery_age_bucket(lag_minutes: Any) -> str:
     if lag_minutes <= 1440:
         return "6_TO_24H"
     return "OVER_24H"
+
+
+def _source_provenance(candidate: Mapping[str, Any]) -> tuple[str, int]:
+    quality = candidate.get("source_quality")
+    host_count = candidate.get("source_host_count")
+    if quality not in _SOURCE_QUALITIES:
+        raise ValueError(f"unsupported source quality: {quality}")
+    if not isinstance(host_count, int) or isinstance(host_count, bool) or host_count < 1:
+        raise ValueError("source_host_count must be a positive integer")
+    return str(quality), host_count
 
 
 def build_attention_brief(scan: Mapping[str, Any], delta: Mapping[str, Any]) -> dict[str, Any]:
@@ -97,12 +108,15 @@ def build_attention_brief(scan: Mapping[str, Any], delta: Mapping[str, Any]) -> 
                     "thesis": None,
                     "falsification": [],
                     "source_urls": [],
+                    "source_quality": None,
+                    "source_host_count": 0,
                     "cards": [],
                 }
             )
             continue
 
         lag_minutes = candidate.get("observation_to_scan_lag_minutes")
+        source_quality, source_host_count = _source_provenance(candidate)
         items.append(
             {
                 "player_id": player_id,
@@ -122,6 +136,8 @@ def build_attention_brief(scan: Mapping[str, Any], delta: Mapping[str, Any]) -> 
                 "thesis": candidate.get("thesis"),
                 "falsification": list(candidate.get("falsification") or []),
                 "source_urls": list(candidate.get("source_urls") or []),
+                "source_quality": source_quality,
+                "source_host_count": source_host_count,
                 "cards": list(candidate.get("cards") or []),
             }
         )
@@ -142,6 +158,9 @@ def build_attention_brief(scan: Mapping[str, Any], delta: Mapping[str, Any]) -> 
             "became_actionable_count": sum(item["became_actionable"] for item in items),
             "dropped_count": sum(item["status"] == "DROPPED" for item in items),
             "waiting_for_comps_count": sum(item["decision"] == "WATCH_FOR_COMPS" for item in items),
+            "official_source_count": sum(item["source_quality"] == "OFFICIAL" for item in items),
+            "corroborated_source_count": sum(item["source_quality"] == "CORROBORATED" for item in items),
+            "single_source_count": sum(item["source_quality"] == "SINGLE_SOURCE" for item in items),
             "under_6h_discovery_count": sum(item["discovery_age_bucket"] == "UNDER_6H" for item in items),
             "same_day_discovery_count": sum(item["discovery_age_bucket"] == "6_TO_24H" for item in items),
             "over_24h_discovery_count": sum(item["discovery_age_bucket"] == "OVER_24H" for item in items),

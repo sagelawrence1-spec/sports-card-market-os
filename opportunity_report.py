@@ -14,6 +14,9 @@ from typing import Any
 from opportunity_radar import RadarBatchReport
 
 
+_SOURCE_QUALITIES = {"OFFICIAL", "CORROBORATED", "SINGLE_SOURCE"}
+
+
 def _aware_utc(value: str, *, field: str) -> datetime:
     parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
     if parsed.tzinfo is None:
@@ -37,6 +40,11 @@ def build_radar_scan_artifact(report: RadarBatchReport, *, generated_at: str | N
     observation_lags: list[float] = []
     candidates: list[dict[str, Any]] = []
     for rank, candidate in enumerate(report.candidates, start=1):
+        if candidate.source_quality not in _SOURCE_QUALITIES:
+            raise ValueError(f"unsupported source quality: {candidate.source_quality}")
+        if not isinstance(candidate.source_host_count, int) or isinstance(candidate.source_host_count, bool) or candidate.source_host_count < 1:
+            raise ValueError("source_host_count must be a positive integer")
+
         thesis = candidate.thesis
         observed_at = thesis.signals[-1].observed_at if thesis.signals else None
         observation_to_scan_lag_minutes: float | None = None
@@ -72,6 +80,8 @@ def build_radar_scan_artifact(report: RadarBatchReport, *, generated_at: str | N
                 "evidence_confidence": thesis.evidence_confidence,
                 "asymmetry": thesis.asymmetry,
                 "source_urls": list(candidate.source_urls),
+                "source_quality": candidate.source_quality,
+                "source_host_count": candidate.source_host_count,
                 "cards": [
                     {
                         "card_id": card.card_id,
@@ -98,6 +108,9 @@ def build_radar_scan_artifact(report: RadarBatchReport, *, generated_at: str | N
             "duplicate_count": report.duplicate_count,
             "failure_count": len(report.failures),
             "waiting_for_comps_count": sum(c.decision == "WATCH_FOR_COMPS" for c in report.candidates),
+            "official_source_count": sum(c.source_quality == "OFFICIAL" for c in report.candidates),
+            "corroborated_source_count": sum(c.source_quality == "CORROBORATED" for c in report.candidates),
+            "single_source_count": sum(c.source_quality == "SINGLE_SOURCE" for c in report.candidates),
             "observed_at_count": len(observation_lags),
             "missing_observed_at_count": report.candidate_count - len(observation_lags),
             "median_observation_to_scan_lag_minutes": round(median(observation_lags), 2) if observation_lags else None,

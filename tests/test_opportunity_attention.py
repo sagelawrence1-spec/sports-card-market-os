@@ -21,7 +21,9 @@ def _scan() -> dict:
                 "why_now": "Attention is moving before broader repricing.",
                 "thesis": "Entry remains open after verified modest repricing.",
                 "falsification": ["Role disappears"],
-                "source_urls": ["https://example.com/source"],
+                "source_urls": ["https://mlb.com/source"],
+                "source_quality": "OFFICIAL",
+                "source_host_count": 1,
                 "cards": [{"card_id": "c1", "label": "2025 Bowman Chrome Auto"}],
             },
             {
@@ -37,7 +39,9 @@ def _scan() -> dict:
                 "why_now": "Club comments indicate promotion risk.",
                 "thesis": "Attention may move before the transaction.",
                 "falsification": ["Player remains in minors"],
-                "source_urls": ["https://example.com/source-2"],
+                "source_urls": ["https://example.com/source-2", "https://other.example/source"],
+                "source_quality": "CORROBORATED",
+                "source_host_count": 2,
                 "cards": [{"card_id": "c2", "label": "2025 Bowman Chrome Prospect"}],
             },
         ],
@@ -84,6 +88,9 @@ def test_attention_brief_surfaces_actionable_and_dropped_only():
         "became_actionable_count": 1,
         "dropped_count": 1,
         "waiting_for_comps_count": 0,
+        "official_source_count": 1,
+        "corroborated_source_count": 0,
+        "single_source_count": 0,
         "under_6h_discovery_count": 1,
         "same_day_discovery_count": 0,
         "over_24h_discovery_count": 0,
@@ -93,10 +100,13 @@ def test_attention_brief_surfaces_actionable_and_dropped_only():
     assert brief["items"][0]["observed_at"] == "2026-08-17T13:45:00+00:00"
     assert brief["items"][0]["observation_to_scan_lag_minutes"] == 75.0
     assert brief["items"][0]["discovery_age_bucket"] == "UNDER_6H"
+    assert brief["items"][0]["source_quality"] == "OFFICIAL"
+    assert brief["items"][0]["source_host_count"] == 1
     assert brief["items"][0]["cards"][0]["card_id"] == "c1"
     assert brief["items"][1]["status"] == "DROPPED"
     assert brief["items"][1]["observed_at"] is None
     assert brief["items"][1]["discovery_age_bucket"] == "UNKNOWN"
+    assert brief["items"][1]["source_quality"] is None
 
 
 def test_attention_brief_reports_late_discovery_without_changing_decision():
@@ -113,6 +123,13 @@ def test_attention_brief_rejects_invalid_discovery_latency():
     scan = _scan()
     scan["candidates"][0]["observation_to_scan_lag_minutes"] = -1
     with pytest.raises(ValueError, match="non-negative number"):
+        build_attention_brief(scan, _delta())
+
+
+def test_attention_brief_rejects_invalid_source_quality():
+    scan = _scan()
+    scan["candidates"][0]["source_quality"] = "RUMOR"
+    with pytest.raises(ValueError, match="unsupported source quality"):
         build_attention_brief(scan, _delta())
 
 

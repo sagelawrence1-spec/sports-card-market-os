@@ -24,6 +24,9 @@ def test_live_radar_batch_builds_reviewable_scan_artifact():
         "duplicate_count": 0,
         "failure_count": 0,
         "waiting_for_comps_count": 4,
+        "official_source_count": 0,
+        "corroborated_source_count": 0,
+        "single_source_count": 4,
         "observed_at_count": 4,
         "missing_observed_at_count": 0,
         "median_observation_to_scan_lag_minutes": 6920.0,
@@ -35,6 +38,8 @@ def test_live_radar_batch_builds_reviewable_scan_artifact():
     assert all(row["observed_at"] for row in artifact["candidates"])
     assert all(row["observation_to_scan_lag_minutes"] is not None for row in artifact["candidates"])
     assert all(row["source_urls"] for row in artifact["candidates"])
+    assert all(row["source_quality"] == "SINGLE_SOURCE" for row in artifact["candidates"])
+    assert all(row["source_host_count"] == 1 for row in artifact["candidates"])
     assert all(row["cards"] for row in artifact["candidates"])
 
 
@@ -53,6 +58,8 @@ def test_scan_artifact_preserves_ranked_card_and_thesis_evidence():
     assert baez["falsification"]
     assert baez["cards"][0]["card_id"] == "2022-bowman-chrome-prospects-bcp-112-joshua-baez"
     assert any("reuters.com" in url for url in baez["source_urls"])
+    assert baez["source_quality"] == "SINGLE_SOURCE"
+    assert baez["source_host_count"] == 1
 
 
 def test_scan_artifact_rejects_naive_generated_timestamp():

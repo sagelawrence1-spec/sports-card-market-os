@@ -66,6 +66,12 @@ _OFFICIAL_CATALYST_DOMAINS = {
     "wnba.com",
     "nhl.com",
 }
+# These hosts may be valuable provenance for card/checklist identity, but they do not
+# independently corroborate that the real-world catalyst itself occurred. Counting a
+# checklist source as a second catalyst source would create false corroboration.
+_SUPPORT_ONLY_SOURCE_DOMAINS = {
+    "beckett.com",
+}
 _SOURCE_QUALITY_RANK = {
     "OFFICIAL": 2,
     "CORROBORATED": 1,
@@ -93,15 +99,20 @@ def _is_official_catalyst_host(host: str) -> bool:
     return any(host == domain or host.endswith(f".{domain}") for domain in _OFFICIAL_CATALYST_DOMAINS)
 
 
+def _is_support_only_source_host(host: str) -> bool:
+    return any(host == domain or host.endswith(f".{domain}") for domain in _SUPPORT_ONLY_SOURCE_DOMAINS)
+
+
 def _source_quality(urls: tuple[str, ...]) -> tuple[str, int]:
-    """Return descriptive provenance quality without changing capital thresholds."""
+    """Return catalyst provenance quality without letting card-reference sources corroborate events."""
     hosts = {_source_host(value) for value in urls}
     hosts.discard("")
-    if any(_is_official_catalyst_host(host) for host in hosts):
-        return "OFFICIAL", len(hosts)
-    if len(hosts) >= 2:
-        return "CORROBORATED", len(hosts)
-    return "SINGLE_SOURCE", len(hosts)
+    catalyst_hosts = {host for host in hosts if not _is_support_only_source_host(host)}
+    if any(_is_official_catalyst_host(host) for host in catalyst_hosts):
+        return "OFFICIAL", len(catalyst_hosts)
+    if len(catalyst_hosts) >= 2:
+        return "CORROBORATED", len(catalyst_hosts)
+    return "SINGLE_SOURCE", len(catalyst_hosts)
 
 
 def _catalyst_source_confirmed(kind: SignalKind, urls: tuple[str, ...]) -> bool:
