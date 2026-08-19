@@ -7,6 +7,13 @@ import json
 import re
 from typing import Any, Iterable, Mapping
 
+from providers.ebay_product_research import (
+    _currency as _provider_currency,
+    _currency_conflicts,
+    _money,
+    _shipping_amount,
+)
+
 
 SENSITIVE_KEYS = {
     "buyer",
@@ -26,8 +33,8 @@ TITLE_KEYS = ("title", "item_title", "listing_title")
 PRICE_KEYS = ("sold_price", "price", "sale_price")
 DATE_KEYS = ("sold_date", "date_sold", "sale_date", "end_date")
 CURRENCY_KEYS = ("currency", "currency_code")
+SHIPPING_KEYS = ("shipping", "shipping_price", "shipping_cost")
 
-_PRICE_RANGE_RE = re.compile(r"\d[\d,.]*\s*[-–—]\s*[$€£]?\s*\d[\d,.]*")
 _HEADER_SEP_RE = re.compile(r"[^a-z0-9]+")
 _SOLD_DATE_FORMATS = (
     "%Y-%m-%d",
@@ -42,6 +49,7 @@ _SOLD_DATE_FORMATS = (
 class CorpusIntakePolicy:
     require_usd: bool = True
     require_item_id: bool = False
+    require_shipping: bool = True
     max_missing_required_share: float = 0.0
 
     def __post_init__(self) -> None:
@@ -67,22 +75,6 @@ def _normalized_header(value: Any) -> str:
     return _HEADER_SEP_RE.sub("_", text).strip("_")
 
 
-def _parse_price(value: Any) -> float | None:
-    if value is None:
-        return None
-    text = _normalized_text(value)
-    if not text or _PRICE_RANGE_RE.search(text):
-        return None
-    cleaned = re.sub(r"[^0-9.]", "", text.replace(",", ""))
-    if cleaned.count(".") > 1 or not cleaned:
-        return None
-    try:
-        price = float(cleaned)
-    except ValueError:
-        return None
-    return price if price > 0 else None
-
-
 def _parse_sold_date(value: Any) -> str | None:
     text = _normalized_text(value)
     if not text:
@@ -92,16 +84,6 @@ def _parse_sold_date(value: Any) -> str | None:
             return datetime.strptime(text, fmt).date().isoformat()
         except ValueError:
             continue
-    return None
-
-
-def _currency(row: Mapping[str, Any], raw_price: Any) -> str | None:
-    explicit = _normalized_text(_first(row, CURRENCY_KEYS)).upper()
-    if explicit:
-        return explicit
-    price_text = _normalized_text(raw_price)
-    if "$" in price_text and "CAD" not in price_text.upper() and "AUD" not in price_text.upper():
-        return "USD"
     return None
 
 
@@ -124,12 +106,11 @@ def sanitize_product_research_rows(
     *,
     policy: CorpusIntakePolicy | None = None,
 ) -> dict[str, Any]:
-    """Normalize a genuine Product Research export into a reproducible corpus fixture.
+    """Normalize Product Research rows using the production provider's money rules.
 
-    The sanitizer deliberately preserves only evidence needed for parser/matcher auditing.
-    Seller/buyer contact fields are removed. Ambiguous prices, malformed sold dates,
-    unknown currency, missing core fields, conflicting duplicate item IDs, and non-USD
-    rows (by default) fail closed instead of being silently coerced into usable evidence.
+    The proof corpus must not admit evidence the authoritative production provider would
+    reject. Monetary parsing, currency conflicts and shipping therefore share the provider
+    helpers, and accepted comps use the same sold-price-plus-shipping valuation basis.
     """
     policy = policy or CorpusIntakePolicy()
     accepted: list[dict[str, Any]] = []
@@ -146,8 +127,11 @@ def sanitize_product_research_rows(
         sold_date = _parse_sold_date(raw_sold_date)
         item_id = _stable_item_id(row)
         raw_price = _first(row, PRICE_KEYS)
-        price = _parse_price(raw_price)
-        currency = _currency(row, raw_price)
+        sold_price = _money(raw_price)
+        explicit_currency = _first(row, CURRENCY_KEYS)
+        currency = _provider_currency(explicit_currency, raw_price)
+        raw_shipping = _first(row, SHIPPING_KEYS)
+        shipping = _shipping_amount(raw_shipping)
 
         reasons: list[str] = []
         if not title:
@@ -156,7 +140,9 @@ def sanitize_product_research_rows(
             reasons.append("missing_sold_date")
         elif sold_date is None:
             reasons.append("invalid_sold_date")
-        if price is None:
+        if _currency_conflicts(currency, raw_price):
+            reasons.append("conflicting_currency_evidence")
+        if sold_price is None:
             reasons.append("invalid_or_ambiguous_price")
         if policy.require_item_id and not item_id:
             reasons.append("missing_item_id")
@@ -164,12 +150,25 @@ def sanitize_product_research_rows(
             reasons.append("missing_currency")
         elif policy.require_usd and currency != "USD":
             reasons.append("non_usd_currency")
+        if policy.require_shipping and raw_shipping in (None, ""):
+            reasons.append("missing_shipping")
+        elif raw_shipping not in (None, "") and _currency_conflicts(currency, raw_shipping):
+            reasons.append("conflicting_shipping_currency")
+        elif policy.require_shipping and shipping is None:
+            reasons.append("invalid_or_missing_shipping")
+
+        landed_price = None
+        if sold_price is not None and shipping is not None:
+            landed_price = round(sold_price + shipping, 2)
 
         sanitized = {
             "item_id": item_id,
             "title": title,
             "sold_date": sold_date,
-            "sold_price": price,
+            "sold_price": sold_price,
+            "shipping": shipping,
+            "landed_price": landed_price,
+            "price_basis": "sold_price_plus_shipping" if landed_price is not None else None,
             "currency": currency,
         }
         sanitized["fingerprint"] = _fingerprint(sanitized)
@@ -182,7 +181,9 @@ def sanitize_product_research_rows(
             })
             continue
 
-        dedupe_key = item_id or sanitized["fingerprint"]
+        # Product Research can report multiple transactions from one multi-quantity
+        # listing. Match production identity at the available day granularity.
+        dedupe_key = f"{item_id}:{sold_date}" if item_id else sanitized["fingerprint"]
         prior_fingerprint = seen_fingerprints_by_key.get(dedupe_key)
         if prior_fingerprint is not None:
             if prior_fingerprint == sanitized["fingerprint"]:
@@ -191,7 +192,7 @@ def sanitize_product_research_rows(
                 conflicting_duplicates += 1
                 rejected.append({
                     "row_index": index,
-                    "reasons": ["conflicting_duplicate_item_id"],
+                    "reasons": ["conflicting_duplicate_evidence"],
                     "sanitized": sanitized,
                 })
             continue
