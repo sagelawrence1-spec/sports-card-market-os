@@ -19,6 +19,8 @@ class RadarCandidate:
     market_price_verified: bool
     blocking_reason: str | None
     source_urls: tuple[str, ...]
+    source_quality: str = "SINGLE_SOURCE"
+    source_host_count: int = 1
 
 
 @dataclass(frozen=True)
@@ -64,6 +66,11 @@ _OFFICIAL_CATALYST_DOMAINS = {
     "wnba.com",
     "nhl.com",
 }
+_SOURCE_QUALITY_RANK = {
+    "OFFICIAL": 2,
+    "CORROBORATED": 1,
+    "SINGLE_SOURCE": 0,
+}
 
 
 def _source_urls(payload: Mapping[str, Any]) -> tuple[str, ...]:
@@ -86,6 +93,17 @@ def _is_official_catalyst_host(host: str) -> bool:
     return any(host == domain or host.endswith(f".{domain}") for domain in _OFFICIAL_CATALYST_DOMAINS)
 
 
+def _source_quality(urls: tuple[str, ...]) -> tuple[str, int]:
+    """Return descriptive provenance quality without changing capital thresholds."""
+    hosts = {_source_host(value) for value in urls}
+    hosts.discard("")
+    if any(_is_official_catalyst_host(host) for host in hosts):
+        return "OFFICIAL", len(hosts)
+    if len(hosts) >= 2:
+        return "CORROBORATED", len(hosts)
+    return "SINGLE_SOURCE", len(hosts)
+
+
 def _catalyst_source_confirmed(kind: SignalKind, urls: tuple[str, ...]) -> bool:
     """Require official confirmation or independent corroboration for event catalysts.
 
@@ -97,11 +115,8 @@ def _catalyst_source_confirmed(kind: SignalKind, urls: tuple[str, ...]) -> bool:
     """
     if kind not in _CONFIRMATION_REQUIRED:
         return True
-    hosts = {_source_host(value) for value in urls}
-    hosts.discard("")
-    if any(_is_official_catalyst_host(host) for host in hosts):
-        return True
-    return len(hosts) >= 2
+    quality, _ = _source_quality(urls)
+    return quality in {"OFFICIAL", "CORROBORATED"}
 
 
 def _observation_key(payload: Mapping[str, Any]) -> tuple[str, str, str, str]:
@@ -124,6 +139,7 @@ def evaluate_live_observation(payload: Mapping[str, Any], *, engine: Opportunity
     """
     radar = engine or OpportunityEngine()
     urls = _source_urls(payload)
+    source_quality, source_host_count = _source_quality(urls)
     market_price_verified = bool(payload.get("market_price_verified", False))
     repricing = payload.get("market_repricing_pct")
     if market_price_verified and repricing is None:
@@ -144,7 +160,11 @@ def evaluate_live_observation(payload: Mapping[str, Any], *, engine: Opportunity
         importance=float(payload.get("importance", 50)),
         novelty=float(payload.get("novelty", 50)),
         market_impact=float(payload.get("market_impact", 50)),
-        metadata={"source_urls": urls},
+        metadata={
+            "source_urls": urls,
+            "source_quality": source_quality,
+            "source_host_count": source_host_count,
+        },
     )
     cards = tuple(
         CardExpression(
@@ -179,6 +199,8 @@ def evaluate_live_observation(payload: Mapping[str, Any], *, engine: Opportunity
             market_price_verified=False,
             blocking_reason="authoritative_market_repricing_unverified",
             source_urls=urls,
+            source_quality=source_quality,
+            source_host_count=source_host_count,
         )
     if not _catalyst_source_confirmed(kind, urls):
         return RadarCandidate(
@@ -187,6 +209,8 @@ def evaluate_live_observation(payload: Mapping[str, Any], *, engine: Opportunity
             market_price_verified=True,
             blocking_reason="catalyst_source_unconfirmed",
             source_urls=urls,
+            source_quality=source_quality,
+            source_host_count=source_host_count,
         )
     return RadarCandidate(
         thesis=thesis,
@@ -194,6 +218,8 @@ def evaluate_live_observation(payload: Mapping[str, Any], *, engine: Opportunity
         market_price_verified=True,
         blocking_reason=None,
         source_urls=urls,
+        source_quality=source_quality,
+        source_host_count=source_host_count,
     )
 
 
@@ -201,7 +227,8 @@ def scan_live_observations(payloads: Iterable[Mapping[str, Any]]) -> RadarBatchR
     """Evaluate a live Radar scan without letting one malformed event erase the scan.
 
     Duplicate event identities are collapsed before evaluation. Valid candidates are
-    ranked by edge conviction, then evidence confidence, with deterministic tie-breaks.
+    ranked by edge conviction, then evidence confidence, then source provenance as a
+    deterministic tie-break. Source quality never changes capital thresholds.
     Failures remain explicit so breadth metrics cannot silently ignore bad intake rows.
     """
     rows = list(payloads)
@@ -226,6 +253,7 @@ def scan_live_observations(payloads: Iterable[Mapping[str, Any]]) -> RadarBatchR
         key=lambda candidate: (
             -candidate.thesis.edge_conviction,
             -candidate.thesis.evidence_confidence,
+            -_SOURCE_QUALITY_RANK[candidate.source_quality],
             candidate.thesis.player_id,
             candidate.thesis.headline.casefold(),
         )

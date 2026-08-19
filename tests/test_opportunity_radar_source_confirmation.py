@@ -1,9 +1,9 @@
-from opportunity_radar import evaluate_live_observation
+from opportunity_radar import evaluate_live_observation, scan_live_observations
 
 
-def _payload(*, kind="CALL_UP", source_urls=None):
+def _payload(*, kind="CALL_UP", source_urls=None, player_id="mlb-test-prospect"):
     return {
-        "player_id": "mlb-test-prospect",
+        "player_id": player_id,
         "player": "Test Prospect",
         "sport": "MLB",
         "signal_kind": kind,
@@ -42,6 +42,8 @@ def test_single_unconfirmed_event_source_cannot_unlock_capital():
     assert candidate.market_price_verified is True
     assert candidate.decision == "WATCH"
     assert candidate.blocking_reason == "catalyst_source_unconfirmed"
+    assert candidate.source_quality == "SINGLE_SOURCE"
+    assert candidate.source_host_count == 1
 
 
 def test_two_independent_event_sources_can_unlock_capital():
@@ -56,6 +58,8 @@ def test_two_independent_event_sources_can_unlock_capital():
 
     assert candidate.decision == "START_POSITION"
     assert candidate.blocking_reason is None
+    assert candidate.source_quality == "CORROBORATED"
+    assert candidate.source_host_count == 2
 
 
 def test_single_official_league_source_can_unlock_capital():
@@ -65,6 +69,8 @@ def test_single_official_league_source_can_unlock_capital():
 
     assert candidate.decision == "START_POSITION"
     assert candidate.blocking_reason is None
+    assert candidate.source_quality == "OFFICIAL"
+    assert candidate.source_host_count == 1
 
 
 def test_single_source_performance_edge_is_not_over_gated():
@@ -74,3 +80,44 @@ def test_single_source_performance_edge_is_not_over_gated():
 
     assert candidate.decision == "ADD"
     assert candidate.blocking_reason is None
+    assert candidate.source_quality == "SINGLE_SOURCE"
+
+
+def test_source_quality_is_only_a_ranking_tiebreaker():
+    single = _payload(
+        kind="PERFORMANCE",
+        player_id="single-source",
+        source_urls=["https://local-report.example.com/breakout"],
+    )
+    official = _payload(
+        kind="PERFORMANCE",
+        player_id="official-source",
+        source_urls=["https://www.mlb.com/news/breakout"],
+    )
+
+    report = scan_live_observations([single, official])
+
+    assert [candidate.thesis.player_id for candidate in report.candidates] == [
+        "official-source",
+        "single-source",
+    ]
+    assert [candidate.source_quality for candidate in report.candidates] == [
+        "OFFICIAL",
+        "SINGLE_SOURCE",
+    ]
+
+
+def test_repeated_urls_from_same_host_do_not_fake_corroboration():
+    candidate = evaluate_live_observation(
+        _payload(
+            source_urls=[
+                "https://report.example.com/one",
+                "https://www.report.example.com/two",
+            ]
+        )
+    )
+
+    assert candidate.source_quality == "SINGLE_SOURCE"
+    assert candidate.source_host_count == 1
+    assert candidate.decision == "WATCH"
+    assert candidate.blocking_reason == "catalyst_source_unconfirmed"
