@@ -85,7 +85,11 @@ def collect_repricing_verification(
         sold_at = datetime.combine(sold_day, time(12, 0), tzinfo=timezone.utc).isoformat()
         comps.append(
             OpportunityPriceComp(
-                evidence_id=f"{record.provider}:{record.source_item_id}",
+                # Product Research can report separate purchases from one
+                # multi-quantity listing. Day granularity is the strongest stable
+                # transaction key currently available, so bind evidence identity to
+                # provider + item ID + sold date rather than item ID alone.
+                evidence_id=f"{record.provider}:{record.source_item_id}:{record.event_date}",
                 card_id=card_id,
                 sold_at=sold_at,
                 landed_price=float(record.price),
