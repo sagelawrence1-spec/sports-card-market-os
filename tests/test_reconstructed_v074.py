@@ -43,8 +43,8 @@ def test_calibration_grades_realized_values(): assert calibration_metrics([{"pre
 
 def write_bulk(path):
     with path.open("w",newline="") as f:
-        w=csv.DictWriter(f,fieldnames=["Item Title","Sold Price","Sold Date","Item ID"]); w.writeheader()
-        w.writerow({"Item Title":title(),"Sold Price":"$100","Sold Date":"2026-08-01","Item ID":"1"})
+        w=csv.DictWriter(f,fieldnames=["Item Title","Sold Price","Shipping","Sold Date","Item ID"]); w.writeheader()
+        w.writerow({"Item Title":title(),"Sold Price":"$100","Shipping":"$0.00","Sold Date":"2026-08-01","Item ID":"1"})
 
 def test_bulk_dry_run_does_not_write(tmp_path):
     path=tmp_path/"sold.csv"; write_bulk(path); db=tmp_path/"evidence.sqlite"
