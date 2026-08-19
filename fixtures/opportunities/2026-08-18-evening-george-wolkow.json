@@ -1,0 +1,44 @@
+[
+  {
+    "player_id": "mlb-george-wolkow",
+    "player": "George Wolkow",
+    "sport": "MLB",
+    "signal_kind": "PERFORMANCE",
+    "signal_description": "White Sox prospect George Wolkow hit two home runs and drove in four for High-A Winston-Salem on August 18, giving Radar a fresh performance-acceleration signal before any MLB call-up catalyst.",
+    "observed_at": "2026-08-18T23:59:00+00:00",
+    "headline": "George Wolkow's two-homer night creates a fresh pre-MLB hobby acceleration watch",
+    "why_now": "Wolkow remains pre-MLB, so a multi-homer performance can move prospect attention before a roster catalyst forces broader hobby repricing. The timing is early enough to investigate, but one performance report alone is not enough to justify capital without authoritative sold-market verification.",
+    "thesis": "George Wolkow is an ACCELERATION-stage EDGE candidate: fresh power performance is increasing attention while he remains pre-MLB. His 2024 Bowman Chrome Prospect Autograph CPA-GWO is the cleanest hobby expression, but the correct current action is WATCH_FOR_COMPS until authoritative Product Research data establishes whether the move is already priced in.",
+    "falsification": [
+      "The two-homer performance proves isolated and Wolkow's underlying production does not sustain the attention increase.",
+      "Authoritative sold comps show the 2024 Bowman Chrome Prospect Autograph already repriced beyond an attractive entry.",
+      "Developmental performance or promotion trajectory weakens enough to remove the near-term hobby catalyst path."
+    ],
+    "importance": 70,
+    "novelty": 75,
+    "market_impact": 58,
+    "factors": {
+      "situation_change": 66,
+      "narrative_potential": 73,
+      "collectibility": 79,
+      "hobby_lag": 82,
+      "attention_velocity": 71,
+      "evidence_maturity": 62,
+      "upside_asymmetry": 76
+    },
+    "market_price_verified": false,
+    "market_repricing_pct": null,
+    "source_urls": [
+      "https://www.southsidesox.com/chicago-white-sox-prospects/133703/white-sox-minor-league-update-august-17-18-2026",
+      "https://www.beckett.com/news/2024-bowman-baseball-cards/"
+    ],
+    "cards": [
+      {
+        "card_id": "2024-bowman-chrome-prospect-auto-cpa-gwo-george-wolkow",
+        "label": "2024 Bowman Chrome Prospect Autograph CPA-GWO George Wolkow",
+        "priority": 1,
+        "rationale": "Verified 2024 Bowman Chrome Prospect Autograph identity and the cleanest liquid prospect-card expression for a pre-MLB performance thesis."
+      }
+    ]
+  }
+]
