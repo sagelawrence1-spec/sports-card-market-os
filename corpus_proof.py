@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+from collections import Counter
 import csv
 from dataclasses import dataclass
 import json
@@ -60,11 +61,7 @@ def load_delimited_export(path: str | Path) -> list[dict[str, str]]:
     return [dict(row) for row in csv.DictReader(text.splitlines(), delimiter=delimiter)]
 
 
-def _prediction_for_title(
-    title: str,
-    assets: list[Mapping[str, Any]],
-    matcher: SportsCardEntityMatcher,
-) -> dict[str, Any]:
+def _prediction_for_title(title: str, assets: list[Mapping[str, Any]], matcher: SportsCardEntityMatcher) -> dict[str, Any]:
     """Run the same candidate ranking/ambiguity rule used by live evidence routing."""
     ranked = sorted(
         ((matcher.match(dict(asset), title), asset) for asset in assets),
@@ -79,20 +76,11 @@ def _prediction_for_title(
             "manual_review",
             {
                 **decision.diagnostics,
-                "ambiguous_candidates": [
-                    str(asset["card_id"]),
-                    str(ranked[1][1]["card_id"]),
-                ],
+                "ambiguous_candidates": [str(asset["card_id"]), str(ranked[1][1]["card_id"])],
             },
         )
 
-    status = (
-        "accepted"
-        if decision.accepted
-        else "review"
-        if decision.reason == "manual_review"
-        else "rejected"
-    )
+    status = "accepted" if decision.accepted else "review" if decision.reason == "manual_review" else "rejected"
     return {
         "predicted_status": status,
         "predicted_card_id": str(asset["card_id"]),
@@ -101,19 +89,26 @@ def _prediction_for_title(
     }
 
 
-def _generate_predictions(
-    accepted_rows: Iterable[Mapping[str, Any]],
-    assets: list[Mapping[str, Any]],
-) -> dict[str, dict[str, Any]]:
+def _evidence_ids_for_rows(accepted_rows: Iterable[Mapping[str, Any]]) -> list[tuple[str, Mapping[str, Any]]]:
+    rows = list(accepted_rows)
+    item_counts = Counter(str(row.get("item_id")) for row in rows if row.get("item_id"))
+    keyed: list[tuple[str, Mapping[str, Any]]] = []
+    for row in rows:
+        item_id = row.get("item_id")
+        if item_id:
+            item_id = str(item_id)
+            evidence_id = item_id if item_counts[item_id] == 1 else f"{item_id}:{row['sold_date']}"
+        else:
+            evidence_id = str(row["fingerprint"])
+        keyed.append((evidence_id, row))
+    return keyed
+
+
+def _generate_predictions(accepted_rows: Iterable[Mapping[str, Any]], assets: list[Mapping[str, Any]]) -> dict[str, dict[str, Any]]:
     matcher = SportsCardEntityMatcher()
     predictions: dict[str, dict[str, Any]] = {}
-    for row in accepted_rows:
-        evidence_id = str(row.get("item_id") or row["fingerprint"])
-        predictions[evidence_id] = _prediction_for_title(
-            str(row.get("title") or ""),
-            assets,
-            matcher,
-        )
+    for evidence_id, row in _evidence_ids_for_rows(accepted_rows):
+        predictions[evidence_id] = _prediction_for_title(str(row.get("title") or ""), assets, matcher)
     return predictions
 
 
@@ -133,21 +128,13 @@ def build_corpus_proof_report(
     )
     manifest = build_routing_corpus_manifest(
         candidates,
-        policy=CorpusManifestPolicy(
-            target_size=policy.target_cards,
-            max_sport_share=policy.max_sport_share,
-        ),
+        policy=CorpusManifestPolicy(target_size=policy.target_cards, max_sport_share=policy.max_sport_share),
         seed=seed,
     )
 
-    accepted_ids = {
-        str(row.get("item_id") or row["fingerprint"])
-        for row in intake["accepted"]
-    }
+    accepted_ids = {evidence_id for evidence_id, _ in _evidence_ids_for_rows(intake["accepted"])}
     selected_cards = {row["card_id"] for row in manifest["cards"]}
-    selected_assets = [
-        card for card in candidates if str(card.get("card_id")) in selected_cards
-    ]
+    selected_assets = [card for card in candidates if str(card.get("card_id")) in selected_cards]
     predictions = _generate_predictions(intake["accepted"], selected_assets)
 
     candidate_labels: dict[str, list[dict[str, Any]]] = {}
@@ -167,19 +154,14 @@ def build_corpus_proof_report(
             caller_predictions_ignored += 1
         candidate_labels.setdefault(evidence_id, []).append({
             "expected_status": row["expected_status"],
-            "expected_card_id": (
-                str(expected_card_id) if expected_card_id is not None else None
-            ),
+            "expected_card_id": str(expected_card_id) if expected_card_id is not None else None,
         })
 
     scoped_labels: list[dict[str, Any]] = []
     duplicate_labels = 0
     conflicting_label_ids: list[str] = []
     for evidence_id, rows in candidate_labels.items():
-        truths = {
-            (row["expected_status"], row["expected_card_id"])
-            for row in rows
-        }
+        truths = {(row["expected_status"], row["expected_card_id"]) for row in rows}
         duplicate_labels += max(len(rows) - 1, 0)
         if len(truths) != 1:
             conflicting_label_ids.append(evidence_id)
@@ -194,36 +176,16 @@ def build_corpus_proof_report(
             "expected_card_id": expected_card_id,
         })
 
-    routing = audit_routing(
-        labels_from_rows(scoped_labels),
-        min_labeled_rows=policy.min_labeled_rows,
-    )
+    routing = audit_routing(labels_from_rows(scoped_labels), min_labeled_rows=policy.min_labeled_rows)
 
     unique_labeled_ids = {row["evidence_id"] for row in scoped_labels}
-    label_coverage = (
-        len(unique_labeled_ids) / len(accepted_ids)
-        if accepted_ids
-        else None
-    )
+    label_coverage = len(unique_labeled_ids) / len(accepted_ids) if accepted_ids else None
     intake_retained_rows = intake["accepted_rows"] + intake["duplicates"]
-    intake_retention = (
-        intake_retained_rows / intake["input_rows"]
-        if intake["input_rows"]
-        else None
-    )
+    intake_retention = intake_retained_rows / intake["input_rows"] if intake["input_rows"] else None
 
-    negative_labels = [
-        row for row in scoped_labels if row.get("expected_status") == "rejected"
-    ]
-    negative_label_share = (
-        len(negative_labels) / len(scoped_labels) if scoped_labels else None
-    )
-
-    relevant = [
-        row
-        for row in scoped_labels
-        if row.get("expected_status") == "accepted" and row.get("expected_card_id")
-    ]
+    negative_labels = [row for row in scoped_labels if row.get("expected_status") == "rejected"]
+    negative_label_share = len(negative_labels) / len(scoped_labels) if scoped_labels else None
+    relevant = [row for row in scoped_labels if row.get("expected_status") == "accepted" and row.get("expected_card_id")]
     counts: dict[str, int] = {}
     for row in relevant:
         card_id = str(row["expected_card_id"])
@@ -246,13 +208,7 @@ def build_corpus_proof_report(
         blockers.append("conflicting_duplicate_labels")
     if label_coverage is None or label_coverage < policy.min_label_coverage:
         blockers.append("label_coverage_below_floor")
-    if (
-        policy.min_negative_label_share is not None
-        and (
-            negative_label_share is None
-            or negative_label_share < policy.min_negative_label_share
-        )
-    ):
+    if policy.min_negative_label_share is not None and (negative_label_share is None or negative_label_share < policy.min_negative_label_share):
         blockers.append("negative_label_share_below_floor")
     if distinct_labeled_cards < policy.target_cards:
         blockers.append("selected_card_coverage_incomplete")
@@ -260,10 +216,7 @@ def build_corpus_proof_report(
         blockers.append("single_card_overrepresented")
     if routing["review_rate"] is not None and routing["review_rate"] > policy.max_review_rate:
         blockers.append("review_rate_above_ceiling")
-    if (
-        routing["positive_recall"] is None
-        or routing["positive_recall"] < policy.min_positive_recall
-    ):
+    if routing["positive_recall"] is None or routing["positive_recall"] < policy.min_positive_recall:
         blockers.append("positive_recall_below_floor")
     blockers.extend(f"routing:{value}" for value in routing["blockers"])
 
@@ -310,10 +263,7 @@ def build_corpus_proof_report(
             "caller_predictions_ignored": caller_predictions_ignored,
         },
         "routing": routing,
-        "predictions": {
-            evidence_id: predictions[evidence_id]
-            for evidence_id in sorted(unique_labeled_ids)
-        },
+        "predictions": {evidence_id: predictions[evidence_id] for evidence_id in sorted(unique_labeled_ids)},
     }
 
 
