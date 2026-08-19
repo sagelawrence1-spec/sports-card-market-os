@@ -79,6 +79,8 @@ def apply_repricing_collection(
         "market_repricing_pct": float(repricing_pct) if verified else None,
         "verification_blocking_reason": blocker,
         "pricing_evidence_ids": list(evidence_ids),
+        "source_quality": candidate.source_quality,
+        "source_host_count": candidate.source_host_count,
         "decision": candidate.decision,
         "stage": candidate.thesis.stage.value,
         "engine_action": candidate.thesis.action.value,

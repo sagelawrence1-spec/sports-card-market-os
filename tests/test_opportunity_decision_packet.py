@@ -61,9 +61,23 @@ def test_packet_surfaces_actionable_call_with_evidence_and_falsification():
     assert packet["card"]["card_id"] == "card-10"
     assert packet["falsification"]
     assert packet["source_urls"]
+    assert packet["source_quality"] == "OFFICIAL"
+    assert packet["source_host_count"] == 1
     assert packet["observed_at"] == "2026-08-10T12:00:00+00:00"
     assert packet["observation_to_decision_lag_minutes"] == 11400.0
     assert packet["decision_latency_bucket"] == "OVER_24H"
+
+
+def test_packet_does_not_treat_card_reference_as_catalyst_corroboration():
+    observation = _observation()
+    observation["signal_kind"] = "PERFORMANCE"
+    observation["source_urls"] = [
+        "https://report.example.com/player-one-breakout",
+        "https://www.beckett.com/news/player-one-card-checklist/",
+    ]
+    packet = build_opportunity_decision_packet(observation, _collection())
+    assert packet["source_quality"] == "SINGLE_SOURCE"
+    assert packet["source_host_count"] == 1
 
 
 def test_packet_buckets_fast_decision_latency_without_changing_decision_logic():
@@ -115,3 +129,4 @@ def test_cli_writes_reviewable_packet(tmp_path):
     assert payload["schema"] == "opportunity-decision-packet.v1"
     assert payload["decision"] == "START_POSITION"
     assert payload["decision_latency_bucket"] == "OVER_24H"
+    assert payload["source_quality"] == "OFFICIAL"
