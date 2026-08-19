@@ -62,6 +62,22 @@ def test_two_independent_event_sources_can_unlock_capital():
     assert candidate.source_host_count == 2
 
 
+def test_card_reference_source_does_not_fake_event_corroboration():
+    candidate = evaluate_live_observation(
+        _payload(
+            source_urls=[
+                "https://report.example.com/test-prospect-call-up",
+                "https://www.beckett.com/news/test-card-checklist/",
+            ]
+        )
+    )
+
+    assert candidate.source_quality == "SINGLE_SOURCE"
+    assert candidate.source_host_count == 1
+    assert candidate.decision == "WATCH"
+    assert candidate.blocking_reason == "catalyst_source_unconfirmed"
+
+
 def test_single_official_league_source_can_unlock_capital():
     candidate = evaluate_live_observation(
         _payload(source_urls=["https://www.mlb.com/news/test-prospect-called-up"])
