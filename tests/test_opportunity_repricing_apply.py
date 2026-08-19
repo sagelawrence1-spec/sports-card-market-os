@@ -62,6 +62,8 @@ def test_verified_collection_upgrades_watch_to_engine_capital_decision():
     assert artifact["decision"] == "START_POSITION"
     assert artifact["stage"] == "ENTRY"
     assert artifact["verification_blocking_reason"] is None
+    assert artifact["source_quality"] == "OFFICIAL"
+    assert artifact["source_host_count"] == 1
 
 
 def test_large_verified_repricing_becomes_do_not_chase():
@@ -78,6 +80,7 @@ def test_unverified_collection_stays_non_actionable_and_preserves_blocker():
     assert artifact["market_price_verified"] is False
     assert artifact["decision"] == "WATCH_FOR_COMPS"
     assert artifact["verification_blocking_reason"] == "insufficient_post_catalyst_comps"
+    assert artifact["source_quality"] == "OFFICIAL"
 
 
 @pytest.mark.parametrize("field,value,error", [
@@ -113,6 +116,7 @@ def test_cli_emits_durable_decision_update(tmp_path):
     artifact = json.loads(output_path.read_text(encoding="utf-8"))
     assert artifact["decision"] == "START_POSITION"
     assert artifact["pricing_evidence_ids"]
+    assert artifact["source_quality"] == "OFFICIAL"
 
 
 def test_cli_fails_closed_on_non_object_collection(tmp_path):
