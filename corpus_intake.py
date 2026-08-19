@@ -8,8 +8,10 @@ import re
 from typing import Any, Iterable, Mapping
 
 from providers.ebay_product_research import (
+    _canonical_item_id,
     _currency as _provider_currency,
     _currency_conflicts,
+    _item_id_from_url,
     _money,
     _shipping_amount,
 )
@@ -29,6 +31,7 @@ SENSITIVE_KEYS = {
 }
 
 ID_KEYS = ("item_id", "ebay_item_id", "source_item_id")
+URL_KEYS = ("url", "item_url", "listing_url")
 TITLE_KEYS = ("title", "item_title", "listing_title")
 PRICE_KEYS = ("sold_price", "price", "sale_price")
 DATE_KEYS = ("sold_date", "date_sold", "sale_date", "end_date")
@@ -87,13 +90,26 @@ def _parse_sold_date(value: Any) -> str | None:
     return None
 
 
-def _stable_item_id(row: Mapping[str, Any]) -> str | None:
-    value = _first(row, ID_KEYS)
-    if value in (None, ""):
-        return None
-    text = _normalized_text(value)
-    match = re.search(r"(\d{8,})", text)
-    return match.group(1) if match else text
+def _resolve_item_id(row: Mapping[str, Any]) -> tuple[str | None, list[str]]:
+    """Mirror production Product Research identity validation.
+
+    Explicit IDs must be canonical numeric eBay item IDs. URL-derived identity is only
+    trusted when the URL is an eBay host, and contradictory explicit/URL identities fail
+    closed instead of being normalized into one proof record.
+    """
+    reasons: list[str] = []
+    raw_explicit_id = _first(row, ID_KEYS)
+    explicit_text = _normalized_text(raw_explicit_id)
+    explicit_id = _canonical_item_id(explicit_text)
+    if explicit_text and explicit_id is None:
+        reasons.append("invalid_item_id")
+
+    raw_url = _first(row, URL_KEYS)
+    url_id = _item_id_from_url(raw_url)
+    if explicit_id and url_id and explicit_id != url_id:
+        reasons.append("conflicting_item_id")
+
+    return explicit_id or url_id, reasons
 
 
 def _fingerprint(payload: Mapping[str, Any]) -> str:
@@ -106,11 +122,12 @@ def sanitize_product_research_rows(
     *,
     policy: CorpusIntakePolicy | None = None,
 ) -> dict[str, Any]:
-    """Normalize Product Research rows using the production provider's money rules.
+    """Normalize Product Research rows using the production provider's evidence rules.
 
     The proof corpus must not admit evidence the authoritative production provider would
-    reject. Monetary parsing, currency conflicts and shipping therefore share the provider
-    helpers, and accepted comps use the same sold-price-plus-shipping valuation basis.
+    reject. Monetary parsing, currency conflicts, shipping and sold-item identity therefore
+    share the provider helpers, and accepted comps use the same sold-price-plus-shipping
+    valuation basis.
     """
     policy = policy or CorpusIntakePolicy()
     accepted: list[dict[str, Any]] = []
@@ -125,7 +142,7 @@ def sanitize_product_research_rows(
         title = _normalized_text(_first(row, TITLE_KEYS))
         raw_sold_date = _first(row, DATE_KEYS)
         sold_date = _parse_sold_date(raw_sold_date)
-        item_id = _stable_item_id(row)
+        item_id, identity_reasons = _resolve_item_id(row)
         raw_price = _first(row, PRICE_KEYS)
         sold_price = _money(raw_price)
         explicit_currency = _first(row, CURRENCY_KEYS)
@@ -133,7 +150,7 @@ def sanitize_product_research_rows(
         raw_shipping = _first(row, SHIPPING_KEYS)
         shipping = _shipping_amount(raw_shipping)
 
-        reasons: list[str] = []
+        reasons: list[str] = list(identity_reasons)
         if not title:
             reasons.append("missing_title")
         if raw_sold_date in (None, ""):
@@ -145,7 +162,7 @@ def sanitize_product_research_rows(
         if sold_price is None:
             reasons.append("invalid_or_ambiguous_price")
         if policy.require_item_id and not item_id:
-            reasons.append("missing_item_id")
+            reasons.append("missing_stable_item_id")
         if policy.require_usd and currency is None:
             reasons.append("missing_currency")
         elif policy.require_usd and currency != "USD":
