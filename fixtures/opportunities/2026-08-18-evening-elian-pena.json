@@ -1,0 +1,44 @@
+[
+  {
+    "player_id": "mlb-elian-pena",
+    "player": "Elian Pena",
+    "sport": "MLB",
+    "signal_kind": "PERFORMANCE",
+    "signal_description": "Eighteen-year-old Mets shortstop Elian Pena was named the organization's Week 21 position-player standout after hitting .286/.400/.762 with three home runs and a double, extending a stronger August in which his production and offensive aggression both moved materially higher after a recent promotion to High-A Brooklyn.",
+    "observed_at": "2026-08-18T23:59:00+00:00",
+    "headline": "Elian Pena's post-promotion power jump creates an early hobby acceleration watch",
+    "why_now": "Pena is still only 18 and remains well before an MLB catalyst, which is exactly why the signal is interesting. A fresh three-homer week after promotion to High-A, paired with improved August production, creates a pre-consensus performance edge where prospect attention can accelerate before the broader hobby treats him like a near-term major leaguer.",
+    "thesis": "Elian Pena is an ACCELERATION-stage EDGE candidate: a very young premium-position prospect is showing a fresh power and approach inflection after promotion. His 2025 Bowman Chrome Prospect Autograph CPA-EP is the cleanest hobby expression, but no capital action is permitted until authoritative Product Research comps establish whether this performance jump is already priced in.",
+    "falsification": [
+      "Pena's post-promotion power spike quickly regresses and August proves to be a short-lived outlier.",
+      "Authoritative sold comps show the 2025 Bowman Chrome Prospect Autograph already repriced beyond an attractive entry.",
+      "His swing decisions or contact quality deteriorate as High-A pitching adjusts, undermining the developmental thesis."
+    ],
+    "importance": 74,
+    "novelty": 79,
+    "market_impact": 62,
+    "factors": {
+      "situation_change": 72,
+      "narrative_potential": 78,
+      "collectibility": 80,
+      "hobby_lag": 82,
+      "attention_velocity": 70,
+      "evidence_maturity": 67,
+      "upside_asymmetry": 78
+    },
+    "market_price_verified": false,
+    "market_repricing_pct": null,
+    "source_urls": [
+      "https://www.amazinavenue.com/new-york-mets-prospects-minor-leagues/99559/mets-minor-league-players-of-the-week-week-twenty-one-inf-elian-pena-rhp-jose-chirinos",
+      "https://www.beckett.com/news/2025-bowman-chrome-baseball-cards/"
+    ],
+    "cards": [
+      {
+        "card_id": "2025-bowman-chrome-prospect-auto-cpa-ep-elian-pena",
+        "label": "2025 Bowman Chrome Prospect Autograph CPA-EP Elian Pena",
+        "priority": 1,
+        "rationale": "Verified Bowman Chrome Prospect Autograph identity and the cleanest liquid prospect-card expression for a pre-MLB developmental thesis."
+      }
+    ]
+  }
+]
