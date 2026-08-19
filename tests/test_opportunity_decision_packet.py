@@ -17,7 +17,7 @@ def _observation():
         "why_now": "Attention can outrun repricing after the promotion.",
         "thesis": "The first Bowman remains attractive if sold comps have not materially repriced.",
         "falsification": ["Role disappears", "Market reprices beyond chase threshold"],
-        "source_urls": ["https://example.com/player-one"],
+        "source_urls": ["https://www.mlb.com/news/player-one-called-up"],
         "factors": {
             "situation_change": 90,
             "narrative_potential": 90,
