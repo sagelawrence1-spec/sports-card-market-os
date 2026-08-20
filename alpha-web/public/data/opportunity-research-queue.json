@@ -1,0 +1,51 @@
+{
+  "schema": "opportunity-research-queue-public.v1",
+  "source_radar_generated_at": "2026-08-19T19:57:00-07:00",
+  "source_type": "EBAY_PRODUCT_RESEARCH",
+  "status": "AWAITING_EXPORTS",
+  "requested_count": 3,
+  "items": [
+    {
+      "queue_position": 1,
+      "collection_priority": "P1",
+      "player_id": "mlb-elian-pena",
+      "player": "Elian Pena",
+      "card_id": "2025-bowman-chrome-prospect-auto-cpa-ep-elian-pena",
+      "card_label": "2025 Bowman Chrome Prospect Autograph CPA-EP Elian Pena",
+      "catalyst_at": "2026-08-18T23:59:00+00:00",
+      "sold_window_start": "2026-07-19T23:59:00+00:00",
+      "sold_window_end": "2026-08-20T02:57:00+00:00",
+      "window_status": "COLLECTION_OPEN",
+      "expected_export_filename": "01-elian-pena-2025-bowman-chrome-prospect-autograph-cpa-ep-elian-pena.csv",
+      "status": "MISSING_EXPORT"
+    },
+    {
+      "queue_position": 2,
+      "collection_priority": "P1",
+      "player_id": "mlb-george-wolkow",
+      "player": "George Wolkow",
+      "card_id": "2024-bowman-chrome-prospect-auto-cpa-gwo-george-wolkow",
+      "card_label": "2024 Bowman Chrome Prospect Autograph CPA-GWO George Wolkow",
+      "catalyst_at": "2026-08-18T23:59:00+00:00",
+      "sold_window_start": "2026-07-19T23:59:00+00:00",
+      "sold_window_end": "2026-08-20T02:57:00+00:00",
+      "window_status": "COLLECTION_OPEN",
+      "expected_export_filename": "02-george-wolkow-2024-bowman-chrome-prospect-autograph-cpa-gwo-george-wolkow.csv",
+      "status": "MISSING_EXPORT"
+    },
+    {
+      "queue_position": 3,
+      "collection_priority": "P1",
+      "player_id": "nfl-kaytron-allen",
+      "player": "Kaytron Allen",
+      "card_id": "2025-bowman-chrome-university-prospect-auto-bca-ka-kaytron-allen",
+      "card_label": "2025 Bowman Chrome University Prospect Autograph BCA-KA Kaytron Allen",
+      "catalyst_at": "2026-08-15T23:00:00+00:00",
+      "sold_window_start": "2026-07-16T23:00:00+00:00",
+      "sold_window_end": "2026-08-20T02:57:00+00:00",
+      "window_status": "COLLECTION_OPEN",
+      "expected_export_filename": "03-kaytron-allen-2025-bowman-chrome-university-prospect-autograph-bca-ka-kaytron-allen.csv",
+      "status": "MISSING_EXPORT"
+    }
+  ]
+}
