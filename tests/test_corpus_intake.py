@@ -35,6 +35,7 @@ def test_sanitizer_removes_sensitive_fields_and_preserves_landed_evidence():
     assert row["landed_price"] == 257.5
     assert row["price_basis"] == "sold_price_plus_shipping"
     assert row["sold_date"] == "2026-08-01"
+    assert row["quantity"] is None
     assert "seller_username" not in row
     assert "buyer_name" not in row
 
@@ -144,6 +145,27 @@ def test_shipping_currency_conflict_fails_closed():
     result = sanitize_product_research_rows([_row(Shipping="C$5.00")])
     assert result["accepted_rows"] == 0
     assert "conflicting_shipping_currency" in result["rejected"][0]["reasons"]
+
+
+def test_quantity_one_is_preserved_when_exported():
+    result = sanitize_product_research_rows([_row(Quantity="1")])
+    assert result["accepted_rows"] == 1
+    assert result["accepted"][0]["quantity"] == 1
+
+
+def test_multi_unit_sale_fails_closed_like_production_provider():
+    result = sanitize_product_research_rows([_row(Quantity="2")])
+    assert result["accepted_rows"] == 0
+    assert "multi_unit_sale" in result["rejected"][0]["reasons"]
+
+
+def test_malformed_or_blank_exported_quantity_fails_closed():
+    malformed = sanitize_product_research_rows([_row(Quantity="two")])
+    blank = sanitize_product_research_rows([_row(Quantity="")])
+    assert malformed["accepted_rows"] == 0
+    assert blank["accepted_rows"] == 0
+    assert "invalid_or_missing_quantity" in malformed["rejected"][0]["reasons"]
+    assert "invalid_or_missing_quantity" in blank["rejected"][0]["reasons"]
 
 
 def test_common_sold_date_format_is_normalized_to_iso():
