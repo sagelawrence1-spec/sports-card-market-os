@@ -304,7 +304,7 @@ class SportsCardEntityMatcher:
             if found:
                 return MatchDecision(False,30.0,"unexpected_parallel",{**diag,"unexpected_parallel":sorted(found)})
 
-        auto_terms={"auto","autograph","signed"}
+        auto_terms={"auto","autograph","autographs","signed"}
         has_auto=bool(auto_terms & title_tokens)
         diag["auto_title"]=int(has_auto)
         if autograph:
