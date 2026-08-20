@@ -19,12 +19,12 @@ def test_public_radar_builds_exact_product_research_queue():
     result = build_live_research_manifest(_load(RADAR_PATH), assets=_load(ASSETS_PATH))
 
     assert result["schema"] == "opportunity-live-research-manifest.v1"
-    assert result["candidate_count"] == 3
+    assert result["candidate_count"] == 6
     plan = result["repricing_plan"]
     manifest = result["collection_manifest"]
-    assert plan["request_count"] == 3
-    assert manifest["selected_request_count"] == 3
-    assert manifest["priority_counts"] == {"P0": 0, "P1": 3, "P2": 0}
+    assert plan["request_count"] == 6
+    assert manifest["selected_request_count"] == 6
+    assert manifest["priority_counts"] == {"P0": 0, "P1": 6, "P2": 0}
 
     radar = _load(RADAR_PATH)
     expected_cards = {row["card_id"] for row in radar["candidates"]}
@@ -36,6 +36,9 @@ def test_public_radar_builds_exact_product_research_queue():
     assert by_player["Elian Pena"]["search_query"] == "2025 Elian Pena Bowman Chrome CPA-EP autograph"
     assert by_player["George Wolkow"]["search_query"] == "2024 George Wolkow Bowman Chrome CPA-GWO autograph"
     assert by_player["Kaytron Allen"]["search_query"] == "2025 Kaytron Allen Bowman Chrome University BCA-KA autograph"
+    assert by_player["Franklin Arias"]["search_query"] == "2025 Franklin Arias Bowman Chrome CPA-FA autograph"
+    assert by_player["Bo Davidson"]["search_query"] == "2025 Bo Davidson Bowman Chrome CPA-BD autograph"
+    assert by_player["Caleb Bonemer"]["search_query"] == "2024 Caleb Bonemer Bowman Draft Chrome CPA-CBO autograph"
     assert all(row["repricing_request"]["search_query"] == row["search_query"] for row in manifest["items"])
     assert all(row["search_query"] in row["collection_instruction"] for row in manifest["items"])
 
@@ -86,5 +89,5 @@ def test_cli_emits_live_collection_manifest(tmp_path):
     ])
     assert rc == 0
     payload = json.loads(output.read_text(encoding="utf-8"))
-    assert payload["collection_manifest"]["selected_request_count"] == 3
+    assert payload["collection_manifest"]["selected_request_count"] == 6
     assert all(item["search_query"] for item in payload["collection_manifest"]["items"])
