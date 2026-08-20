@@ -117,7 +117,7 @@ def test_dollar_price_can_supply_usd_when_currency_column_is_absent():
 def test_qualified_foreign_dollar_is_not_assumed_usd():
     result = sanitize_product_research_rows([_row(Currency="", **{"Sold Price": "NZD $125.00"})])
     assert result["accepted_rows"] == 0
-    assert "missing_currency" in result["rejected"][0]["reasons"]
+    assert "non_usd_currency" in result["rejected"][0]["reasons"]
 
 
 def test_explicit_currency_conflict_fails_closed():
