@@ -8,6 +8,7 @@ atomically persist READY decisions.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -35,6 +36,39 @@ def _write_json(payload: Any, path: str) -> None:
         sys.stdout.write(rendered)
         return
     Path(path).write_text(rendered, encoding="utf-8")
+
+
+def _source_fingerprint(path: Path) -> tuple[str, int]:
+    raw = path.read_bytes()
+    return hashlib.sha256(raw).hexdigest(), len(raw)
+
+
+def _verify_receipted_exports_unchanged(receipts: Sequence[Mapping[str, Any]]) -> None:
+    """Bind downstream collection to the exact raw exports that were receipted.
+
+    Collection reopens Product Research CSVs after their receipts are built. If a file
+    changes in that gap, the receipt would otherwise describe different bytes from the
+    evidence actually consumed by repricing. Fail before decision construction.
+    """
+    for item in receipts:
+        if item.get("status") != "RECEIPT_READY":
+            continue
+        csv_path = Path(str(item.get("csv_path", "")))
+        receipt = item.get("receipt")
+        if not isinstance(receipt, Mapping):
+            raise ValueError("ready Product Research receipt is missing receipt payload")
+        source = receipt.get("source")
+        if not isinstance(source, Mapping):
+            raise ValueError("Product Research receipt is missing source fingerprint")
+        expected_sha = str(source.get("sha256", "")).strip()
+        expected_size = source.get("size_bytes")
+        if not expected_sha or not isinstance(expected_size, int):
+            raise ValueError("Product Research receipt has invalid source fingerprint")
+        if not csv_path.is_file():
+            raise ValueError(f"Product Research export disappeared after receipt: {csv_path}")
+        current_sha, current_size = _source_fingerprint(csv_path)
+        if current_sha != expected_sha or current_size != expected_size:
+            raise ValueError(f"Product Research export changed after receipt: {csv_path}")
 
 
 def execute_opportunity_research_run(
@@ -81,6 +115,7 @@ def execute_opportunity_research_run(
         })
 
     collection_batch = collect_manifest_batch(manifest, assets=assets, export_dir=root)
+    _verify_receipted_exports_unchanged(receipts)
     decision_batch = build_opportunity_decision_batch(collection_batch, observations=observations)
     persistence = None
     if ledger_path is not None:
