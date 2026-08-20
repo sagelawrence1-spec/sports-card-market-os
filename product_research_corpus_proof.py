@@ -2,8 +2,9 @@
 
 `corpus_proof.build_corpus_proof_report` remains useful for leakage-safe in-memory
 measurement. This wrapper is the authoritative file-based path: it creates the hardened
-Product Research receipt, verifies that receipt against the same export path, then builds
-the routing proof only after the source binding is proven.
+Product Research receipt, verifies that receipt against the same export path, binds the
+candidate registry and adjudicated label set used for proof generation, then builds the
+routing proof only after the source binding is proven.
 """
 from __future__ import annotations
 
@@ -24,6 +25,28 @@ EXPECTED_PRICE_BASIS = "sold_price_plus_shipping"
 def _fingerprint(path: Path) -> tuple[str, int]:
     raw = path.read_bytes()
     return hashlib.sha256(raw).hexdigest(), len(raw)
+
+
+def _manifest_binding(rows: list[Mapping[str, Any]]) -> dict[str, Any]:
+    """Fingerprint proof inputs independent of mapping key order.
+
+    List order remains significant because corpus selection and label adjudication are
+    ordered inputs to proof generation. Mapping key order is normalized so semantically
+    identical JSON objects produce the same binding.
+    """
+
+    canonical = json.dumps(
+        rows,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+        default=str,
+    ).encode("utf-8")
+    return {
+        "sha256": hashlib.sha256(canonical).hexdigest(),
+        "rows": len(rows),
+        "canonical_bytes": len(canonical),
+    }
 
 
 def _verify_receipt_source(path: Path, receipt: Mapping[str, Any], *, proof_input_rows: int) -> dict[str, Any]:
@@ -71,12 +94,16 @@ def build_product_research_corpus_proof(
     seed: str = "routing-corpus-v1",
     query: str = "",
 ) -> dict[str, Any]:
-    """Build a leakage-safe routing proof cryptographically bound to one PR export."""
+    """Build a leakage-safe routing proof bound to exact export, candidates, and labels."""
 
     source = Path(export_path)
     receipt = build_receipt(source, query=query)
     raw_rows = load_delimited_export(source)
     binding = _verify_receipt_source(source, receipt, proof_input_rows=len(raw_rows))
+    proof_inputs = {
+        "candidates": _manifest_binding(candidates),
+        "labels": _manifest_binding(label_rows),
+    }
     proof = build_corpus_proof_report(raw_rows, candidates, label_rows, policy=policy, seed=seed)
 
     return {
@@ -85,13 +112,14 @@ def build_product_research_corpus_proof(
             "schema": SCHEMA,
             "binding": binding,
             "receipt": receipt,
+            "proof_inputs": proof_inputs,
         },
     }
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Build a routing proof bound to the exact eBay Product Research export bytes."
+        description="Build a routing proof bound to exact eBay Product Research export, candidate, and label inputs."
     )
     parser.add_argument("--export", required=True)
     parser.add_argument("--candidates", required=True)
