@@ -7,9 +7,10 @@ structured extracts captured from Product Research without changing downstream l
 
 Accepted input: CSV with flexible aliases for title, sold price, sold date, item ID, URL,
 and shipping. Rows fail closed when title, sold date, price, USD currency evidence,
-stable sold-item identity, an explicitly exported shipping amount, or duplicate sold
-evidence is ambiguous. Shipping provenance is required so authoritative comps always
-share the same landed-price basis.
+stable sold-item identity, an explicitly exported shipping amount, quantity, or duplicate
+sold evidence is ambiguous. Shipping provenance is required so authoritative comps always
+share the same landed-price basis. Explicit multi-unit sales are rejected so a bundled
+transaction cannot masquerade as one single-card comp.
 """
 import csv, re
 from collections import Counter, defaultdict
@@ -27,6 +28,7 @@ ALIASES={
     "currency":["currency","currency code"],
     "shipping":["shipping","shipping price","shipping cost","shipping and handling"],
     "format":["listing format","format","sale type","selling format"],
+    "quantity":["quantity","qty","sold quantity"],
 }
 
 _SOLD_DATE_FORMATS=("%Y-%m-%d","%m/%d/%Y","%m/%d/%y","%b %d, %Y","%B %d, %Y")
@@ -73,6 +75,12 @@ def _shipping_amount(v):
     if text.lower() in {"free","free shipping"}: return 0.0
     value=_parsed_money_value(text)
     return value if value is not None and value>=0 else None
+
+def _sold_quantity(v):
+    text=" ".join(str(v or "").strip().split())
+    if not text or not text.isdigit(): return None
+    quantity=int(text)
+    return quantity if quantity>0 else None
 
 def _sold_date(v):
     text=" ".join(str(v or "").strip().split())
@@ -155,6 +163,16 @@ class EbayProductResearchProvider:
             if not title:
                 rejection_reasons["missing_title"]+=1
                 continue
+            if cols["quantity"]:
+                quantity=_sold_quantity(r.get(cols["quantity"]))
+                if quantity is None:
+                    rejection_reasons["invalid_or_missing_quantity"]+=1
+                    continue
+                if quantity!=1:
+                    rejection_reasons["multi_unit_sale"]+=1
+                    continue
+            else:
+                quantity=None
             if _currency_conflicts(currency,raw_price):
                 rejection_reasons["conflicting_currency_evidence"]+=1
                 continue
@@ -199,6 +217,7 @@ class EbayProductResearchProvider:
             payload["normalized_sold_price"] = sold_price
             payload["normalized_shipping"] = shipping
             payload["normalized_listing_format"] = r.get(cols["format"]) if cols["format"] else None
+            payload["normalized_quantity"] = quantity
             candidates.append(EvidenceRecord(
                 provider=self.provider_name,record_type="sold",source_item_id=sid,
                 title=title,price=price,event_date=sold_date,
@@ -219,6 +238,7 @@ class EbayProductResearchProvider:
                 r.payload.get("price_basis"),
                 r.payload.get("normalized_sold_price"),
                 r.payload.get("normalized_shipping"),
+                r.payload.get("normalized_quantity"),
             ) for r in group}
             if len(fingerprints)>1:
                 rejection_reasons["conflicting_duplicate_evidence"]+=len(group)
