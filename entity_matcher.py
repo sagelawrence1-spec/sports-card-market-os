@@ -18,11 +18,13 @@ DISTINCTIVE_SET_MARKERS={
     "bowman","prizm","select","optic","mosaic","finest","heritage","stadium",
     "inception","museum","definitive","transcendent","immaculate","flawless","now","cosmic",
 }
-PARALLEL_IDENTITY_MARKERS={
-    "silver","gold","red","blue","green","orange","purple","black","pink","aqua","teal",
-    "sepia","negative","xfractor","superfractor","wave","shimmer","sapphire","atomic","speckle",
-    "raywave","lava","variation",
+COLOR_PARALLEL_MARKERS={"gold","red","blue","green","orange","purple","black","pink","aqua","teal"}
+DISTINCT_PARALLEL_MARKERS={
+    "silver","sepia","negative","xfractor","superfractor","wave","shimmer","sapphire","atomic",
+    "speckle","raywave","lava","variation",
 }
+PARALLEL_IDENTITY_MARKERS=COLOR_PARALLEL_MARKERS | DISTINCT_PARALLEL_MARKERS
+PARALLEL_CONTEXT_TERMS={"refractor","prizm","parallel","wave","shimmer","sapphire","atomic","speckle","raywave","lava"}
 
 
 def norm(s:str)->str:
@@ -32,7 +34,8 @@ def norm(s:str)->str:
 
 
 def toks(s:str)->set:
-    return {x for x in norm(s).split() if x not in STOP and len(x)>1}
+    value=norm(s).replace("#"," ")
+    return {x for x in value.split() if x not in STOP and len(x)>1}
 
 
 def aliases_for_parallel(p:str)->set:
@@ -69,13 +72,25 @@ def observed_graders(title_tokens:set) -> set[str]:
     }
 
 
-def card_number_evidence(cardnum:str, title:str) -> tuple[bool,list[str]]:
-    """Return whether the target card number is explicitly supported by title evidence.
+def observed_parallel_markers(title:str) -> set[str]:
+    """Extract hard parallel markers without mistaking team/color words for parallels."""
+    t=norm(title)
+    title_tokens=toks(t)
+    found=DISTINCT_PARALLEL_MARKERS & title_tokens
+    contexts="|".join(sorted(PARALLEL_CONTEXT_TERMS))
+    for color in COLOR_PARALLEL_MARKERS & title_tokens:
+        contextual=bool(re.search(
+            rf"\b{re.escape(color)}\b(?:\s+[a-z0-9.+-]+){{0,3}}\s+(?:{contexts})\b",
+            t,
+        ))
+        numbered=bool(re.search(rf"\b{re.escape(color)}\b[^/]{{0,30}}/\s*\d+\b",t))
+        if contextual or numbered:
+            found.add(color)
+    return found
 
-    Numeric card numbers require an identity marker (#, No., or Card) so unrelated
-    values such as PSA grades cannot masquerade as card-number evidence. Alphanumeric
-    catalog numbers remain safe to match as standalone tokens (for example HMT1).
-    """
+
+def card_number_evidence(cardnum:str, title:str) -> tuple[bool,list[str]]:
+    """Return whether the target card number is explicitly supported by title evidence."""
     if not cardnum:
         return False,[]
     if cardnum.isdigit():
@@ -83,8 +98,16 @@ def card_number_evidence(cardnum:str, title:str) -> tuple[bool,list[str]]:
     else:
         pat=rf"(?<![a-z0-9])(?:#\s*|no\.?\s*|card\s+#?\s*)?{re.escape(cardnum)}(?![a-z0-9])"
     matched=bool(re.search(pat,title))
-    explicit_nums=re.findall(r"(?:#\s*|no\.?\s*|card\s+#?\s*)([a-z0-9-]+)",title)
+    raw_explicit=re.findall(r"(?:#\s*|no\.?\s*|card\s+#?\s*)([a-z0-9-]+)",title)
+    explicit_nums=[value for value in raw_explicit if any(ch.isdigit() for ch in value) or "-" in value]
     return matched,explicit_nums
+
+
+def can_infer_missing_card_number(cardnum:str,title:str) -> bool:
+    """Conservative observed fallback for Bowman Chrome CPA Prospect Autographs."""
+    if not cardnum.startswith("cpa-"):
+        return False
+    return bool(re.search(r"\bprospect\s+autographs?\b",norm(title)))
 
 
 @dataclass
@@ -152,7 +175,11 @@ class SportsCardEntityMatcher:
                     same_prefix=[tok for tok in title_tokens if tok.startswith(prefix) and tok!=cardnum and re.match(rf"^{re.escape(prefix)}[0-9]",tok)]
                 if explicit_nums or same_prefix:
                     return MatchDecision(False,20.0,"wrong_card_number",{**diag,"explicit_card_numbers":explicit_nums,"same_prefix_numbers":same_prefix})
-                return MatchDecision(False,70.0,"manual_review",{**diag,"review_reason":"card_number_not_confirmed"})
+                if can_infer_missing_card_number(cardnum,t):
+                    score += 4
+                    diag["card_number_inferred"]=1
+                else:
+                    return MatchDecision(False,70.0,"manual_review",{**diag,"review_reason":"card_number_not_confirmed"})
 
         set_tokens=toks(setname)
         if set_tokens:
@@ -251,10 +278,10 @@ class SportsCardEntityMatcher:
             if observed:
                 return MatchDecision(False,28.0,"raw_vs_graded_mismatch",{**diag,"unexpected_grader":sorted(observed)})
 
+        title_parallel_markers=observed_parallel_markers(t)
         if parallel and parallel not in {"base","base card"}:
             palias=aliases_for_parallel(parallel)
             target_parallel_markers=PARALLEL_IDENTITY_MARKERS & toks(parallel)
-            title_parallel_markers=PARALLEL_IDENTITY_MARKERS & title_tokens
             diag["target_parallel_markers"]=sorted(target_parallel_markers)
             diag["title_parallel_markers"]=sorted(title_parallel_markers)
 
@@ -273,7 +300,7 @@ class SportsCardEntityMatcher:
             else:
                 return MatchDecision(False,70.0,"manual_review",{**diag,"review_reason":"parallel_not_confirmed"})
         else:
-            found=(PARALLEL_IDENTITY_MARKERS | {"refractor"}) & title_tokens
+            found=title_parallel_markers | ({"refractor"} & title_tokens)
             if found:
                 return MatchDecision(False,30.0,"unexpected_parallel",{**diag,"unexpected_parallel":sorted(found)})
 

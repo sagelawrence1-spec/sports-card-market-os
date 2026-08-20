@@ -15,29 +15,18 @@ def test_public_ebay_sold_bootstrap_measures_real_matcher_behavior():
 
     rows = []
     for evidence in corpus["rows"]:
-        asset = assets[evidence["card_id"]]
         rows.append({
-            "asset": asset,
+            "asset": assets[evidence["card_id"]],
             "title": evidence["title"],
             "expected_match": evidence["expected_match"],
         })
 
-    result = evaluate_entity_resolution(rows, matcher=SportsCardEntityMatcher())
-    overall = result["overall"]
-
+    overall = evaluate_entity_resolution(rows, matcher=SportsCardEntityMatcher())["overall"]
     assert overall["rows"] == len(corpus["rows"])
     assert overall["false_accepts"] == 0
-    assert overall["precision"] == 1.0
-    assert overall["recall"] == 0.3333
-    assert overall["review_rate"] == 0.3333
-
-    release_gate_ready = (
-        overall["false_accepts"] == 0
-        and overall["precision"] >= 0.99
-        and overall["recall"] >= 0.80
-        and overall["review_rate"] <= 0.35
-    )
-    assert release_gate_ready is False
+    assert overall["precision"] >= 0.99
+    assert overall["recall"] >= 0.80
+    assert overall["review_rate"] <= 0.35
 
 
 def test_public_bootstrap_price_subset_is_explicitly_non_product_research():
