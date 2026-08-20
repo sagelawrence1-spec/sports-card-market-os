@@ -34,5 +34,41 @@
     "autograph": 1,
     "label": "2025 Bowman Chrome University Prospect Autograph BCA-KA Kaytron Allen",
     "registry_source": "live_opportunity_verified_identity"
+  },
+  "2025-bowman-chrome-prospect-auto-cpa-fa-franklin-arias": {
+    "card_id": "2025-bowman-chrome-prospect-auto-cpa-fa-franklin-arias",
+    "player": "Franklin Arias",
+    "year": 2025,
+    "manufacturer": "Topps",
+    "set_name": "Bowman Chrome",
+    "card_number": "CPA-FA",
+    "parallel": "base",
+    "autograph": 1,
+    "label": "2025 Bowman Chrome Prospect Autograph CPA-FA Franklin Arias",
+    "registry_source": "live_opportunity_verified_identity"
+  },
+  "2025-bowman-chrome-prospect-auto-cpa-bd-bo-davidson": {
+    "card_id": "2025-bowman-chrome-prospect-auto-cpa-bd-bo-davidson",
+    "player": "Bo Davidson",
+    "year": 2025,
+    "manufacturer": "Topps",
+    "set_name": "Bowman Chrome",
+    "card_number": "CPA-BD",
+    "parallel": "base",
+    "autograph": 1,
+    "label": "2025 Bowman Chrome Prospect Autograph CPA-BD Bo Davidson",
+    "registry_source": "live_opportunity_verified_identity"
+  },
+  "2024-bowman-draft-chrome-prospect-auto-cpa-cbo-caleb-bonemer": {
+    "card_id": "2024-bowman-draft-chrome-prospect-auto-cpa-cbo-caleb-bonemer",
+    "player": "Caleb Bonemer",
+    "year": 2024,
+    "manufacturer": "Topps",
+    "set_name": "Bowman Draft Chrome",
+    "card_number": "CPA-CBO",
+    "parallel": "base",
+    "autograph": 1,
+    "label": "2024 Bowman Draft Chrome Prospect Autograph CPA-CBO Caleb Bonemer",
+    "registry_source": "live_opportunity_verified_identity"
   }
 }
