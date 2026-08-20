@@ -14,6 +14,7 @@ from providers.ebay_product_research import (
     _item_id_from_url,
     _money,
     _shipping_amount,
+    _sold_quantity,
 )
 
 
@@ -37,6 +38,7 @@ PRICE_KEYS = ("sold_price", "price", "sale_price")
 DATE_KEYS = ("sold_date", "date_sold", "sale_date", "end_date")
 CURRENCY_KEYS = ("currency", "currency_code")
 SHIPPING_KEYS = ("shipping", "shipping_price", "shipping_cost")
+QUANTITY_KEYS = ("quantity", "qty", "sold_quantity")
 
 _HEADER_SEP_RE = re.compile(r"[^a-z0-9]+")
 _SOLD_DATE_FORMATS = (
@@ -125,9 +127,9 @@ def sanitize_product_research_rows(
     """Normalize Product Research rows using the production provider's evidence rules.
 
     The proof corpus must not admit evidence the authoritative production provider would
-    reject. Monetary parsing, currency conflicts, shipping and sold-item identity therefore
-    share the provider helpers, and accepted comps use the same sold-price-plus-shipping
-    valuation basis.
+    reject. Monetary parsing, currency conflicts, shipping, quantity and sold-item identity
+    therefore share the provider helpers, and accepted comps use the same
+    sold-price-plus-shipping valuation basis.
     """
     policy = policy or CorpusIntakePolicy()
     accepted: list[dict[str, Any]] = []
@@ -149,6 +151,9 @@ def sanitize_product_research_rows(
         currency = _provider_currency(explicit_currency, raw_price)
         raw_shipping = _first(row, SHIPPING_KEYS)
         shipping = _shipping_amount(raw_shipping)
+        quantity_key_present = any(key in row for key in QUANTITY_KEYS)
+        raw_quantity = _first(row, QUANTITY_KEYS)
+        quantity = _sold_quantity(raw_quantity) if quantity_key_present else None
 
         reasons: list[str] = list(identity_reasons)
         if not title:
@@ -173,6 +178,11 @@ def sanitize_product_research_rows(
             reasons.append("conflicting_shipping_currency")
         elif policy.require_shipping and shipping is None:
             reasons.append("invalid_or_missing_shipping")
+        if quantity_key_present:
+            if quantity is None:
+                reasons.append("invalid_or_missing_quantity")
+            elif quantity != 1:
+                reasons.append("multi_unit_sale")
 
         landed_price = None
         if sold_price is not None and shipping is not None:
@@ -187,6 +197,7 @@ def sanitize_product_research_rows(
             "landed_price": landed_price,
             "price_basis": "sold_price_plus_shipping" if landed_price is not None else None,
             "currency": currency,
+            "quantity": quantity,
         }
         sanitized["fingerprint"] = _fingerprint(sanitized)
 
