@@ -1,6 +1,6 @@
 {
   "schema": "opportunity-radar-public.v1",
-  "generated_at": "2026-08-19T19:57:00-07:00",
+  "generated_at": "2026-08-20T11:01:57-07:00",
   "status": "evidence_gated",
   "candidates": [
     {
@@ -50,6 +50,54 @@
       "card_id": "2025-bowman-chrome-university-prospect-auto-bca-ka-kaytron-allen",
       "card": "2025 Bowman Chrome University Prospect Autograph BCA-KA Kaytron Allen",
       "source_url": "https://www.reuters.com/sports/nfl-preseason-roundup-new-look-dolphins-offense-finds-stride--flm-2026-08-15/"
+    },
+    {
+      "player_id": "mlb-franklin-arias",
+      "player": "Franklin Arias",
+      "sport": "MLB",
+      "thesis_type": "EDGE",
+      "stage": "ACCELERATION",
+      "decision": "WATCH_FOR_COMPS",
+      "source_quality": "OFFICIAL",
+      "observed_at": "2026-08-14T14:30:00+00:00",
+      "headline": "Franklin Arias' Triple-A power surge creates a pre-call-up hobby acceleration watch",
+      "why_now": "Arias is MLB Pipeline's No. 7 overall prospect, reached Triple-A on July 24 and has continued producing there. The combination of elite prospect status, proximity to the Majors and a fresh power spike creates a pre-call-up attention signal before any roster transaction forces broader hobby repricing.",
+      "blocker": "Authoritative eBay Product Research repricing has not been verified.",
+      "card_id": "2025-bowman-chrome-prospect-auto-cpa-fa-franklin-arias",
+      "card": "2025 Bowman Chrome Prospect Autograph CPA-FA Franklin Arias",
+      "source_url": "https://www.mlb.com/news/red-sox-promoting-franklin-arias-to-triple-a"
+    },
+    {
+      "player_id": "mlb-bo-davidson",
+      "player": "Bo Davidson",
+      "sport": "MLB",
+      "thesis_type": "EDGE",
+      "stage": "ACCELERATION",
+      "decision": "WATCH_FOR_COMPS",
+      "source_quality": "OFFICIAL",
+      "observed_at": "2026-08-17T22:43:14+00:00",
+      "headline": "Bo Davidson's Triple-A breakout creates a pre-call-up hobby acceleration watch",
+      "why_now": "Davidson is now producing at Triple-A after a slow first 22 games at the level, while remaining outside the consensus MLB call-up cycle. That creates an early performance signal worth repricing before any promotion catalyst arrives.",
+      "blocker": "Authoritative eBay Product Research repricing has not been verified.",
+      "card_id": "2025-bowman-chrome-prospect-auto-cpa-bd-bo-davidson",
+      "card": "2025 Bowman Chrome Prospect Autograph CPA-BD Bo Davidson",
+      "source_url": "https://www.mlb.com/milb/prospects/giants/bo-davidson-815589"
+    },
+    {
+      "player_id": "mlb-caleb-bonemer",
+      "player": "Caleb Bonemer",
+      "sport": "MLB",
+      "thesis_type": "EDGE",
+      "stage": "ACCELERATION",
+      "decision": "WATCH_FOR_COMPS",
+      "source_quality": "OFFICIAL",
+      "observed_at": "2026-08-18T06:45:00+00:00",
+      "headline": "Caleb Bonemer's repeated Double-A impact creates a pre-call-up hobby acceleration watch",
+      "why_now": "Bonemer is already one of the White Sox system's premier prospects, reached Double-A in June and continues to stack impact weeks while staying years young for the level. Repeated weekly dominance plus proximity to Triple-A creates an attention-velocity signal before a major promotion or MLB roster catalyst.",
+      "blocker": "Authoritative eBay Product Research repricing has not been verified.",
+      "card_id": "2024-bowman-draft-chrome-prospect-auto-cpa-cbo-caleb-bonemer",
+      "card": "2024 Bowman Draft Chrome Prospect Autograph CPA-CBO Caleb Bonemer",
+      "source_url": "https://www.milb.com/player/caleb-bonemer-815352"
     }
   ]
 }

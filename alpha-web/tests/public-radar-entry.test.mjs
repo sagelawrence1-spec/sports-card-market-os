@@ -29,6 +29,7 @@ test("public Radar exposes the exact authoritative research queue", async () => 
   assert.equal(queue.schema, "opportunity-research-queue-public.v1");
   assert.equal(queue.source_type, "EBAY_PRODUCT_RESEARCH");
   assert.equal(queue.source_radar_generated_at, radarFeed.generated_at);
+  assert.equal(queue.requested_count, 6);
   assert.equal(queue.requested_count, radarFeed.candidates.length);
   assert.equal(queue.items.length, radarFeed.candidates.length);
   assert.deepEqual(
@@ -44,8 +45,16 @@ test("public Radar exposes the exact authoritative research queue", async () => 
       "2025 Elian Pena Bowman Chrome CPA-EP autograph",
       "2024 George Wolkow Bowman Chrome CPA-GWO autograph",
       "2025 Kaytron Allen Bowman Chrome University BCA-KA autograph",
+      "2025 Franklin Arias Bowman Chrome CPA-FA autograph",
+      "2025 Bo Davidson Bowman Chrome CPA-BD autograph",
+      "2024 Caleb Bonemer Bowman Draft Chrome CPA-CBO autograph",
     ],
   );
+  assert.deepEqual(
+    radarFeed.candidates.slice(3).map((candidate) => candidate.player_id),
+    ["mlb-franklin-arias", "mlb-bo-davidson", "mlb-caleb-bonemer"],
+  );
+  assert.ok(radarFeed.candidates.every((candidate) => candidate.decision === "WATCH_FOR_COMPS"));
   assert.match(radarSource, /eBay Product Research queue/);
   assert.match(radarSource, /PRODUCT RESEARCH QUERY/);
   assert.match(radarSource, /EXPECTED EXPORT/);
