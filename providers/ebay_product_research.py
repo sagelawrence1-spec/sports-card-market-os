@@ -20,13 +20,13 @@ from .base import EvidenceRecord, ProviderResult
 
 ALIASES={
     "title":["title","item title","listing title"],
-    "price":["sold price","sale price","price","final price"],
+    "price":["sold price","sale price","price","final price","sold for"],
     "date":["sold date","sale date","date sold","date"],
-    "id":["item id","itemid","listing id","ebay item id"],
+    "id":["item id","itemid","listing id","ebay item id","item number"],
     "url":["url","item url","listing url"],
     "currency":["currency","currency code"],
-    "shipping":["shipping","shipping price","shipping cost"],
-    "format":["listing format","format","sale type"],
+    "shipping":["shipping","shipping price","shipping cost","shipping and handling"],
+    "format":["listing format","format","sale type","selling format"],
 }
 
 _SOLD_DATE_FORMATS=("%Y-%m-%d","%m/%d/%Y","%m/%d/%y","%b %d, %Y","%B %d, %Y")
@@ -207,10 +207,6 @@ class EbayProductResearchProvider:
 
         grouped=defaultdict(list)
         for record in candidates:
-            # Product Research reports item sales. Multi-quantity eBay listings can
-            # therefore produce legitimate sales on different dates under the same
-            # listing ID. Item + sold day is the conservative transaction identity at
-            # the day granularity available in the authoritative export.
             grouped[(record.source_item_id,record.event_date)].append(record)
         records=[]
         deduplicated_rows=0
