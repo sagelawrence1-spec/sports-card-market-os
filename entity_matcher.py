@@ -98,7 +98,8 @@ def card_number_evidence(cardnum:str, title:str) -> tuple[bool,list[str]]:
     else:
         pat=rf"(?<![a-z0-9])(?:#\s*|no\.?\s*|card\s+#?\s*)?{re.escape(cardnum)}(?![a-z0-9])"
     matched=bool(re.search(pat,title))
-    explicit_nums=re.findall(r"(?:#\s*|no\.?\s*|card\s+#?\s*)([a-z0-9-]+)",title)
+    raw_explicit=re.findall(r"(?:#\s*|no\.?\s*|card\s+#?\s*)([a-z0-9-]+)",title)
+    explicit_nums=[value for value in raw_explicit if any(ch.isdigit() for ch in value) or "-" in value]
     return matched,explicit_nums
 
 
