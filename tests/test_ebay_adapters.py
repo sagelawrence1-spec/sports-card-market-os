@@ -53,9 +53,9 @@ with tempfile.TemporaryDirectory() as td:
         'invalid_or_ambiguous_price':1,
         'invalid_or_missing_shipping':1,
         'invalid_sold_date':1,
-        'missing_currency':2,
+        'missing_currency':1,
         'missing_stable_item_id':1,
         'missing_title':1,
-        'non_usd_currency':1,
+        'non_usd_currency':2,
     }
 print('adapter tests: PASS')
