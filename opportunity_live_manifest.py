@@ -43,6 +43,30 @@ def _parse_time(value: Any, *, field: str) -> datetime:
     return parsed.astimezone(timezone.utc)
 
 
+def _build_search_query(asset: Mapping[str, Any]) -> str:
+    """Build one deterministic Product Research query from canonical card identity.
+
+    The query is deliberately narrow and machine-generated so the operator does not
+    have to reconstruct the card identity from a display label. Matching still occurs
+    downstream against the full canonical asset; this query only scopes the eBay
+    Product Research export and never weakens entity-resolution gates.
+    """
+    player = str(asset.get("player", "")).strip()
+    year = asset.get("year")
+    set_name = str(asset.get("set_name", "")).strip()
+    card_number = str(asset.get("card_number", "")).strip()
+    if not player or not isinstance(year, int) or isinstance(year, bool) or not set_name or not card_number:
+        raise ValueError("canonical research asset requires player, integer year, set_name, and card_number")
+
+    tokens = [str(year), player, set_name, card_number]
+    if bool(asset.get("autograph")):
+        tokens.append("autograph")
+    parallel = str(asset.get("parallel", "")).strip()
+    if parallel and parallel.casefold() != "base":
+        tokens.append(parallel)
+    return " ".join(tokens)
+
+
 def _to_internal_scan(public_radar: Mapping[str, Any], assets: Mapping[str, Mapping[str, Any]]) -> dict[str, Any]:
     if public_radar.get("schema") != PUBLIC_SCHEMA:
         raise ValueError("unsupported public Radar schema")
@@ -115,6 +139,24 @@ def build_live_research_manifest(
     scan = _to_internal_scan(public_radar, assets)
     plan = build_repricing_plan(scan, as_of=as_of)
     manifest = build_collection_manifest(plan, max_requests=max_requests, include_p2=include_p2)
+
+    for item in manifest["items"]:
+        card_id = str(item["card_id"])
+        asset = assets.get(card_id)
+        if not isinstance(asset, Mapping):
+            raise ValueError(f"manifest card has no canonical research asset: {card_id}")
+        search_query = _build_search_query(asset)
+        item["search_query"] = search_query
+        request = item.get("repricing_request")
+        if not isinstance(request, dict):
+            raise ValueError("collection manifest item is missing repricing_request")
+        request["search_query"] = search_query
+        item["collection_instruction"] = (
+            f"In eBay Product Research, search exactly: {search_query}. "
+            "Set the sold-date window shown here and export the complete result set without hand-filtering rows. "
+            "Preserve item ID, title, sold date, sold price, shipping, currency, and item URL."
+        )
+
     return {
         "schema": SCHEMA,
         "source_public_schema": PUBLIC_SCHEMA,
