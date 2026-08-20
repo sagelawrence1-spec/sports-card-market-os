@@ -43,6 +43,19 @@ def _source_fingerprint(path: Path) -> tuple[str, int]:
     return hashlib.sha256(raw).hexdigest(), len(raw)
 
 
+def _export_path(root: Path, filename: str) -> Path:
+    """Resolve one expected export filename without allowing path escape.
+
+    Repricing manifests describe an expected export *filename*, not an arbitrary path.
+    Reject absolute paths, parent traversal, and nested paths so a manifest cannot make
+    the authoritative research runner fingerprint or consume files outside export_dir.
+    """
+    candidate = Path(filename)
+    if candidate.is_absolute() or candidate.name != filename or filename in {".", ".."}:
+        raise ValueError("expected_export_filename must be a plain filename within export_dir")
+    return root / candidate
+
+
 def _verify_receipted_exports_unchanged(receipts: Sequence[Mapping[str, Any]]) -> None:
     """Bind downstream collection to the exact raw exports that were receipted.
 
@@ -96,7 +109,7 @@ def execute_opportunity_research_run(
         request = item.get("repricing_request")
         if not card_id or not filename or not isinstance(request, Mapping):
             raise ValueError("manifest item requires card_id, expected_export_filename, and repricing_request")
-        csv_path = root / filename
+        csv_path = _export_path(root, filename)
         if not csv_path.is_file():
             missing_receipts += 1
             receipts.append({
