@@ -116,6 +116,51 @@ def test_research_run_fails_if_export_changes_after_receipt(tmp_path, monkeypatc
     assert decision_called is False
 
 
+def test_research_run_rejects_parent_traversal_export_filename(tmp_path, monkeypatch):
+    outside = tmp_path.parent / "outside.csv"
+    outside.write_text("secret\n", encoding="utf-8")
+    collection_called = False
+
+    def collect(*args, **kwargs):
+        nonlocal collection_called
+        collection_called = True
+        return {"schema": "opportunity-repricing-batch.v1", "ready": True, "results": []}
+
+    monkeypatch.setattr(run, "collect_manifest_batch", collect)
+
+    try:
+        run.execute_opportunity_research_run(
+            _manifest("../outside.csv"),
+            assets={"card-1": {"card_id": "card-1"}},
+            observations=[{"player_id": "player-1"}],
+            export_dir=tmp_path,
+        )
+    except ValueError as exc:
+        assert "plain filename within export_dir" in str(exc)
+    else:
+        raise AssertionError("expected ValueError")
+
+    assert collection_called is False
+
+
+def test_research_run_rejects_absolute_export_filename(tmp_path, monkeypatch):
+    outside = tmp_path / "outside.csv"
+    outside.write_text("secret\n", encoding="utf-8")
+    monkeypatch.setattr(run, "collect_manifest_batch", lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("collection must not run")))
+
+    try:
+        run.execute_opportunity_research_run(
+            _manifest(str(outside.resolve())),
+            assets={"card-1": {"card_id": "card-1"}},
+            observations=[{"player_id": "player-1"}],
+            export_dir=tmp_path,
+        )
+    except ValueError as exc:
+        assert "plain filename within export_dir" in str(exc)
+    else:
+        raise AssertionError("expected ValueError")
+
+
 def test_research_run_keeps_missing_export_visible(tmp_path, monkeypatch):
     monkeypatch.setattr(run, "collect_manifest_batch", lambda manifest, assets, export_dir: {
         "schema": "opportunity-repricing-batch.v1",
