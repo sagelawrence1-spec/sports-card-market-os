@@ -2,8 +2,8 @@
 
 `corpus_proof.build_corpus_proof_report` remains useful for leakage-safe in-memory
 measurement. This wrapper is the authoritative file-based path: it creates the hardened
-Product Research receipt, builds the proof from the same export path, then re-fingerprints
-the source so a file changed between receipt and proof cannot silently pass.
+Product Research receipt, verifies that receipt against the same export path, then builds
+the routing proof only after the source binding is proven.
 """
 from __future__ import annotations
 
@@ -76,8 +76,8 @@ def build_product_research_corpus_proof(
     source = Path(export_path)
     receipt = build_receipt(source, query=query)
     raw_rows = load_delimited_export(source)
-    proof = build_corpus_proof_report(raw_rows, candidates, label_rows, policy=policy, seed=seed)
     binding = _verify_receipt_source(source, receipt, proof_input_rows=len(raw_rows))
+    proof = build_corpus_proof_report(raw_rows, candidates, label_rows, policy=policy, seed=seed)
 
     return {
         **proof,
