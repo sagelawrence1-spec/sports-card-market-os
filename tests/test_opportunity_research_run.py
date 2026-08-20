@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 
 import opportunity_research_run as run
@@ -21,11 +22,16 @@ def _manifest(filename: str = "card.csv"):
 
 def test_research_run_composes_receipt_collection_decision_and_persistence(tmp_path, monkeypatch):
     csv_path = tmp_path / "card.csv"
-    csv_path.write_text("header\nrow\n", encoding="utf-8")
+    raw = b"header\nrow\n"
+    csv_path.write_bytes(raw)
 
     monkeypatch.setattr(run, "build_receipt", lambda path, query="": {
         "schema": "product-research-receipt.v1",
-        "source": {"filename": path.name, "sha256": "abc", "size_bytes": 11},
+        "source": {
+            "filename": path.name,
+            "sha256": hashlib.sha256(raw).hexdigest(),
+            "size_bytes": len(raw),
+        },
         "query": query,
     })
     monkeypatch.setattr(run, "collect_manifest_batch", lambda manifest, assets, export_dir: {
@@ -60,6 +66,54 @@ def test_research_run_composes_receipt_collection_decision_and_persistence(tmp_p
     assert result["decisions"]["ready"] is True
     assert result["persistence"]["persisted_count"] == 1
     assert result["complete"] is True
+
+
+def test_research_run_fails_if_export_changes_after_receipt(tmp_path, monkeypatch):
+    csv_path = tmp_path / "card.csv"
+    raw = b"header\nrow\n"
+    csv_path.write_bytes(raw)
+
+    monkeypatch.setattr(run, "build_receipt", lambda path, query="": {
+        "schema": "product-research-receipt.v1",
+        "source": {
+            "filename": path.name,
+            "sha256": hashlib.sha256(raw).hexdigest(),
+            "size_bytes": len(raw),
+        },
+        "query": query,
+    })
+
+    def mutate_during_collection(manifest, assets, export_dir):
+        csv_path.write_bytes(b"header\nROW\n")
+        return {
+            "schema": "opportunity-repricing-batch.v1",
+            "ready": True,
+            "results": [{"card_id": "card-1", "status": "COLLECTED"}],
+        }
+
+    monkeypatch.setattr(run, "collect_manifest_batch", mutate_during_collection)
+    decision_called = False
+
+    def build_decisions(batch, observations):
+        nonlocal decision_called
+        decision_called = True
+        return {"schema": "opportunity-decision-batch.v1", "ready": True, "results": []}
+
+    monkeypatch.setattr(run, "build_opportunity_decision_batch", build_decisions)
+
+    try:
+        run.execute_opportunity_research_run(
+            _manifest(),
+            assets={"card-1": {"card_id": "card-1"}},
+            observations=[{"player_id": "player-1"}],
+            export_dir=tmp_path,
+        )
+    except ValueError as exc:
+        assert "changed after receipt" in str(exc)
+    else:
+        raise AssertionError("expected ValueError")
+
+    assert decision_called is False
 
 
 def test_research_run_keeps_missing_export_visible(tmp_path, monkeypatch):
