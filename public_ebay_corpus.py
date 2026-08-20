@@ -19,6 +19,9 @@ from entity_resolution_metrics import evaluate_entity_resolution
 
 
 _EBAY_ITEM_URL = re.compile(r"^https://www\.ebay\.com/itm/(\d+)(?:[/?#].*)?$")
+PRICE_SANITY_ROLE = "sold_identity_and_price_sanity"
+IDENTITY_ONLY_ROLES = {"sold_identity_only", "public_item_identity_only"}
+ALLOWED_EVIDENCE_ROLES = {PRICE_SANITY_ROLE, *IDENTITY_ONLY_ROLES}
 
 
 @dataclass(frozen=True)
@@ -56,7 +59,11 @@ def validate_public_ebay_corpus(
     corpus: Mapping[str, Any],
     assets: Mapping[str, Mapping[str, Any]],
 ) -> dict[str, Any]:
-    """Validate provenance and fields without trusting the matcher or labels."""
+    """Validate provenance and fields without trusting the matcher or labels.
+
+    Evidence roles are part of the security boundary. Identity-only item pages can
+    never become price evidence merely because a caller supplies a numeric price.
+    """
 
     errors: list[str] = []
     rows = corpus.get("rows")
@@ -79,6 +86,7 @@ def validate_public_ebay_corpus(
         card_id = str(row.get("card_id") or "").strip()
         expected = row.get("expected_match")
         price_usable = row.get("price_usable")
+        evidence_role = str(row.get("evidence_role") or "").strip()
 
         if not item_id.isdigit():
             errors.append(f"{prefix}:invalid_item_id")
@@ -101,15 +109,24 @@ def validate_public_ebay_corpus(
             errors.append(f"{prefix}:unknown_card_id")
         if not isinstance(expected, bool):
             errors.append(f"{prefix}:expected_match_not_boolean")
+        if evidence_role not in ALLOWED_EVIDENCE_ROLES:
+            errors.append(f"{prefix}:invalid_evidence_role")
+
         if not isinstance(price_usable, bool):
             errors.append(f"{prefix}:price_usable_not_boolean")
-        elif price_usable:
-            sold_price = row.get("sold_price")
-            shipping = row.get("shipping")
-            if not isinstance(sold_price, (int, float)) or sold_price <= 0:
-                errors.append(f"{prefix}:usable_price_missing")
-            if not isinstance(shipping, (int, float)) or shipping < 0:
-                errors.append(f"{prefix}:usable_shipping_missing")
+        else:
+            if evidence_role == PRICE_SANITY_ROLE and not price_usable:
+                errors.append(f"{prefix}:price_sanity_role_not_usable")
+            if evidence_role in IDENTITY_ONLY_ROLES and price_usable:
+                errors.append(f"{prefix}:identity_only_price_escalation")
+
+            if price_usable:
+                sold_price = row.get("sold_price")
+                shipping = row.get("shipping")
+                if not isinstance(sold_price, (int, float)) or sold_price <= 0:
+                    errors.append(f"{prefix}:usable_price_missing")
+                if not isinstance(shipping, (int, float)) or shipping < 0:
+                    errors.append(f"{prefix}:usable_shipping_missing")
 
         if not any(value.startswith(f"{prefix}:") for value in errors):
             valid_rows += 1
@@ -212,7 +229,11 @@ def build_public_ebay_corpus_report(
     blockers = list(matcher_blockers) + coverage_blockers
     if len(rows) < policy.min_rows:
         blockers.append("corpus_rows_below_floor")
-    usable_prices = sum(1 for row in rows if row.get("price_usable") is True)
+    usable_prices = sum(
+        1
+        for row in rows
+        if row.get("evidence_role") == PRICE_SANITY_ROLE and row.get("price_usable") is True
+    )
     if usable_prices < policy.min_price_usable_rows:
         blockers.append("price_sanity_subset_below_floor")
 
@@ -227,6 +248,7 @@ def build_public_ebay_corpus_report(
         "price_sanity_subset": {
             "usable_rows": usable_prices,
             "minimum": policy.min_price_usable_rows,
+            "required_evidence_role": PRICE_SANITY_ROLE,
             "authoritative_product_research": False,
         },
         "policy": {
