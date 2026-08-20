@@ -1,0 +1,52 @@
+{
+  "schema": "opportunity-radar-public.v1",
+  "generated_at": "2026-08-19T19:57:00-07:00",
+  "status": "evidence_gated",
+  "candidates": [
+    {
+      "player_id": "mlb-elian-pena",
+      "player": "Elian Pena",
+      "sport": "MLB",
+      "thesis_type": "EDGE",
+      "stage": "ACCELERATION",
+      "decision": "WATCH_FOR_COMPS",
+      "source_quality": "SINGLE_SOURCE",
+      "observed_at": "2026-08-18T23:59:00+00:00",
+      "headline": "Elian Pena's post-promotion power jump creates an early hobby acceleration watch",
+      "why_now": "Pena is still only 18 and remains well before an MLB catalyst. A fresh three-homer week after promotion to High-A creates a pre-consensus performance edge where prospect attention can accelerate before the broader hobby treats him like a near-term major leaguer.",
+      "blocker": "Authoritative eBay Product Research repricing has not been verified.",
+      "card": "2025 Bowman Chrome Prospect Autograph CPA-EP Elian Pena",
+      "source_url": "https://www.amazinavenue.com/new-york-mets-prospects-minor-leagues/99559/mets-minor-league-players-of-the-week-week-twenty-one-inf-elian-pena-rhp-jose-chirinos"
+    },
+    {
+      "player_id": "mlb-george-wolkow",
+      "player": "George Wolkow",
+      "sport": "MLB",
+      "thesis_type": "EDGE",
+      "stage": "ACCELERATION",
+      "decision": "WATCH_FOR_COMPS",
+      "source_quality": "SINGLE_SOURCE",
+      "observed_at": "2026-08-18T23:59:00+00:00",
+      "headline": "George Wolkow's two-homer night creates a fresh pre-MLB hobby acceleration watch",
+      "why_now": "Wolkow remains pre-MLB, so a multi-homer performance can move prospect attention before a roster catalyst forces broader hobby repricing.",
+      "blocker": "Authoritative eBay Product Research repricing has not been verified.",
+      "card": "2024 Bowman Chrome Prospect Autograph CPA-GWO George Wolkow",
+      "source_url": "https://www.southsidesox.com/chicago-white-sox-prospects/133703/white-sox-minor-league-update-august-17-18-2026"
+    },
+    {
+      "player_id": "nfl-kaytron-allen",
+      "player": "Kaytron Allen",
+      "sport": "NFL",
+      "thesis_type": "EDGE",
+      "stage": "ACCELERATION",
+      "decision": "WATCH_FOR_COMPS",
+      "source_quality": "CORROBORATED",
+      "observed_at": "2026-08-15T23:00:00+00:00",
+      "headline": "Kaytron Allen's productive preseason showing creates an early football hobby edge watch",
+      "why_now": "Allen is a sixth-round rookie competing for a role in Washington's backfield. An 85-yard preseason performance with a touchdown can move role expectations and hobby attention before regular-season touches establish a durable narrative.",
+      "blocker": "Authoritative eBay Product Research repricing has not been verified.",
+      "card": "2025 Bowman Chrome University Prospect Autograph BCA-KA Kaytron Allen",
+      "source_url": "https://www.reuters.com/sports/nfl-preseason-roundup-new-look-dolphins-offense-finds-stride--flm-2026-08-15/"
+    }
+  ]
+}
