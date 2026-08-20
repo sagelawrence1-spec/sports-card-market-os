@@ -1,0 +1,38 @@
+{
+  "2025-bowman-chrome-prospect-auto-cpa-ep-elian-pena": {
+    "card_id": "2025-bowman-chrome-prospect-auto-cpa-ep-elian-pena",
+    "player": "Elian Pena",
+    "year": 2025,
+    "manufacturer": "Topps",
+    "set_name": "Bowman Chrome",
+    "card_number": "CPA-EP",
+    "parallel": "base",
+    "autograph": 1,
+    "label": "2025 Bowman Chrome Prospect Autograph CPA-EP Elian Pena",
+    "registry_source": "live_opportunity_verified_identity"
+  },
+  "2024-bowman-chrome-prospect-auto-cpa-gwo-george-wolkow": {
+    "card_id": "2024-bowman-chrome-prospect-auto-cpa-gwo-george-wolkow",
+    "player": "George Wolkow",
+    "year": 2024,
+    "manufacturer": "Topps",
+    "set_name": "Bowman Chrome",
+    "card_number": "CPA-GWO",
+    "parallel": "base",
+    "autograph": 1,
+    "label": "2024 Bowman Chrome Prospect Autograph CPA-GWO George Wolkow",
+    "registry_source": "live_opportunity_verified_identity"
+  },
+  "2025-bowman-chrome-university-prospect-auto-bca-ka-kaytron-allen": {
+    "card_id": "2025-bowman-chrome-university-prospect-auto-bca-ka-kaytron-allen",
+    "player": "Kaytron Allen",
+    "year": 2025,
+    "manufacturer": "Topps",
+    "set_name": "Bowman Chrome University",
+    "card_number": "BCA-KA",
+    "parallel": "base",
+    "autograph": 1,
+    "label": "2025 Bowman Chrome University Prospect Autograph BCA-KA Kaytron Allen",
+    "registry_source": "live_opportunity_verified_identity"
+  }
+}
