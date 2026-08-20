@@ -37,7 +37,17 @@ test("public Radar exposes the exact authoritative research queue", async () => 
   );
   assert.ok(queue.items.every((item) => item.status === "MISSING_EXPORT"));
   assert.ok(queue.items.every((item) => item.expected_export_filename.endsWith(".csv")));
+  assert.ok(queue.items.every((item) => typeof item.search_query === "string" && item.search_query.length > 20));
+  assert.deepEqual(
+    queue.items.map((item) => item.search_query),
+    [
+      "2025 Elian Pena Bowman Chrome CPA-EP autograph",
+      "2024 George Wolkow Bowman Chrome CPA-GWO autograph",
+      "2025 Kaytron Allen Bowman Chrome University BCA-KA autograph",
+    ],
+  );
   assert.match(radarSource, /eBay Product Research queue/);
+  assert.match(radarSource, /PRODUCT RESEARCH QUERY/);
   assert.match(radarSource, /EXPECTED EXPORT/);
   assert.match(radarSource, /EXPORTS MISSING/);
 });

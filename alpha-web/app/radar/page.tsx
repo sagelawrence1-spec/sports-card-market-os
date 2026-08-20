@@ -53,7 +53,7 @@ export default function RadarPage() {
 
     <section style={{border:"1px solid #27272a",borderRadius:18,overflow:"hidden",background:"#111113",marginTop:34}}>
       <div style={{padding:20,borderBottom:"1px solid #27272a",display:"flex",justifyContent:"space-between",gap:20,alignItems:"center",flexWrap:"wrap"}}>
-        <div><div style={{fontSize:12,color:"#a1a1aa",letterSpacing:1.3}}>AUTHORITATIVE RESEARCH</div><h2 style={{margin:"5px 0 0",fontSize:24}}>eBay Product Research queue</h2><p style={{margin:"8px 0 0",color:"#a1a1aa",maxWidth:720,lineHeight:1.5}}>These are the exact exports blocking a real decision. Pull the full result set for each window; the research runner fingerprints the CSV bytes, resolves the card, measures repricing, and returns START_POSITION / DO_NOT_CHASE / WATCH.</p></div>
+        <div><div style={{fontSize:12,color:"#a1a1aa",letterSpacing:1.3}}>AUTHORITATIVE RESEARCH</div><h2 style={{margin:"5px 0 0",fontSize:24}}>eBay Product Research queue</h2><p style={{margin:"8px 0 0",color:"#a1a1aa",maxWidth:720,lineHeight:1.5}}>These are the exact exports blocking a real decision. Use the exact search query and full sold window shown for each card; the research runner fingerprints the CSV bytes, resolves the card, measures repricing, and returns START_POSITION / DO_NOT_CHASE / WATCH.</p></div>
         <span style={{fontSize:12,color:"#fbbf24"}}>{queue.length} EXPORTS MISSING</span>
       </div>
       <div>
@@ -63,6 +63,7 @@ export default function RadarPage() {
             <span style={{fontSize:11,border:"1px solid #7c2d12",background:"#431407",borderRadius:999,padding:"6px 9px",color:"#fdba74"}}>{item.status}</span>
           </div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(210px,1fr))",gap:10,marginTop:16}}>
+            <div style={{background:"#09090b",border:"1px solid #27272a",borderRadius:12,padding:14}}><small style={{color:"#71717a"}}>PRODUCT RESEARCH QUERY</small><div style={{marginTop:7,fontFamily:"ui-monospace,SFMono-Regular,monospace",fontSize:12,overflowWrap:"anywhere"}}>{item.search_query}</div></div>
             <div style={{background:"#09090b",border:"1px solid #27272a",borderRadius:12,padding:14}}><small style={{color:"#71717a"}}>SOLD WINDOW</small><div style={{marginTop:7,fontWeight:700}}>{formatWindow(item.sold_window_start)} → {formatWindow(item.sold_window_end)}</div></div>
             <div style={{background:"#09090b",border:"1px solid #27272a",borderRadius:12,padding:14,minWidth:0}}><small style={{color:"#71717a"}}>EXPECTED EXPORT</small><div style={{marginTop:7,fontFamily:"ui-monospace,SFMono-Regular,monospace",fontSize:12,overflowWrap:"anywhere"}}>{item.expected_export_filename}</div></div>
           </div>

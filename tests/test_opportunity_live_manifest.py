@@ -32,6 +32,13 @@ def test_public_radar_builds_exact_product_research_queue():
     assert all(row["repricing_request"]["source_type"] == "EBAY_PRODUCT_RESEARCH" for row in manifest["items"])
     assert all(row["expected_export_filename"].endswith(".csv") for row in manifest["items"])
 
+    by_player = {row["player"]: row for row in manifest["items"]}
+    assert by_player["Elian Pena"]["search_query"] == "2025 Elian Pena Bowman Chrome CPA-EP autograph"
+    assert by_player["George Wolkow"]["search_query"] == "2024 George Wolkow Bowman Chrome CPA-GWO autograph"
+    assert by_player["Kaytron Allen"]["search_query"] == "2025 Kaytron Allen Bowman Chrome University BCA-KA autograph"
+    assert all(row["repricing_request"]["search_query"] == row["search_query"] for row in manifest["items"])
+    assert all(row["search_query"] in row["collection_instruction"] for row in manifest["items"])
+
 
 def test_public_radar_requires_canonical_asset_for_every_card():
     radar = _load(RADAR_PATH)
@@ -49,6 +56,16 @@ def test_public_radar_rejects_asset_player_drift():
     assets[card_id]["player"] = "Different Player"
 
     with pytest.raises(ValueError, match="player mismatch"):
+        build_live_research_manifest(radar, assets=assets)
+
+
+def test_public_radar_rejects_incomplete_search_identity():
+    radar = _load(RADAR_PATH)
+    assets = _load(ASSETS_PATH)
+    card_id = radar["candidates"][0]["card_id"]
+    assets[card_id].pop("card_number")
+
+    with pytest.raises(ValueError, match="requires player, integer year, set_name, and card_number"):
         build_live_research_manifest(radar, assets=assets)
 
 
@@ -70,3 +87,4 @@ def test_cli_emits_live_collection_manifest(tmp_path):
     assert rc == 0
     payload = json.loads(output.read_text(encoding="utf-8"))
     assert payload["collection_manifest"]["selected_request_count"] == 3
+    assert all(item["search_query"] for item in payload["collection_manifest"]["items"])
