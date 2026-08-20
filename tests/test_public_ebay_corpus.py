@@ -3,6 +3,7 @@ from pathlib import Path
 
 from entity_resolution_metrics import evaluate_entity_resolution
 from public_ebay_corpus import (
+    PRICE_SANITY_ROLE,
     PublicEbayCorpusPolicy,
     build_public_ebay_corpus_report,
     validate_public_ebay_corpus,
@@ -30,6 +31,7 @@ def test_real_bootstrap_passes_matcher_quality_but_fails_breadth_gate():
 
     # The public-price subset remains deliberately weaker than Product Research.
     assert report["price_sanity_subset"]["usable_rows"] >= 5
+    assert report["price_sanity_subset"]["required_evidence_role"] == PRICE_SANITY_ROLE
     assert report["price_sanity_subset"]["authoritative_product_research"] is False
 
 
@@ -62,12 +64,25 @@ def test_validation_rejects_duplicate_provenance_and_fake_price_usability():
     assert validation["valid"] is False
     assert any(value.endswith("duplicate_item_id") for value in validation["errors"])
     assert any(value.endswith("duplicate_source_url") for value in validation["errors"])
+    assert any(value.endswith("identity_only_price_escalation") for value in validation["errors"])
     assert any(value.endswith("usable_shipping_missing") for value in validation["errors"])
 
     report = build_public_ebay_corpus_report(corpus, ASSETS)
     assert report["ready"] is False
     assert report["evaluation"] is None
     assert report["blockers"] == ["invalid_corpus"]
+
+
+def test_validation_rejects_missing_or_mismatched_evidence_authority():
+    missing_role = json.loads(json.dumps(CORPUS))
+    missing_role["rows"][0].pop("evidence_role")
+    validation = validate_public_ebay_corpus(missing_role, ASSETS)
+    assert any(value.endswith("invalid_evidence_role") for value in validation["errors"])
+
+    downgraded_price = json.loads(json.dumps(CORPUS))
+    downgraded_price["rows"][0]["price_usable"] = False
+    validation = validate_public_ebay_corpus(downgraded_price, ASSETS)
+    assert any(value.endswith("price_sanity_role_not_usable") for value in validation["errors"])
 
 
 def test_entity_resolution_report_exposes_per_card_reason_histograms():
