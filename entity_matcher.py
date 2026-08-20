@@ -186,6 +186,13 @@ class SportsCardEntityMatcher:
             if target_update != title_update:
                 return MatchDecision(False,25.0,"wrong_set_family",diag)
 
+            target_draft="draft" in set_tokens
+            title_draft="draft" in title_tokens
+            diag["target_draft"]=int(target_draft)
+            diag["title_draft"]=int(title_draft)
+            if target_draft != title_draft:
+                return MatchDecision(False,25.0,"wrong_set_family",diag)
+
         man_tokens=toks(manufacturer)
         if man_tokens:
             cov=len(man_tokens & title_tokens)/len(man_tokens)
