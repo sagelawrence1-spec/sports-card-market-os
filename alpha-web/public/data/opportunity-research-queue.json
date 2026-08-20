@@ -1,9 +1,9 @@
 {
   "schema": "opportunity-research-queue-public.v1",
-  "source_radar_generated_at": "2026-08-19T19:57:00-07:00",
+  "source_radar_generated_at": "2026-08-20T11:01:57-07:00",
   "source_type": "EBAY_PRODUCT_RESEARCH",
   "status": "AWAITING_EXPORTS",
-  "requested_count": 3,
+  "requested_count": 6,
   "items": [
     {
       "queue_position": 1,
@@ -15,7 +15,7 @@
       "search_query": "2025 Elian Pena Bowman Chrome CPA-EP autograph",
       "catalyst_at": "2026-08-18T23:59:00+00:00",
       "sold_window_start": "2026-07-19T23:59:00+00:00",
-      "sold_window_end": "2026-08-20T02:57:00+00:00",
+      "sold_window_end": "2026-08-20T18:01:57+00:00",
       "window_status": "COLLECTION_OPEN",
       "expected_export_filename": "01-elian-pena-2025-bowman-chrome-prospect-autograph-cpa-ep-elian-pena.csv",
       "status": "MISSING_EXPORT"
@@ -30,7 +30,7 @@
       "search_query": "2024 George Wolkow Bowman Chrome CPA-GWO autograph",
       "catalyst_at": "2026-08-18T23:59:00+00:00",
       "sold_window_start": "2026-07-19T23:59:00+00:00",
-      "sold_window_end": "2026-08-20T02:57:00+00:00",
+      "sold_window_end": "2026-08-20T18:01:57+00:00",
       "window_status": "COLLECTION_OPEN",
       "expected_export_filename": "02-george-wolkow-2024-bowman-chrome-prospect-autograph-cpa-gwo-george-wolkow.csv",
       "status": "MISSING_EXPORT"
@@ -45,9 +45,54 @@
       "search_query": "2025 Kaytron Allen Bowman Chrome University BCA-KA autograph",
       "catalyst_at": "2026-08-15T23:00:00+00:00",
       "sold_window_start": "2026-07-16T23:00:00+00:00",
-      "sold_window_end": "2026-08-20T02:57:00+00:00",
+      "sold_window_end": "2026-08-20T18:01:57+00:00",
       "window_status": "COLLECTION_OPEN",
       "expected_export_filename": "03-kaytron-allen-2025-bowman-chrome-university-prospect-autograph-bca-ka-kaytron-allen.csv",
+      "status": "MISSING_EXPORT"
+    },
+    {
+      "queue_position": 4,
+      "collection_priority": "P1",
+      "player_id": "mlb-franklin-arias",
+      "player": "Franklin Arias",
+      "card_id": "2025-bowman-chrome-prospect-auto-cpa-fa-franklin-arias",
+      "card_label": "2025 Bowman Chrome Prospect Autograph CPA-FA Franklin Arias",
+      "search_query": "2025 Franklin Arias Bowman Chrome CPA-FA autograph",
+      "catalyst_at": "2026-08-14T14:30:00+00:00",
+      "sold_window_start": "2026-07-15T14:30:00+00:00",
+      "sold_window_end": "2026-08-20T18:01:57+00:00",
+      "window_status": "COLLECTION_OPEN",
+      "expected_export_filename": "04-franklin-arias-2025-bowman-chrome-prospect-autograph-cpa-fa-franklin-arias.csv",
+      "status": "MISSING_EXPORT"
+    },
+    {
+      "queue_position": 5,
+      "collection_priority": "P1",
+      "player_id": "mlb-bo-davidson",
+      "player": "Bo Davidson",
+      "card_id": "2025-bowman-chrome-prospect-auto-cpa-bd-bo-davidson",
+      "card_label": "2025 Bowman Chrome Prospect Autograph CPA-BD Bo Davidson",
+      "search_query": "2025 Bo Davidson Bowman Chrome CPA-BD autograph",
+      "catalyst_at": "2026-08-17T22:43:14+00:00",
+      "sold_window_start": "2026-07-18T22:43:14+00:00",
+      "sold_window_end": "2026-08-20T18:01:57+00:00",
+      "window_status": "COLLECTION_OPEN",
+      "expected_export_filename": "05-bo-davidson-2025-bowman-chrome-prospect-autograph-cpa-bd-bo-davidson.csv",
+      "status": "MISSING_EXPORT"
+    },
+    {
+      "queue_position": 6,
+      "collection_priority": "P1",
+      "player_id": "mlb-caleb-bonemer",
+      "player": "Caleb Bonemer",
+      "card_id": "2024-bowman-draft-chrome-prospect-auto-cpa-cbo-caleb-bonemer",
+      "card_label": "2024 Bowman Draft Chrome Prospect Autograph CPA-CBO Caleb Bonemer",
+      "search_query": "2024 Caleb Bonemer Bowman Draft Chrome CPA-CBO autograph",
+      "catalyst_at": "2026-08-18T06:45:00+00:00",
+      "sold_window_start": "2026-07-19T06:45:00+00:00",
+      "sold_window_end": "2026-08-20T18:01:57+00:00",
+      "window_status": "COLLECTION_OPEN",
+      "expected_export_filename": "06-caleb-bonemer-2024-bowman-draft-chrome-prospect-autograph-cpa-cbo-caleb-bonemer.csv",
       "status": "MISSING_EXPORT"
     }
   ]
