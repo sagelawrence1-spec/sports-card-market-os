@@ -33,6 +33,7 @@ _SOLD_DATE_FORMATS=("%Y-%m-%d","%m/%d/%Y","%m/%d/%y","%b %d, %Y","%B %d, %Y")
 _PRICE_RANGE_RE=re.compile(r"\d[\d,.]*\s*[-–—]\s*[$€£]?\s*\d[\d,.]*")
 _MONEY_VALUE_RE=re.compile(r"^(?:[A-Z]{3}\s*)?[$€£]?\s*(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d{1,2})?$",re.IGNORECASE)
 _EBAY_ITEM_URL_RE=re.compile(r"/itm/(?:[^/?#]+/)?(\d+)(?:[/?#]|$)",re.IGNORECASE)
+_CURRENCY_CODE_PREFIX_RE=re.compile(r"^([A-Z]{3})\b",re.IGNORECASE)
 
 def _norm(s): return re.sub(r"[^a-z0-9]+"," ",str(s).lower()).strip()
 
@@ -87,8 +88,9 @@ def _strong_currency_marker(raw):
     upper=text.upper()
     if "€" in text: return "EUR"
     if "£" in text: return "GBP"
-    for code in ("USD","CAD","AUD","NZD","HKD"):
-        if re.search(rf"\b{code}\b",upper): return code
+    code_match=_CURRENCY_CODE_PREFIX_RE.match(upper)
+    if code_match:
+        return code_match.group(1)
     for pattern,code in ((r"C\s*\$","CAD"),(r"A\s*\$","AUD"),(r"NZ\s*\$","NZD"),(r"HK\s*\$","HKD")):
         if re.search(pattern,upper): return code
     return None
@@ -100,10 +102,11 @@ def _currency_conflicts(currency, raw_amount):
 def _currency(explicit, raw_price):
     value=" ".join(str(explicit or "").strip().split()).upper()
     if value: return value
+    marker=_strong_currency_marker(raw_price)
+    if marker:
+        return marker
     price_text=" ".join(str(raw_price or "").strip().split())
     upper=price_text.upper()
-    if "USD" in upper and "$" in price_text:
-        return "USD"
     if "$" not in price_text:
         return None
     if re.search(r"[A-Z]",upper):
