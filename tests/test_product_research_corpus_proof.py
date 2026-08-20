@@ -1,4 +1,5 @@
 import hashlib
+import json
 from pathlib import Path
 
 import pytest
@@ -63,14 +64,27 @@ def _write_export(path: Path, *, ohtani_title: str = "2025 Shohei Ohtani #1") ->
     )
 
 
+def _manifest_sha(rows) -> str:
+    canonical = json.dumps(
+        rows,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+        default=str,
+    ).encode("utf-8")
+    return hashlib.sha256(canonical).hexdigest()
+
+
 def test_authoritative_corpus_proof_is_bound_to_exact_export_bytes(tmp_path):
     export = tmp_path / "product-research.csv"
     _write_export(export)
+    candidates = _candidates()
+    labels = _labels()
 
     report = bound_proof.build_product_research_corpus_proof(
         export,
-        _candidates(),
-        _labels(),
+        candidates,
+        labels,
         policy=_policy(),
         query="balanced proof export",
     )
@@ -91,6 +105,29 @@ def test_authoritative_corpus_proof_is_bound_to_exact_export_bytes(tmp_path):
     assert authoritative["receipt"]["source"]["sha256"] == expected_sha
     assert authoritative["receipt"]["query"] == "balanced proof export"
     assert authoritative["receipt"]["rows"]["accepted"] == 2
+    assert authoritative["proof_inputs"]["candidates"]["sha256"] == _manifest_sha(candidates)
+    assert authoritative["proof_inputs"]["candidates"]["rows"] == 2
+    assert authoritative["proof_inputs"]["labels"]["sha256"] == _manifest_sha(labels)
+    assert authoritative["proof_inputs"]["labels"]["rows"] == 2
+
+
+def test_manifest_binding_is_stable_to_mapping_key_order_but_not_content_changes():
+    candidates = _candidates()
+    reordered = [dict(reversed(list(row.items()))) for row in candidates]
+    changed = _candidates()
+    changed[0]["card_number"] = "99"
+
+    assert bound_proof._manifest_binding(candidates) == bound_proof._manifest_binding(reordered)
+    assert bound_proof._manifest_binding(candidates)["sha256"] != bound_proof._manifest_binding(changed)["sha256"]
+
+
+def test_label_binding_changes_when_adjudication_changes():
+    labels = _labels()
+    changed = _labels()
+    changed[0]["expected_status"] = "rejected"
+    changed[0]["expected_card_id"] = None
+
+    assert bound_proof._manifest_binding(labels)["sha256"] != bound_proof._manifest_binding(changed)["sha256"]
 
 
 def test_export_mutation_after_receipt_fails_closed(tmp_path, monkeypatch):
