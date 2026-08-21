@@ -58,9 +58,9 @@ def _policy():
 
 def _write_export(path: Path, *, ohtani_title: str = "2025 Shohei Ohtani #1") -> None:
     path.write_text(
-        "Item ID,Title,Sold Date,Sold Price,Currency,Shipping\n"
-        f'123456789012,"{ohtani_title}",2026-08-01,$100.00,USD,$5.00\n'
-        '123456789013,"2025 Stephen Curry #2",2026-08-02,$200.00,USD,$7.00\n'
+        "Item ID,Title,Sold Date,Sold Price,Currency,Shipping,Quantity\n"
+        f'123456789012,"{ohtani_title}",2026-08-01,$100.00,USD,$5.00,1\n'
+        '123456789013,"2025 Stephen Curry #2",2026-08-02,$200.00,USD,$7.00,1\n'
     )
 
 
