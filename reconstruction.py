@@ -16,6 +16,21 @@ def _pct_change(previous: float | None, current: float | None) -> float | None:
     return (float(current) - float(previous)) / float(previous)
 
 
+def _accepted_evidence_ids(state: Mapping[str, Any]) -> tuple[str, ...]:
+    ledger = state.get("evidence_ledger") or {}
+    accepted = ledger.get("accepted") or []
+    ids = {
+        str(row.get("evidence_id") or "").strip()
+        for row in accepted
+        if isinstance(row, Mapping) and str(row.get("evidence_id") or "").strip()
+    }
+    return tuple(sorted(ids))
+
+
+def _price_changed(previous: Mapping[str, Any], current: Mapping[str, Any], field: str) -> bool:
+    return previous.get(field) != current.get(field)
+
+
 def build_reconstruction_delta(
     previous: Mapping[str, Any] | None,
     current: Mapping[str, Any],
@@ -49,6 +64,11 @@ def build_reconstruction_delta(
     if previous_sales != current_sales:
         valuation_reasons.append("accepted_sales_changed")
 
+    previous_comp_ids = _accepted_evidence_ids(previous)
+    current_comp_ids = _accepted_evidence_ids(current)
+    if previous_comp_ids and current_comp_ids and previous_comp_ids != current_comp_ids:
+        valuation_reasons.append("accepted_comp_set_changed")
+
     if previous.get("latest_sale_date") != current.get("latest_sale_date"):
         valuation_reasons.append("latest_sale_changed")
 
@@ -56,6 +76,11 @@ def build_reconstruction_delta(
     current_active = int(current.get("accepted_active_count") or 0)
     if previous_active != current_active:
         valuation_reasons.append("active_supply_changed")
+
+    if _price_changed(previous, current, "lowest_ask"):
+        valuation_reasons.append("lowest_ask_changed")
+    if _price_changed(previous, current, "median_ask"):
+        valuation_reasons.append("median_ask_changed")
 
     if previous.get("evidence_grade") != current.get("evidence_grade"):
         quality_reasons.append("evidence_grade_changed")

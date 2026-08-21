@@ -12,8 +12,16 @@ def state(**overrides):
         "accepted_sales_total":10,
         "latest_sale_date":"2026-08-11",
         "accepted_active_count":2,
+        "lowest_ask":120.0,
+        "median_ask":130.0,
         "evidence_grade":"A",
         "confidence":0.8,
+        "evidence_ledger":{
+            "accepted":[
+                {"evidence_id":"sale-1"},
+                {"evidence_id":"sale-2"},
+            ]
+        },
     }
     base.update(overrides)
     return base
@@ -44,13 +52,33 @@ def test_fifteen_percent_move_without_input_change_fails_closed():
 def test_new_sale_explains_repricing():
     delta=build_reconstruction_delta(
         state(),
-        state(fair_value=120.0,accepted_sales_total=11,latest_sale_date="2026-08-12"),
+        state(
+            fair_value=120.0,
+            accepted_sales_total=11,
+            latest_sale_date="2026-08-12",
+            evidence_ledger={"accepted":[{"evidence_id":"sale-1"},{"evidence_id":"sale-2"},{"evidence_id":"sale-3"}]},
+        ),
     )
     assert delta["material_input_change"] is True
     assert delta["valuation_input_change"] is True
     assert "accepted_sales_changed" in delta["valuation_change_reasons"]
+    assert "accepted_comp_set_changed" in delta["valuation_change_reasons"]
     assert "latest_sale_changed" in delta["valuation_change_reasons"]
     assert delta["unexplained_repricing"] is False
+    assert delta["reconstruction_health_failure"] is False
+
+
+def test_same_count_comp_replacement_explains_repricing():
+    delta=build_reconstruction_delta(
+        state(),
+        state(
+            fair_value=116.0,
+            evidence_ledger={"accepted":[{"evidence_id":"sale-1"},{"evidence_id":"sale-3"}]},
+        ),
+    )
+    assert delta["accepted_sales_delta"] == 0
+    assert delta["valuation_change_reasons"] == ["accepted_comp_set_changed"]
+    assert delta["valuation_input_change"] is True
     assert delta["reconstruction_health_failure"] is False
 
 
@@ -61,6 +89,18 @@ def test_supply_or_confidence_change_is_attributed():
     )
     assert "active_supply_changed" in delta["valuation_change_reasons"]
     assert "confidence_changed" in delta["quality_change_reasons"]
+    assert delta["valuation_input_change"] is True
+    assert delta["reconstruction_health_failure"] is False
+
+
+def test_ask_price_change_with_same_listing_count_explains_repricing():
+    delta=build_reconstruction_delta(
+        state(),
+        state(fair_value=116.0,lowest_ask=110.0,median_ask=125.0),
+    )
+    assert delta["active_supply_delta"] == 0
+    assert "lowest_ask_changed" in delta["valuation_change_reasons"]
+    assert "median_ask_changed" in delta["valuation_change_reasons"]
     assert delta["valuation_input_change"] is True
     assert delta["reconstruction_health_failure"] is False
 
