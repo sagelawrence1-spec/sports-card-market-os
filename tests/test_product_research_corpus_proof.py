@@ -204,3 +204,44 @@ def test_non_authoritative_provider_or_price_basis_cannot_be_bound(tmp_path, mon
             _labels(),
             policy=_policy(),
         )
+
+
+def test_candidate_manifest_requires_unique_nonempty_card_ids(tmp_path):
+    export = tmp_path / "product-research.csv"
+    _write_export(export)
+
+    duplicate = _candidates()
+    duplicate[1]["card_id"] = "A"
+    with pytest.raises(ValueError, match="duplicate card_id: A"):
+        bound_proof.build_product_research_corpus_proof(export, duplicate, _labels(), policy=_policy())
+
+    missing = _candidates()
+    missing[0]["card_id"] = "  "
+    with pytest.raises(ValueError, match="missing card_id"):
+        bound_proof.build_product_research_corpus_proof(export, missing, _labels(), policy=_policy())
+
+
+def test_label_manifest_requires_unique_nonempty_evidence_ids(tmp_path):
+    export = tmp_path / "product-research.csv"
+    _write_export(export)
+
+    duplicate = _labels()
+    duplicate[1]["evidence_id"] = "123456789012"
+    with pytest.raises(ValueError, match="duplicate evidence_id: 123456789012"):
+        bound_proof.build_product_research_corpus_proof(export, _candidates(), duplicate, policy=_policy())
+
+    missing = _labels()
+    missing[0]["evidence_id"] = None
+    with pytest.raises(ValueError, match="missing evidence_id"):
+        bound_proof.build_product_research_corpus_proof(export, _candidates(), missing, policy=_policy())
+
+
+def test_authoritative_manifests_must_be_arrays_of_objects(tmp_path):
+    export = tmp_path / "product-research.csv"
+    _write_export(export)
+
+    with pytest.raises(ValueError, match="candidate manifest must be a JSON array"):
+        bound_proof.build_product_research_corpus_proof(export, {"card_id": "A"}, _labels(), policy=_policy())
+
+    with pytest.raises(ValueError, match="label manifest row 0 must be an object"):
+        bound_proof.build_product_research_corpus_proof(export, _candidates(), ["bad-row"], policy=_policy())
