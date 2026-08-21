@@ -95,9 +95,11 @@ def _parse_sold_date(value: Any) -> str | None:
 def _resolve_item_id(row: Mapping[str, Any]) -> tuple[str | None, list[str]]:
     """Mirror production Product Research identity validation.
 
-    Explicit IDs must be canonical numeric eBay item IDs. URL-derived identity is only
-    trusted when the URL is an eBay host, and contradictory explicit/URL identities fail
-    closed instead of being normalized into one proof record.
+    Explicit IDs must be canonical numeric eBay item IDs. Any supplied URL must itself
+    resolve to an eBay item URL, even when an explicit item ID is also present. This keeps
+    proof intake from admitting evidence that the authoritative production provider rejects.
+    Contradictory explicit/URL identities fail closed instead of being normalized into one
+    proof record.
     """
     reasons: list[str] = []
     raw_explicit_id = _first(row, ID_KEYS)
@@ -107,7 +109,10 @@ def _resolve_item_id(row: Mapping[str, Any]) -> tuple[str | None, list[str]]:
         reasons.append("invalid_item_id")
 
     raw_url = _first(row, URL_KEYS)
+    raw_url_text = _normalized_text(raw_url)
     url_id = _item_id_from_url(raw_url)
+    if raw_url_text and url_id is None:
+        reasons.append("invalid_item_url")
     if explicit_id and url_id and explicit_id != url_id:
         reasons.append("conflicting_item_id")
 
