@@ -55,7 +55,34 @@ def test_audit_never_increases_allocation(tmp_path):
         )
 
 
-def test_upsert_is_idempotent_per_run_and_card(tmp_path):
+def test_identical_retry_is_idempotent_and_preserves_original_timestamp(tmp_path):
+    store = AllocationAuditStore(tmp_path / "market.sqlite")
+    row = {
+        "card_id": "a",
+        "allocation": 500,
+        "exposure_adjusted_allocation": 400,
+        "ready": True,
+        "exposure_blockers": [],
+    }
+    persist_allocation_run(
+        store,
+        run_id="run-1",
+        allocations=[row],
+        decided_at="2026-08-14T12:00:00Z",
+    )
+    persist_allocation_run(
+        store,
+        run_id="run-1",
+        allocations=[row],
+        decided_at="2026-08-15T12:00:00Z",
+    )
+    loaded = store.load_run("run-1")
+    assert len(loaded) == 1
+    assert loaded[0].approved_allocation == 400
+    assert loaded[0].decided_at == "2026-08-14T12:00:00Z"
+
+
+def test_recorded_allocation_cannot_be_rewritten(tmp_path):
     store = AllocationAuditStore(tmp_path / "market.sqlite")
     persist_allocation_run(
         store,
@@ -66,22 +93,27 @@ def test_upsert_is_idempotent_per_run_and_card(tmp_path):
             "exposure_adjusted_allocation": 400,
             "ready": True,
         }],
+        decided_at="2026-08-14T12:00:00Z",
     )
-    persist_allocation_run(
-        store,
-        run_id="run-1",
-        allocations=[{
-            "card_id": "a",
-            "allocation": 500,
-            "exposure_adjusted_allocation": 300,
-            "ready": True,
-            "exposure_blockers": ["player_cap_reached"],
-        }],
-    )
+
+    with pytest.raises(ValueError, match="immutable"):
+        persist_allocation_run(
+            store,
+            run_id="run-1",
+            allocations=[{
+                "card_id": "a",
+                "allocation": 500,
+                "exposure_adjusted_allocation": 300,
+                "ready": True,
+                "exposure_blockers": ["player_cap_reached"],
+            }],
+            decided_at="2026-08-15T12:00:00Z",
+        )
+
     loaded = store.load_run("run-1")
     assert len(loaded) == 1
-    assert loaded[0].approved_allocation == 300
-    assert loaded[0].exposure_blockers == ("player_cap_reached",)
+    assert loaded[0].approved_allocation == 400
+    assert loaded[0].exposure_blockers == ()
 
 
 def test_missing_card_id_is_skipped(tmp_path):
