@@ -1,5 +1,7 @@
 from datetime import date
 
+import pytest
+
 from capital_allocation import (
     AllocationCandidate,
     AllocationPolicy,
@@ -118,6 +120,36 @@ def test_sizing_respects_position_and_total_deployment_caps(tmp_path):
     assert approved
     assert all(row["allocation"] <= 1_000 for row in approved)
     assert sum(row["allocation"] for row in approved) <= 2_500
+
+
+def test_duplicate_card_candidates_cannot_split_position_cap(tmp_path):
+    rows = [_row(i) for i in range(1, 7)]
+    journal = _journal(tmp_path, rows)
+    candidates = [
+        AllocationCandidate("same-card", "BUY", 100, 150, 0.90, "A"),
+        AllocationCandidate("same-card", "BUY", 100, 140, 0.85, "A"),
+    ]
+
+    with pytest.raises(ValueError, match="duplicate allocation candidate card_id"):
+        size_candidates(
+            journal,
+            candidates,
+            portfolio_value=10_000,
+            policy=_policy(),
+        )
+
+
+def test_empty_card_id_fails_closed_before_sizing(tmp_path):
+    rows = [_row(i) for i in range(1, 7)]
+    journal = _journal(tmp_path, rows)
+
+    with pytest.raises(ValueError, match="card_id cannot be empty"):
+        size_candidates(
+            journal,
+            [AllocationCandidate("   ", "BUY", 100, 150, 0.90, "A")],
+            portfolio_value=10_000,
+            policy=_policy(),
+        )
 
 
 def test_hold_does_not_receive_incremental_capital(tmp_path):
