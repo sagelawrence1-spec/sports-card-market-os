@@ -230,10 +230,14 @@ class EbayProductResearchProvider:
 
         grouped=defaultdict(list)
         for record in candidates:
-            grouped[(record.source_item_id,record.event_date)].append(record)
+            grouped[record.source_item_id].append(record)
         records=[]
         deduplicated_rows=0
         for group in grouped.values():
+            sold_dates={r.event_date for r in group}
+            if len(sold_dates)>1:
+                rejection_reasons["reused_item_id_across_sold_dates"]+=len(group)
+                continue
             fingerprints={(
                 r.title,
                 r.price,
