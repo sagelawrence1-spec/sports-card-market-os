@@ -24,7 +24,8 @@ def valuation_sample(sales,as_of=None,currency="USD"):
     cutoff=_day(as_of or date.today())
     clean=[]
     for row in sales:
-        if str(row.get("currency","USD")).upper()!=currency: continue
+        row_currency=str(row.get("currency") or "").strip().upper()
+        if not row_currency or row_currency!=currency.upper(): continue
         sold=_day(row["sale_date"])
         if sold > cutoff: continue
         price=float(row["sale_price"])
