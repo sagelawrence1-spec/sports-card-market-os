@@ -9,11 +9,19 @@ from product_research_receipt import build_receipt, main
 
 
 def _write(path, rows):
-    fields = ["Item Title", "Sold Price", "Shipping", "Sold Date", "Item ID", "Currency"]
+    fields = ["Item Title", "Sold Price", "Shipping", "Sold Date", "Item ID", "Currency", "Quantity"]
     with path.open("w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=fields)
         writer.writeheader()
         writer.writerows(rows)
+
+
+def _write_without_quantity(path, rows):
+    fields = ["Item Title", "Sold Price", "Shipping", "Sold Date", "Item ID", "Currency"]
+    with path.open("w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=fields)
+        writer.writeheader()
+        writer.writerows([{k: v for k, v in row.items() if k != "Quantity"} for row in rows])
 
 
 def _row(*, item_id="123456789012", price="$100.00", sold_date="2026-08-01"):
@@ -24,6 +32,7 @@ def _row(*, item_id="123456789012", price="$100.00", sold_date="2026-08-01"):
         "Sold Date": sold_date,
         "Item ID": item_id,
         "Currency": "USD",
+        "Quantity": "1",
     }
 
 
@@ -40,6 +49,7 @@ def test_receipt_fingerprints_exact_source_and_reconciles_rows(tmp_path):
     assert receipt["source"]["sha256"] == hashlib.sha256(raw).hexdigest()
     assert receipt["source"]["size_bytes"] == len(raw)
     assert receipt["price_basis"] == "sold_price_plus_shipping"
+    assert receipt["quantity_basis"] == "explicit_exported_quantity"
     assert receipt["rows"] == {
         "raw": 3,
         "accepted": 1,
@@ -62,6 +72,14 @@ def test_receipt_hash_changes_when_raw_export_changes(tmp_path):
     second = build_receipt(path)
 
     assert first["source"]["sha256"] != second["source"]["sha256"]
+
+
+def test_receipt_fails_closed_when_quantity_column_is_missing(tmp_path):
+    path = tmp_path / "sold.csv"
+    _write_without_quantity(path, [_row()])
+
+    with pytest.raises(ValueError, match="requires an explicit quantity column"):
+        build_receipt(path)
 
 
 def test_receipt_fails_closed_on_row_accounting_drift(tmp_path, monkeypatch):
