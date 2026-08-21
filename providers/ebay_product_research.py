@@ -9,8 +9,8 @@ Accepted input: CSV with flexible aliases for title, sold price, sold date, item
 and shipping. Rows fail closed when title, sold date, price, USD currency evidence,
 stable sold-item identity, an explicitly exported shipping amount, quantity, or duplicate
 sold evidence is ambiguous. Shipping provenance is required so authoritative comps always
-share the same landed-price basis. Explicit multi-unit sales are rejected so a bundled
-transaction cannot masquerade as one single-card comp.
+share the same landed-price basis. Explicit multi-unit sales and explicit multi-card lots
+are rejected so bundled transactions cannot masquerade as one single-card comp.
 """
 import csv, re
 from collections import Counter, defaultdict
@@ -36,6 +36,13 @@ _PRICE_RANGE_RE=re.compile(r"\d[\d,.]*\s*[-–—]\s*[$€£]?\s*\d[\d,.]*")
 _MONEY_VALUE_RE=re.compile(r"^(?:[A-Z]{3}\s*)?[$€£]?\s*(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d{1,2})?$",re.IGNORECASE)
 _EBAY_ITEM_URL_RE=re.compile(r"/itm/(?:[^/?#]+/)?(\d+)(?:[/?#]|$)",re.IGNORECASE)
 _CURRENCY_CODE_PREFIX_RE=re.compile(r"^([A-Z]{3})\b",re.IGNORECASE)
+_MULTI_CARD_TITLE_PATTERNS=(
+    re.compile(r"\blot of (?:[2-9]|[1-9]\d+)\b"),
+    re.compile(r"\b(?:[2-9]|[1-9]\d+) cards? lot\b"),
+    re.compile(r"\b(?:[2-9]|[1-9]\d+) cards? bundle\b"),
+    re.compile(r"\bbundle of (?:[2-9]|[1-9]\d+) cards?\b"),
+    re.compile(r"\bset of (?:[2-9]|[1-9]\d+) cards?\b"),
+)
 
 def _norm(s): return re.sub(r"[^a-z0-9]+"," ",str(s).lower()).strip()
 
@@ -44,6 +51,10 @@ def _find(headers, aliases):
     for a in aliases:
         if _norm(a) in nh: return nh[_norm(a)]
     return None
+
+def _title_indicates_multi_card_lot(title):
+    normalized=_norm(title)
+    return any(pattern.search(normalized) for pattern in _MULTI_CARD_TITLE_PATTERNS)
 
 def _negative_money(text):
     stripped=" ".join(str(text or "").strip().split())
@@ -162,6 +173,9 @@ class EbayProductResearchProvider:
             currency=_currency(explicit_currency,raw_price)
             if not title:
                 rejection_reasons["missing_title"]+=1
+                continue
+            if _title_indicates_multi_card_lot(title):
+                rejection_reasons["multi_card_lot"]+=1
                 continue
             if cols["quantity"]:
                 quantity=_sold_quantity(r.get(cols["quantity"]))
