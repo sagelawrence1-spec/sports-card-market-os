@@ -80,17 +80,46 @@ def test_receipt_fails_closed_on_row_accounting_drift(tmp_path, monkeypatch):
         build_receipt(path)
 
 
-def test_receipt_fails_closed_when_item_id_is_reused_across_sold_dates(tmp_path):
+def test_receipt_preserves_distinct_sale_dates_for_same_item_id(tmp_path):
     path = tmp_path / "sold.csv"
     _write(
         path,
         [
-            _row(item_id="123456789012", sold_date="2026-08-01"),
-            _row(item_id="123456789012", sold_date="2026-08-02"),
+            _row(item_id="123456789012", sold_date="2026-08-01", price="$100.00"),
+            _row(item_id="123456789012", sold_date="2026-08-02", price="$105.00"),
         ],
     )
 
-    with pytest.raises(ValueError, match="reused sold item IDs: 123456789012"):
+    receipt = build_receipt(path)
+
+    assert receipt["rows"] == {
+        "raw": 2,
+        "accepted": 2,
+        "deduplicated": 0,
+        "rejected": 0,
+        "accounted": 2,
+    }
+    assert receipt["accepted_evidence_ids"] == [
+        "ebay_product_research:123456789012:2026-08-01",
+        "ebay_product_research:123456789012:2026-08-02",
+    ]
+
+
+def test_receipt_fails_closed_on_duplicate_composite_evidence_id(tmp_path, monkeypatch):
+    path = tmp_path / "sold.csv"
+    _write(path, [_row()])
+
+    original = receipt_module.EbayProductResearchProvider.load_csv
+
+    def broken(self, path, query=""):
+        result = original(self, path, query=query)
+        result.records.append(result.records[0])
+        result.metadata["accepted_rows"] = 2
+        result.metadata["rows"] = 2
+        return result
+
+    monkeypatch.setattr(receipt_module.EbayProductResearchProvider, "load_csv", broken)
+    with pytest.raises(ValueError, match="duplicate evidence IDs"):
         build_receipt(path)
 
 

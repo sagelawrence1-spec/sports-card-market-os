@@ -4,7 +4,6 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-from collections import Counter
 from pathlib import Path
 from typing import Any
 
@@ -29,17 +28,12 @@ def build_receipt(path: str | Path, *, query: str = "") -> dict[str, Any]:
             f"Product Research row accounting mismatch: rows={rows} accounted={accounted}"
         )
 
-    accepted_source_item_ids = [record.source_item_id for record in result.records]
-    duplicate_item_ids = sorted(
-        item_id
-        for item_id, count in Counter(accepted_source_item_ids).items()
-        if count > 1
-    )
-    if duplicate_item_ids:
-        raise ValueError(
-            "Product Research authoritative receipt cannot bind reused sold item IDs: "
-            + ", ".join(duplicate_item_ids)
-        )
+    accepted_evidence_ids = [
+        f"{record.provider}:{record.source_item_id}:{record.event_date}"
+        for record in result.records
+    ]
+    if len(set(accepted_evidence_ids)) != len(accepted_evidence_ids):
+        raise ValueError("Product Research authoritative receipt contains duplicate evidence IDs")
 
     return {
         "schema": SCHEMA,
@@ -59,10 +53,7 @@ def build_receipt(path: str | Path, *, query: str = "") -> dict[str, Any]:
             "accounted": accounted,
         },
         "rejection_reasons": metadata.get("rejection_reasons", {}),
-        "accepted_evidence_ids": [
-            f"{record.provider}:{record.source_item_id}:{record.event_date}"
-            for record in result.records
-        ],
+        "accepted_evidence_ids": accepted_evidence_ids,
     }
 
 
