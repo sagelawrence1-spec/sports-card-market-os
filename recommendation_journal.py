@@ -86,25 +86,68 @@ class RecommendationJournal:
         conn.row_factory=sqlite3.Row
         return conn
 
+    @staticmethod
+    def _decision_fields(rec: Recommendation) -> tuple[Any, ...]:
+        return (
+            rec.card_id,
+            rec.action,
+            rec.entry_price,
+            rec.fair_value,
+            rec.confidence,
+            rec.evidence_grade,
+            rec.thesis,
+        )
+
+    @staticmethod
+    def _row_decision_fields(row: sqlite3.Row) -> tuple[Any, ...]:
+        return (
+            row["card_id"],
+            row["action"],
+            row["entry_price"],
+            row["fair_value"],
+            row["confidence"],
+            row["evidence_grade"],
+            row["thesis"],
+        )
+
     def upsert(self,rec: Recommendation) -> None:
+        if (rec.realized_price is None) != (rec.realized_at is None):
+            raise ValueError("Recommendation outcomes require both realized price and realized timestamp.")
+        key=(rec.observation_id,rec.as_of_date.isoformat(),rec.horizon_days)
         with self._connect() as conn:
-            conn.execute("""
-                INSERT INTO recommendation_journal VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
-                ON CONFLICT(observation_id,as_of_date,horizon_days) DO UPDATE SET
-                    action=excluded.action,
-                    entry_price=excluded.entry_price,
-                    fair_value=excluded.fair_value,
-                    confidence=excluded.confidence,
-                    evidence_grade=excluded.evidence_grade,
-                    thesis=excluded.thesis,
-                    realized_price=COALESCE(recommendation_journal.realized_price,excluded.realized_price),
-                    realized_at=COALESCE(recommendation_journal.realized_at,excluded.realized_at)
-            """,(
-                rec.observation_id,rec.card_id,rec.as_of_date.isoformat(),rec.action,
-                rec.entry_price,rec.fair_value,rec.confidence,rec.evidence_grade,
-                rec.thesis,rec.horizon_days,rec.realized_price,
-                rec.realized_at.isoformat() if rec.realized_at else None,
-            ))
+            existing=conn.execute("""
+                SELECT * FROM recommendation_journal
+                WHERE observation_id=? AND as_of_date=? AND horizon_days=?
+            """,key).fetchone()
+            if existing is None:
+                conn.execute("""
+                    INSERT INTO recommendation_journal VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+                """,(
+                    rec.observation_id,rec.card_id,rec.as_of_date.isoformat(),rec.action,
+                    rec.entry_price,rec.fair_value,rec.confidence,rec.evidence_grade,
+                    rec.thesis,rec.horizon_days,rec.realized_price,
+                    rec.realized_at.isoformat() if rec.realized_at else None,
+                ))
+                return
+
+            if self._row_decision_fields(existing) != self._decision_fields(rec):
+                raise ValueError("Published recommendation inputs are immutable.")
+
+            existing_price=existing["realized_price"]
+            existing_at=existing["realized_at"]
+            incoming_at=rec.realized_at.isoformat() if rec.realized_at else None
+            if existing_price is None and existing_at is None:
+                if rec.realized_price is None:
+                    return
+                conn.execute("""
+                    UPDATE recommendation_journal
+                    SET realized_price=?, realized_at=?
+                    WHERE observation_id=? AND as_of_date=? AND horizon_days=?
+                """,(rec.realized_price,incoming_at,*key))
+                return
+
+            if existing_price != rec.realized_price or existing_at != incoming_at:
+                raise ValueError("Settled recommendation outcomes are immutable.")
 
     def load(self) -> list[Recommendation]:
         with self._connect() as conn:
