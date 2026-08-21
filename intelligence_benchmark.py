@@ -197,9 +197,10 @@ def evaluate_intelligence_vs_baseline(
 class IntelligenceBenchmarkStore:
     """SQLite-backed point-in-time benchmark journal.
 
-    Observation identity is card + as-of date + horizon. Re-running a scan updates
-    that point deterministically rather than duplicating it. Benchmark run summaries
-    are append-only so calibration decisions remain auditable across restarts.
+    Observation identity is card + as-of date + horizon. Decision-time inputs are
+    immutable after first write; only a previously missing realized outcome may be
+    completed later. Benchmark run summaries are append-only so calibration decisions
+    remain auditable across restarts.
     """
 
     def __init__(self, database_path: str | Path):
@@ -265,7 +266,7 @@ class IntelligenceBenchmarkStore:
 
     def upsert_observation(self, observation: BenchmarkObservation) -> None:
         with self._connect() as connection:
-            connection.execute(
+            cursor = connection.execute(
                 """
                 INSERT INTO intelligence_benchmark_observations (
                     card_id, as_of_date, horizon_days, current_price,
@@ -274,15 +275,30 @@ class IntelligenceBenchmarkStore:
                     liquidity_haircut_rate
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(card_id, as_of_date, horizon_days) DO UPDATE SET
-                    current_price = excluded.current_price,
-                    baseline_estimate = excluded.baseline_estimate,
-                    intelligence_estimate = excluded.intelligence_estimate,
-                    realized_price = excluded.realized_price,
-                    realized_at = excluded.realized_at,
-                    evidence_grade = excluded.evidence_grade,
-                    confidence = excluded.confidence,
-                    exit_fee_rate = excluded.exit_fee_rate,
-                    liquidity_haircut_rate = excluded.liquidity_haircut_rate
+                    realized_price = COALESCE(
+                        intelligence_benchmark_observations.realized_price,
+                        excluded.realized_price
+                    ),
+                    realized_at = COALESCE(
+                        intelligence_benchmark_observations.realized_at,
+                        excluded.realized_at
+                    )
+                WHERE
+                    intelligence_benchmark_observations.current_price = excluded.current_price
+                    AND intelligence_benchmark_observations.baseline_estimate = excluded.baseline_estimate
+                    AND intelligence_benchmark_observations.intelligence_estimate = excluded.intelligence_estimate
+                    AND intelligence_benchmark_observations.evidence_grade IS excluded.evidence_grade
+                    AND intelligence_benchmark_observations.confidence IS excluded.confidence
+                    AND intelligence_benchmark_observations.exit_fee_rate = excluded.exit_fee_rate
+                    AND intelligence_benchmark_observations.liquidity_haircut_rate = excluded.liquidity_haircut_rate
+                    AND (
+                        intelligence_benchmark_observations.realized_price IS NULL
+                        OR intelligence_benchmark_observations.realized_price IS excluded.realized_price
+                    )
+                    AND (
+                        intelligence_benchmark_observations.realized_at IS NULL
+                        OR intelligence_benchmark_observations.realized_at IS excluded.realized_at
+                    )
                 """,
                 (
                     observation.card_id,
@@ -299,6 +315,10 @@ class IntelligenceBenchmarkStore:
                     observation.liquidity_haircut_rate,
                 ),
             )
+            if cursor.rowcount != 1:
+                raise ValueError(
+                    "benchmark observation mutation rejected: decision-time inputs and completed outcomes are immutable"
+                )
 
     def load_observations(self) -> list[BenchmarkObservation]:
         with self._connect() as connection:

@@ -1,6 +1,8 @@
 import sqlite3
 from datetime import date
 
+import pytest
+
 from intelligence_benchmark import (
     BenchmarkObservation,
     IntelligenceBenchmarkStore,
@@ -134,23 +136,57 @@ def test_segments_results_by_evidence_grade_and_confidence_band():
     assert result["segments"]["confidence_band"]["unknown"]["observations"] == 1
 
 
-def test_store_upsert_is_deterministic_and_survives_restart(tmp_path):
+def test_store_freezes_decision_time_inputs_and_survives_restart(tmp_path):
     db = tmp_path / "benchmark.sqlite"
     store = IntelligenceBenchmarkStore(db)
-    store.upsert_observation(obs(intelligence=115.0))
+    original = obs(
+        realized=None,
+        realized_at=None,
+        intelligence=115.0,
+        exit_fee_rate=0.13,
+        liquidity_haircut_rate=0.04,
+    )
+    store.upsert_observation(original)
     store.upsert_observation(
-        obs(intelligence=121.0, exit_fee_rate=0.13, liquidity_haircut_rate=0.04)
+        obs(
+            intelligence=115.0,
+            realized=125.0,
+            realized_at=date(2026, 2, 1),
+            exit_fee_rate=0.13,
+            liquidity_haircut_rate=0.04,
+        )
     )
 
     restarted = IntelligenceBenchmarkStore(db)
     rows = restarted.load_observations()
 
     assert len(rows) == 1
-    assert rows[0].intelligence_estimate == 121.0
+    assert rows[0].intelligence_estimate == 115.0
+    assert rows[0].realized_price == 125.0
     assert rows[0].evidence_grade == "A"
     assert rows[0].confidence == 0.9
     assert rows[0].exit_fee_rate == 0.13
     assert rows[0].liquidity_haircut_rate == 0.04
+
+
+def test_store_rejects_hindsight_forecast_rewrite(tmp_path):
+    store = IntelligenceBenchmarkStore(tmp_path / "benchmark.sqlite")
+    store.upsert_observation(obs(realized=None, realized_at=None, intelligence=115.0))
+
+    with pytest.raises(ValueError, match="decision-time inputs"):
+        store.upsert_observation(obs(intelligence=124.0))
+
+    assert store.load_observations()[0].intelligence_estimate == 115.0
+
+
+def test_store_rejects_completed_outcome_rewrite(tmp_path):
+    store = IntelligenceBenchmarkStore(tmp_path / "benchmark.sqlite")
+    store.upsert_observation(obs(realized=125.0, realized_at=date(2026, 2, 1)))
+
+    with pytest.raises(ValueError, match="completed outcomes"):
+        store.upsert_observation(obs(realized=140.0, realized_at=date(2026, 2, 1)))
+
+    assert store.load_observations()[0].realized_price == 125.0
 
 
 def test_store_migrates_existing_benchmark_database(tmp_path):
