@@ -158,6 +158,18 @@ def allocation_readiness(
     }
 
 
+def _validate_unique_candidates(candidates: list[AllocationCandidate]) -> None:
+    """Prevent duplicate canonical cards from bypassing the per-position cap."""
+    seen: set[str] = set()
+    for candidate in candidates:
+        card_id = str(candidate.card_id).strip()
+        if not card_id:
+            raise ValueError("allocation candidate card_id cannot be empty")
+        if card_id in seen:
+            raise ValueError(f"duplicate allocation candidate card_id: {card_id}")
+        seen.add(card_id)
+
+
 def size_candidates(
     journal: RecommendationJournal,
     candidates: list[AllocationCandidate],
@@ -169,6 +181,7 @@ def size_candidates(
     policy = policy or AllocationPolicy()
     if portfolio_value <= 0:
         raise ValueError("portfolio_value must be positive.")
+    _validate_unique_candidates(candidates)
 
     approved: list[tuple[AllocationCandidate, dict[str, Any], float]] = []
     rejected: list[dict[str, Any]] = []
