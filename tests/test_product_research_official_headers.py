@@ -20,7 +20,7 @@ def test_accepts_official_ebay_report_header_vocabulary(tmp_path: Path):
     assert record.event_date == "2026-08-19"
     assert record.payload["normalized_sold_price"] == 100.0
     assert record.payload["normalized_shipping"] == 5.0
-    assert record.payload["normalized_listing_format"] == "Auction"
+    assert record.payload["normalized_listing_format"] == "auction"
     assert record.payload["normalized_quantity"] == 1
     assert result.metadata["columns"]["id"] == "Item Number"
     assert result.metadata["columns"]["price"] == "Sold For"

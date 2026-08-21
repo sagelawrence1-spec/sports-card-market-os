@@ -220,7 +220,8 @@ class EbayProductResearchProvider:
             payload["price_basis"] = price_basis
             payload["normalized_sold_price"] = sold_price
             payload["normalized_shipping"] = shipping
-            payload["normalized_listing_format"] = r.get(cols["format"]) if cols["format"] else None
+            listing_format=_norm(r.get(cols["format"])) if cols["format"] else ""
+            payload["normalized_listing_format"] = listing_format or None
             payload["normalized_quantity"] = quantity
             candidates.append(EvidenceRecord(
                 provider=self.provider_name,record_type="sold",source_item_id=sid,
@@ -242,6 +243,7 @@ class EbayProductResearchProvider:
                 r.payload.get("price_basis"),
                 r.payload.get("normalized_sold_price"),
                 r.payload.get("normalized_shipping"),
+                r.payload.get("normalized_listing_format"),
                 r.payload.get("normalized_quantity"),
             ) for r in group}
             if len(fingerprints)>1:
