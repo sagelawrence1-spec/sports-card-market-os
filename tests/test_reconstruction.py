@@ -82,6 +82,27 @@ def test_same_count_comp_replacement_explains_repricing():
     assert delta["reconstruction_health_failure"] is False
 
 
+def test_empty_comp_set_change_is_still_attributed_when_ledgers_exist():
+    delta=build_reconstruction_delta(
+        state(),
+        state(fair_value=116.0,evidence_ledger={"accepted":[]}),
+    )
+    assert delta["valuation_change_reasons"] == ["accepted_comp_set_changed"]
+    assert delta["valuation_input_change"] is True
+    assert delta["reconstruction_health_failure"] is False
+
+
+def test_comp_ledger_disappearance_cannot_explain_large_repricing():
+    current=state(fair_value=116.0)
+    current.pop("evidence_ledger")
+    delta=build_reconstruction_delta(state(),current)
+    assert delta["valuation_change_reasons"] == []
+    assert delta["quality_change_reasons"] == ["accepted_comp_ledger_presence_changed"]
+    assert delta["valuation_input_change"] is False
+    assert delta["unexplained_repricing"] is True
+    assert delta["reconstruction_health_failure"] is True
+
+
 def test_supply_or_confidence_change_is_attributed():
     delta=build_reconstruction_delta(
         state(),
