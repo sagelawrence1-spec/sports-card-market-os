@@ -38,6 +38,12 @@ def valuation_sample(sales,as_of=None,currency="USD"):
     mad=statistics.median(deviations) if len(prices)>1 else 0
     if mad:
         clean=[entry for entry in clean if abs(entry[1]-median)/(1.4826*mad) <= 3.5]
+    elif len(prices) >= 4:
+        # MAD collapses to zero when a majority of comps share the exact same price.
+        # Do not let one extreme contamination row disable outlier filtering entirely.
+        median_count=sum(1 for price in prices if price == median)
+        if median > 0 and median_count >= (len(prices)+1)//2:
+            clean=[entry for entry in clean if (median/3) <= entry[1] <= (median*3)]
     return [row for _,_,row in clean]
 
 def estimate_market(card_id, sales, as_of=None, half_life_days=45, currency="USD"):
