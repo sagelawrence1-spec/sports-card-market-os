@@ -52,14 +52,13 @@ def test_zero_mad_fallback_does_not_reject_nearby_legitimate_price():
     assert [row["evidence_id"] for row in sample] == ["a", "b", "c", "nearby"]
 
 
-def test_zero_mad_fallback_requires_repeated_median_support():
+def test_zero_mad_fallback_does_not_fire_on_sparse_three_sale_sample():
     sales = [
         _sale("a", 100),
         _sale("b", 100),
-        _sale("c", 200),
-        _sale("d", 1000),
+        _sale("suspicious_but_sparse", 1000),
     ]
 
     sample = valuation_sample(sales, "2026-08-15")
 
-    assert [row["evidence_id"] for row in sample] == ["a", "b", "c", "d"]
+    assert [row["evidence_id"] for row in sample] == ["a", "b", "suspicious_but_sparse"]
