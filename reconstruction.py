@@ -16,15 +16,25 @@ def _pct_change(previous: float | None, current: float | None) -> float | None:
     return (float(current) - float(previous)) / float(previous)
 
 
-def _accepted_evidence_ids(state: Mapping[str, Any]) -> tuple[str, ...]:
-    ledger = state.get("evidence_ledger") or {}
-    accepted = ledger.get("accepted") or []
+def _accepted_evidence_signature(state: Mapping[str, Any]) -> tuple[bool, tuple[str, ...]]:
+    """Return whether a comp ledger is present plus its accepted evidence IDs."""
+    if "evidence_ledger" not in state or state.get("evidence_ledger") is None:
+        return False, ()
+
+    ledger = state.get("evidence_ledger")
+    if not isinstance(ledger, Mapping):
+        return True, ()
+
+    accepted = ledger.get("accepted")
+    if not isinstance(accepted, list):
+        return True, ()
+
     ids = {
         str(row.get("evidence_id") or "").strip()
         for row in accepted
         if isinstance(row, Mapping) and str(row.get("evidence_id") or "").strip()
     }
-    return tuple(sorted(ids))
+    return True, tuple(sorted(ids))
 
 
 def _price_changed(previous: Mapping[str, Any], current: Mapping[str, Any], field: str) -> bool:
@@ -38,10 +48,10 @@ def build_reconstruction_delta(
     """Return an auditable explanation of how a market state changed.
 
     Valuation repricing is only considered supported when an input capable of
-    carrying market-price information changed: sold evidence, latest-sale
-    chronology, or active supply. Evidence-grade/confidence changes remain
-    visible in the audit trail, but they cannot by themselves justify a price
-    move because doing so would let model metadata explain its own repricing.
+    carrying market-price information changed: sold evidence, accepted comp
+    identity, latest-sale chronology, or active-supply price/count signals.
+    Evidence-grade/confidence changes and loss of comp-ledger lineage remain
+    visible in the audit trail, but cannot by themselves justify a price move.
     """
     if previous is None:
         return {
@@ -64,9 +74,11 @@ def build_reconstruction_delta(
     if previous_sales != current_sales:
         valuation_reasons.append("accepted_sales_changed")
 
-    previous_comp_ids = _accepted_evidence_ids(previous)
-    current_comp_ids = _accepted_evidence_ids(current)
-    if previous_comp_ids and current_comp_ids and previous_comp_ids != current_comp_ids:
+    previous_has_ledger, previous_comp_ids = _accepted_evidence_signature(previous)
+    current_has_ledger, current_comp_ids = _accepted_evidence_signature(current)
+    if previous_has_ledger != current_has_ledger:
+        quality_reasons.append("accepted_comp_ledger_presence_changed")
+    elif previous_has_ledger and previous_comp_ids != current_comp_ids:
         valuation_reasons.append("accepted_comp_set_changed")
 
     if previous.get("latest_sale_date") != current.get("latest_sale_date"):
