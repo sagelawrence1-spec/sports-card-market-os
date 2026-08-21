@@ -83,7 +83,10 @@ def test_family_mae_regression_blocks_aggregate_win() -> None:
 
 
 def test_family_directional_regression_blocks_aggregate_win() -> None:
-    rows = [_row(i, family="topps chrome") for i in range(15)]
+    rows = [
+        _row(i, family="topps chrome", baseline=90.0, comparable=108.0)
+        for i in range(15)
+    ]
     rows.extend(
         _row(i, family="bowman chrome", comparable=90.0, baseline=130.0)
         for i in range(15, 20)
