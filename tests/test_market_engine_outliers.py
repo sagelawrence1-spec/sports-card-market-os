@@ -62,3 +62,26 @@ def test_zero_mad_fallback_does_not_fire_on_sparse_three_sale_sample():
     sample = valuation_sample(sales, "2026-08-15")
 
     assert [row["evidence_id"] for row in sample] == ["a", "b", "suspicious_but_sparse"]
+
+
+def test_missing_currency_is_not_silently_treated_as_usd():
+    ambiguous = _sale("missing-currency", 100)
+    ambiguous.pop("currency")
+
+    sample = valuation_sample([ambiguous], "2026-08-15")
+
+    assert sample == []
+    estimate = estimate_market("CARD", [ambiguous], "2026-08-15")
+    assert estimate.sample_size == 0
+    assert estimate.fair_value is None
+
+
+def test_currency_matching_is_explicit_and_case_insensitive():
+    usd = _sale("usd", 100)
+    usd["currency"] = " usd "
+    eur = _sale("eur", 90)
+    eur["currency"] = "EUR"
+
+    sample = valuation_sample([usd, eur], "2026-08-15", currency="usd")
+
+    assert [row["evidence_id"] for row in sample] == ["usd"]
