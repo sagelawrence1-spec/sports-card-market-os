@@ -42,6 +42,10 @@ _MULTI_CARD_TITLE_PATTERNS=(
     re.compile(r"\b(?:[2-9]|[1-9]\d+) cards? bundle\b"),
     re.compile(r"\bbundle of (?:[2-9]|[1-9]\d+) cards?\b"),
     re.compile(r"\bset of (?:[2-9]|[1-9]\d+) cards?\b"),
+    re.compile(r"\b(?:[2-9]|[1-9]\d+) cards? set\b"),
+    re.compile(r"\bpair of cards?\b"),
+    re.compile(r"\b(?:two|three|four|five|six|seven|eight|nine|ten) cards? (?:lot|bundle|set)\b"),
+    re.compile(r"\b(?:lot|bundle|set) of (?:two|three|four|five|six|seven|eight|nine|ten) cards?\b"),
 )
 
 def _norm(s): return re.sub(r"[^a-z0-9]+"," ",str(s).lower()).strip()
