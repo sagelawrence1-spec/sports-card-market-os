@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+from collections import Counter
 from pathlib import Path
 from typing import Any
 
@@ -26,6 +27,18 @@ def build_receipt(path: str | Path, *, query: str = "") -> dict[str, Any]:
     if accounted != rows:
         raise ValueError(
             f"Product Research row accounting mismatch: rows={rows} accounted={accounted}"
+        )
+
+    accepted_source_item_ids = [record.source_item_id for record in result.records]
+    duplicate_item_ids = sorted(
+        item_id
+        for item_id, count in Counter(accepted_source_item_ids).items()
+        if count > 1
+    )
+    if duplicate_item_ids:
+        raise ValueError(
+            "Product Research authoritative receipt cannot bind reused sold item IDs: "
+            + ", ".join(duplicate_item_ids)
         )
 
     return {

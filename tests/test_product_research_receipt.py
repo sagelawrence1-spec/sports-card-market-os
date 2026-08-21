@@ -80,6 +80,20 @@ def test_receipt_fails_closed_on_row_accounting_drift(tmp_path, monkeypatch):
         build_receipt(path)
 
 
+def test_receipt_fails_closed_when_item_id_is_reused_across_sold_dates(tmp_path):
+    path = tmp_path / "sold.csv"
+    _write(
+        path,
+        [
+            _row(item_id="123456789012", sold_date="2026-08-01"),
+            _row(item_id="123456789012", sold_date="2026-08-02"),
+        ],
+    )
+
+    with pytest.raises(ValueError, match="reused sold item IDs: 123456789012"):
+        build_receipt(path)
+
+
 def test_cli_writes_json_receipt(tmp_path):
     source = tmp_path / "sold.csv"
     output = tmp_path / "receipt.json"
