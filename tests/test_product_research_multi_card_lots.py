@@ -50,6 +50,36 @@ def test_rejects_explicit_multi_card_bundle(tmp_path):
     assert result.metadata["rejection_reasons"]=={"multi_card_lot":1}
 
 
+def test_rejects_numeric_card_set_even_when_quantity_is_one(tmp_path):
+    path=tmp_path/"sold.csv"
+    _write(path,"2025 Topps Chrome Shohei Ohtani 3 Card Set")
+
+    result=EbayProductResearchProvider().load_csv(path)
+
+    assert result.records==[]
+    assert result.metadata["rejection_reasons"]=={"multi_card_lot":1}
+
+
+def test_rejects_pair_of_cards_even_when_quantity_is_one(tmp_path):
+    path=tmp_path/"sold.csv"
+    _write(path,"2025 Topps Chrome Shohei Ohtani Pair of Cards")
+
+    result=EbayProductResearchProvider().load_csv(path)
+
+    assert result.records==[]
+    assert result.metadata["rejection_reasons"]=={"multi_card_lot":1}
+
+
+def test_rejects_spelled_out_multi_card_lot(tmp_path):
+    path=tmp_path/"sold.csv"
+    _write(path,"2025 Topps Chrome Shohei Ohtani Lot of Three Cards")
+
+    result=EbayProductResearchProvider().load_csv(path)
+
+    assert result.records==[]
+    assert result.metadata["rejection_reasons"]=={"multi_card_lot":1}
+
+
 def test_card_number_does_not_trigger_multi_card_lot_filter(tmp_path):
     path=tmp_path/"sold.csv"
     _write(path,"2025 Topps Chrome Shohei Ohtani Card #2 Refractor")
