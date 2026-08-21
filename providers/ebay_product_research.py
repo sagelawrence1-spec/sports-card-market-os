@@ -37,6 +37,7 @@ _MONEY_VALUE_RE=re.compile(r"^(?:[A-Z]{3}\s*)?[$€£]?\s*(?:\d{1,3}(?:,\d{3})+|
 _EBAY_ITEM_URL_RE=re.compile(r"/itm/(?:[^/?#]+/)?(\d+)(?:[/?#]|$)",re.IGNORECASE)
 _CURRENCY_CODE_PREFIX_RE=re.compile(r"^([A-Z]{3})\b",re.IGNORECASE)
 _MULTI_CARD_TITLE_PATTERNS=(
+    re.compile(r"\b(?:lot|bundle)\b"),
     re.compile(r"\blot of (?:[2-9]|[1-9]\d+)\b"),
     re.compile(r"\b(?:[2-9]|[1-9]\d+) cards? lot\b"),
     re.compile(r"\b(?:[2-9]|[1-9]\d+) cards? bundle\b"),
@@ -44,8 +45,10 @@ _MULTI_CARD_TITLE_PATTERNS=(
     re.compile(r"\bset of (?:[2-9]|[1-9]\d+) cards?\b"),
     re.compile(r"\b(?:[2-9]|[1-9]\d+) cards? set\b"),
     re.compile(r"\bpair of cards?\b"),
-    re.compile(r"\b(?:two|three|four|five|six|seven|eight|nine|ten) cards? (?:lot|bundle|set)\b"),
-    re.compile(r"\b(?:lot|bundle|set) of (?:two|three|four|five|six|seven|eight|nine|ten) cards?\b"),
+    re.compile(r"\b(?:[2-9]|[1-9]\d+) cards? pack\b"),
+    re.compile(r"\bpack of (?:[2-9]|[1-9]\d+) cards?\b"),
+    re.compile(r"\b(?:two|three|four|five|six|seven|eight|nine|ten) cards? (?:lot|bundle|set|pack)\b"),
+    re.compile(r"\b(?:lot|bundle|set|pack) of (?:two|three|four|five|six|seven|eight|nine|ten) cards?\b"),
 )
 
 def _norm(s): return re.sub(r"[^a-z0-9]+"," ",str(s).lower()).strip()
