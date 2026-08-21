@@ -16,25 +16,48 @@ def _pct_change(previous: float | None, current: float | None) -> float | None:
     return (float(current) - float(previous)) / float(previous)
 
 
-def _accepted_evidence_signature(state: Mapping[str, Any]) -> tuple[bool, tuple[str, ...]]:
-    """Return whether a comp ledger is present plus its accepted evidence IDs."""
+def _accepted_evidence_signature(
+    state: Mapping[str, Any],
+) -> tuple[bool, tuple[str, ...], tuple[tuple[str, ...], ...]]:
+    """Return ledger presence, accepted IDs, and immutable evidence content.
+
+    Evidence IDs identify the comp set. The content signature separately captures
+    immutable source facts so a price/date/source mutation under the same ID is
+    surfaced as a lineage-quality failure rather than accepted as fresh market
+    evidence.
+    """
     if "evidence_ledger" not in state or state.get("evidence_ledger") is None:
-        return False, ()
+        return False, (), ()
 
     ledger = state.get("evidence_ledger")
     if not isinstance(ledger, Mapping):
-        return True, ()
+        return True, (), ()
 
     accepted = ledger.get("accepted")
     if not isinstance(accepted, list):
-        return True, ()
+        return True, (), ()
 
-    ids = {
-        str(row.get("evidence_id") or "").strip()
-        for row in accepted
-        if isinstance(row, Mapping) and str(row.get("evidence_id") or "").strip()
-    }
-    return True, tuple(sorted(ids))
+    rows: list[tuple[str, ...]] = []
+    for row in accepted:
+        if not isinstance(row, Mapping):
+            continue
+        evidence_id = str(row.get("evidence_id") or "").strip()
+        if not evidence_id:
+            continue
+        rows.append(
+            (
+                evidence_id,
+                str(row.get("price") if row.get("price") is not None else ""),
+                str(row.get("currency") or "").strip().upper(),
+                str(row.get("event_date") or "").strip(),
+                str(row.get("source") or "").strip(),
+                str(row.get("url") or "").strip(),
+            )
+        )
+
+    rows.sort(key=lambda row: row[0])
+    ids = tuple(row[0] for row in rows)
+    return True, ids, tuple(rows)
 
 
 def _price_changed(previous: Mapping[str, Any], current: Mapping[str, Any], field: str) -> bool:
@@ -50,8 +73,9 @@ def build_reconstruction_delta(
     Valuation repricing is only considered supported when an input capable of
     carrying market-price information changed: sold evidence, accepted comp
     identity, latest-sale chronology, or active-supply price/count signals.
-    Evidence-grade/confidence changes and loss of comp-ledger lineage remain
-    visible in the audit trail, but cannot by themselves justify a price move.
+    Evidence-grade/confidence changes, loss of comp-ledger lineage, and mutation
+    of immutable comp facts remain visible in the audit trail, but cannot by
+    themselves justify a price move.
     """
     if previous is None:
         return {
@@ -74,12 +98,14 @@ def build_reconstruction_delta(
     if previous_sales != current_sales:
         valuation_reasons.append("accepted_sales_changed")
 
-    previous_has_ledger, previous_comp_ids = _accepted_evidence_signature(previous)
-    current_has_ledger, current_comp_ids = _accepted_evidence_signature(current)
+    previous_has_ledger, previous_comp_ids, previous_comp_content = _accepted_evidence_signature(previous)
+    current_has_ledger, current_comp_ids, current_comp_content = _accepted_evidence_signature(current)
     if previous_has_ledger != current_has_ledger:
         quality_reasons.append("accepted_comp_ledger_presence_changed")
     elif previous_has_ledger and previous_comp_ids != current_comp_ids:
         valuation_reasons.append("accepted_comp_set_changed")
+    elif previous_has_ledger and previous_comp_content != current_comp_content:
+        quality_reasons.append("accepted_comp_content_changed")
 
     if previous.get("latest_sale_date") != current.get("latest_sale_date"):
         valuation_reasons.append("latest_sale_changed")
