@@ -194,7 +194,11 @@ class EbayProductResearchProvider:
                 rejection_reasons["invalid_item_id"]+=1
                 continue
             raw_url=r.get(cols["url"]) if cols["url"] else None
+            raw_url_text=str(raw_url or "").strip()
             url_id=_item_id_from_url(raw_url)
+            if raw_url_text and not url_id:
+                rejection_reasons["invalid_item_url"]+=1
+                continue
             if explicit_id and url_id and explicit_id!=url_id:
                 rejection_reasons["conflicting_item_id"]+=1
                 continue
