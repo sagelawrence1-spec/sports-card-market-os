@@ -14,7 +14,7 @@ are rejected so bundled transactions cannot masquerade as one single-card comp.
 """
 import csv, re
 from collections import Counter, defaultdict
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 from urllib.parse import urlsplit
 from .base import EvidenceRecord, ProviderResult
@@ -202,6 +202,9 @@ class EbayProductResearchProvider:
                 continue
             if sold_date is None:
                 rejection_reasons["invalid_sold_date"]+=1
+                continue
+            if date.fromisoformat(sold_date) > date.today():
+                rejection_reasons["future_sold_date"]+=1
                 continue
             if currency is None:
                 rejection_reasons["missing_currency"]+=1
