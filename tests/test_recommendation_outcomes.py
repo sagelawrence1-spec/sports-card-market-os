@@ -82,6 +82,27 @@ def test_journal_packet_ignores_unsettled_and_segments_actions():
     assert packet["grades"]["A"] == 2
     assert packet["actions"]["BUY"]["settled"] == 1
     assert packet["actions"]["SELL"]["settled"] == 1
+    assert len(packet["packet_sha256"]) == 64
+
+
+def test_scorecard_hash_is_order_independent_for_same_evidence():
+    buy = _rec(action="BUY", realized=120.0)
+    sell = _rec(action="SELL", realized=80.0)
+    first = grade_journal([buy, sell])
+    second = grade_journal([sell, buy])
+    assert first == second
+    assert first["packet_sha256"] == second["packet_sha256"]
+
+
+def test_scorecard_hash_changes_when_outcome_or_policy_changes():
+    baseline = grade_journal([_rec(realized=120.0)])
+    outcome_changed = grade_journal([_rec(realized=121.0)])
+    policy_changed = grade_journal(
+        [_rec(realized=120.0)],
+        policy=OutcomePolicy(exit_fee_rate=0.01),
+    )
+    assert baseline["packet_sha256"] != outcome_changed["packet_sha256"]
+    assert baseline["packet_sha256"] != policy_changed["packet_sha256"]
 
 
 def test_invalid_policy_fails_closed():
