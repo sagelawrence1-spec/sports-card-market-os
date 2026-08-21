@@ -32,14 +32,26 @@ def test_conflicting_duplicate_item_ids_fail_closed(tmp_path):
     assert result.metadata["rejection_reasons"]=={"conflicting_duplicate_evidence":2}
 
 
-def test_same_listing_id_on_distinct_sold_dates_is_two_legitimate_sales(tmp_path):
+def test_same_listing_id_on_distinct_sold_dates_fails_closed(tmp_path):
     path=tmp_path/"sold.csv"; _write(path,[_row("$100","2026-08-01"),_row("$115","2026-08-03")])
     result=EbayProductResearchProvider().load_csv(path)
-    assert len(result.records)==2
-    assert [record.event_date for record in result.records]==["2026-08-01","2026-08-03"]
-    assert result.metadata["accepted_rows"]==2
+    assert result.records==[]
+    assert result.metadata["accepted_rows"]==0
     assert result.metadata["deduplicated_rows"]==0
-    assert result.metadata["rejected_rows"]==0
+    assert result.metadata["rejected_rows"]==2
+    assert result.metadata["rejection_reasons"]=={"reused_item_id_across_sold_dates":2}
+
+
+def test_cross_date_reuse_does_not_leak_other_same_id_rows(tmp_path):
+    path=tmp_path/"sold.csv"
+    row=_row("$100","2026-08-01")
+    _write(path,[row,row.copy(),_row("$115","2026-08-03")])
+    result=EbayProductResearchProvider().load_csv(path)
+    assert result.records==[]
+    assert result.metadata["accepted_rows"]==0
+    assert result.metadata["deduplicated_rows"]==0
+    assert result.metadata["rejected_rows"]==3
+    assert result.metadata["rejection_reasons"]=={"reused_item_id_across_sold_dates":3}
 
 
 def test_same_listing_id_same_day_still_deduplicates_conservatively(tmp_path):
