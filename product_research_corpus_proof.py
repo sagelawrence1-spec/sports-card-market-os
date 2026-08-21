@@ -27,6 +27,37 @@ def _fingerprint(path: Path) -> tuple[str, int]:
     return hashlib.sha256(raw).hexdigest(), len(raw)
 
 
+def _validate_manifest_rows(
+    rows: Any,
+    *,
+    name: str,
+    identity_key: str,
+) -> list[Mapping[str, Any]]:
+    """Reject structurally ambiguous proof manifests before fingerprinting.
+
+    Authoritative proof inputs must be ordered JSON arrays of objects with a stable,
+    non-empty, unique identity. Otherwise duplicate or malformed manifest rows could
+    make the proof packet auditable by hash while still being semantically ambiguous.
+    """
+
+    if not isinstance(rows, list):
+        raise ValueError(f"{name} manifest must be a JSON array")
+
+    seen: set[str] = set()
+    validated: list[Mapping[str, Any]] = []
+    for index, row in enumerate(rows):
+        if not isinstance(row, Mapping):
+            raise ValueError(f"{name} manifest row {index} must be an object")
+        identity = str(row.get(identity_key) or "").strip()
+        if not identity:
+            raise ValueError(f"{name} manifest row {index} is missing {identity_key}")
+        if identity in seen:
+            raise ValueError(f"{name} manifest contains duplicate {identity_key}: {identity}")
+        seen.add(identity)
+        validated.append(row)
+    return validated
+
+
 def _manifest_binding(rows: list[Mapping[str, Any]]) -> dict[str, Any]:
     """Fingerprint proof inputs independent of mapping key order.
 
@@ -100,6 +131,8 @@ def build_product_research_corpus_proof(
     receipt = build_receipt(source, query=query)
     raw_rows = load_delimited_export(source)
     binding = _verify_receipt_source(source, receipt, proof_input_rows=len(raw_rows))
+    candidates = _validate_manifest_rows(candidates, name="candidate", identity_key="card_id")
+    label_rows = _validate_manifest_rows(label_rows, name="label", identity_key="evidence_id")
     proof_inputs = {
         "candidates": _manifest_binding(candidates),
         "labels": _manifest_binding(label_rows),
