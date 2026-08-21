@@ -25,6 +25,23 @@ class AllocationDecision:
     details: Mapping[str, Any]
 
 
+def _decision_payload(decision: AllocationDecision) -> tuple[Any, ...]:
+    """Return the immutable decision payload, excluding retry timestamp noise."""
+    return (
+        decision.run_id,
+        decision.card_id,
+        decision.requested_allocation,
+        decision.approved_allocation,
+        decision.ready,
+        tuple(decision.blockers),
+        tuple(decision.exposure_blockers),
+        decision.evidence_grade,
+        decision.confidence,
+        decision.action,
+        dict(decision.details),
+    )
+
+
 class AllocationAuditStore:
     def __init__(self, database_path: str):
         self.database_path = str(database_path)
@@ -54,23 +71,39 @@ class AllocationAuditStore:
         conn.row_factory = sqlite3.Row
         return conn
 
+    @staticmethod
+    def _from_row(row: sqlite3.Row) -> AllocationDecision:
+        return AllocationDecision(
+            run_id=row["run_id"],
+            card_id=row["card_id"],
+            decided_at=row["decided_at"],
+            requested_allocation=row["requested_allocation"],
+            approved_allocation=row["approved_allocation"],
+            ready=bool(row["ready"]),
+            blockers=tuple(json.loads(row["blockers_json"])),
+            exposure_blockers=tuple(json.loads(row["exposure_blockers_json"])),
+            evidence_grade=row["evidence_grade"],
+            confidence=row["confidence"],
+            action=row["action"],
+            details=json.loads(row["details_json"]),
+        )
+
     def record(self, decision: AllocationDecision) -> None:
         with self._connect() as conn:
+            existing_row = conn.execute(
+                "SELECT * FROM allocation_decisions WHERE run_id=? AND card_id=?",
+                (decision.run_id, decision.card_id),
+            ).fetchone()
+            if existing_row is not None:
+                existing = self._from_row(existing_row)
+                if _decision_payload(existing) == _decision_payload(decision):
+                    return
+                raise ValueError(
+                    "Allocation decisions are immutable once recorded for a run/card."
+                )
+
             conn.execute(
-                """
-                INSERT INTO allocation_decisions VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
-                ON CONFLICT(run_id,card_id) DO UPDATE SET
-                    decided_at=excluded.decided_at,
-                    requested_allocation=excluded.requested_allocation,
-                    approved_allocation=excluded.approved_allocation,
-                    ready=excluded.ready,
-                    blockers_json=excluded.blockers_json,
-                    exposure_blockers_json=excluded.exposure_blockers_json,
-                    evidence_grade=excluded.evidence_grade,
-                    confidence=excluded.confidence,
-                    action=excluded.action,
-                    details_json=excluded.details_json
-                """,
+                "INSERT INTO allocation_decisions VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
                 (
                     decision.run_id,
                     decision.card_id,
@@ -93,23 +126,7 @@ class AllocationAuditStore:
                 "SELECT * FROM allocation_decisions WHERE run_id=? ORDER BY card_id",
                 (run_id,),
             ).fetchall()
-        return [
-            AllocationDecision(
-                run_id=row["run_id"],
-                card_id=row["card_id"],
-                decided_at=row["decided_at"],
-                requested_allocation=row["requested_allocation"],
-                approved_allocation=row["approved_allocation"],
-                ready=bool(row["ready"]),
-                blockers=tuple(json.loads(row["blockers_json"])),
-                exposure_blockers=tuple(json.loads(row["exposure_blockers_json"])),
-                evidence_grade=row["evidence_grade"],
-                confidence=row["confidence"],
-                action=row["action"],
-                details=json.loads(row["details_json"]),
-            )
-            for row in rows
-        ]
+        return [self._from_row(row) for row in rows]
 
 
 def persist_allocation_run(
