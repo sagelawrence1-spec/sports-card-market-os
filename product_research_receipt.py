@@ -28,6 +28,12 @@ def build_receipt(path: str | Path, *, query: str = "") -> dict[str, Any]:
             f"Product Research row accounting mismatch: rows={rows} accounted={accounted}"
         )
 
+    columns = metadata.get("columns") or {}
+    if rows and not columns.get("quantity"):
+        raise ValueError(
+            "Product Research authoritative receipt requires an explicit quantity column"
+        )
+
     accepted_evidence_ids = [
         f"{record.provider}:{record.source_item_id}:{record.event_date}"
         for record in result.records
@@ -45,6 +51,7 @@ def build_receipt(path: str | Path, *, query: str = "") -> dict[str, Any]:
         "provider": result.provider,
         "query": result.query,
         "price_basis": metadata.get("price_basis"),
+        "quantity_basis": "explicit_exported_quantity",
         "rows": {
             "raw": rows,
             "accepted": accepted,
