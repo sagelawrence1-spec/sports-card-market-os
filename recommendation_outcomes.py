@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import hashlib
+import json
 from statistics import median
 from typing import Iterable
 
@@ -78,6 +80,11 @@ def _letter_grade(score: float, policy: OutcomePolicy) -> str:
     return "F"
 
 
+def _packet_sha256(packet: dict) -> str:
+    canonical = json.dumps(packet, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
+    return hashlib.sha256(canonical).hexdigest()
+
+
 def grade_recommendation(
     rec: Recommendation,
     *,
@@ -125,7 +132,7 @@ def grade_journal(
     *,
     policy: OutcomePolicy | None = None,
 ) -> dict:
-    """Produce an auditable outcome packet from settled recommendation records."""
+    """Produce an auditable, cryptographically bound outcome packet."""
     policy = policy or OutcomePolicy()
     policy.validate()
     rows = [
@@ -155,7 +162,7 @@ def grade_journal(
         }
 
     returns = [row["action_adjusted_return"] for row in rows]
-    return {
+    packet = {
         "schema_version": SCHEMA_VERSION,
         "settled": len(rows),
         "hit_rate": (sum(int(row["hit"]) for row in rows) / len(rows)) if rows else None,
@@ -173,3 +180,5 @@ def grade_journal(
             "grade_d_min": policy.grade_d_min,
         },
     }
+    packet["packet_sha256"] = _packet_sha256(packet)
+    return packet
