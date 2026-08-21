@@ -103,6 +103,69 @@ def test_comp_ledger_disappearance_cannot_explain_large_repricing():
     assert delta["reconstruction_health_failure"] is True
 
 
+def test_same_evidence_id_content_mutation_cannot_explain_large_repricing():
+    previous_ledger={"accepted":[
+        {
+            "evidence_id":"sale-1",
+            "price":100.0,
+            "currency":"USD",
+            "event_date":"2026-08-10",
+            "source":"eBay Product Research",
+            "url":"https://www.ebay.com/itm/1",
+        },
+        {
+            "evidence_id":"sale-2",
+            "price":110.0,
+            "currency":"USD",
+            "event_date":"2026-08-11",
+            "source":"eBay Product Research",
+            "url":"https://www.ebay.com/itm/2",
+        },
+    ]}
+    current_ledger={"accepted":[
+        {
+            "evidence_id":"sale-1",
+            "price":160.0,
+            "currency":"USD",
+            "event_date":"2026-08-10",
+            "source":"eBay Product Research",
+            "url":"https://www.ebay.com/itm/1",
+        },
+        {
+            "evidence_id":"sale-2",
+            "price":110.0,
+            "currency":"USD",
+            "event_date":"2026-08-11",
+            "source":"eBay Product Research",
+            "url":"https://www.ebay.com/itm/2",
+        },
+    ]}
+    delta=build_reconstruction_delta(
+        state(evidence_ledger=previous_ledger),
+        state(fair_value=116.0,evidence_ledger=current_ledger),
+    )
+    assert delta["valuation_change_reasons"] == []
+    assert delta["quality_change_reasons"] == ["accepted_comp_content_changed"]
+    assert delta["valuation_input_change"] is False
+    assert delta["unexplained_repricing"] is True
+    assert delta["reconstruction_health_failure"] is True
+
+
+def test_accepted_comp_row_order_does_not_create_false_change():
+    previous_ledger={"accepted":[
+        {"evidence_id":"sale-1","price":100.0,"currency":"USD","event_date":"2026-08-10"},
+        {"evidence_id":"sale-2","price":110.0,"currency":"USD","event_date":"2026-08-11"},
+    ]}
+    current_ledger={"accepted":list(reversed(previous_ledger["accepted"]))}
+    delta=build_reconstruction_delta(
+        state(evidence_ledger=previous_ledger),
+        state(evidence_ledger=current_ledger),
+    )
+    assert delta["material_input_change"] is False
+    assert delta["valuation_input_change"] is False
+    assert delta["change_reasons"] == ["no_material_input_change"]
+
+
 def test_supply_or_confidence_change_is_attributed():
     delta=build_reconstruction_delta(
         state(),
