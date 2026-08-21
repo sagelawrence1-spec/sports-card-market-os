@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+from datetime import date
 
 import pytest
 
@@ -69,6 +69,39 @@ def test_under_sampled_family_blocks_aggregate_win() -> None:
     assert result["thin_families"] == ["rare family"]
 
 
+def test_family_mae_regression_blocks_aggregate_win() -> None:
+    rows = [_row(i, family="topps chrome") for i in range(15)]
+    rows.extend(
+        _row(i, family="bowman chrome", comparable=130.0)
+        for i in range(15, 20)
+    )
+    result = evaluate_comparable_lift(rows, evaluation_date=date(2026, 3, 1))
+    assert result["overall"]["mae_improvement_pct"] > 0.05
+    assert result["production_ready"] is False
+    assert "family_mae_regression" in result["blockers"]
+    assert result["mae_regressing_families"] == ["bowman chrome"]
+
+
+def test_family_directional_regression_blocks_aggregate_win() -> None:
+    rows = [_row(i, family="topps chrome") for i in range(15)]
+    rows.extend(
+        _row(i, family="bowman chrome", comparable=90.0, baseline=130.0)
+        for i in range(15, 20)
+    )
+    result = evaluate_comparable_lift(
+        rows,
+        evaluation_date=date(2026, 3, 1),
+        policy=ComparableLiftPolicy(
+            min_mae_improvement_pct=-1.0,
+            min_family_mae_improvement_pct=-1.0,
+        ),
+    )
+    assert result["overall"]["directional_lift"] >= 0.0
+    assert result["production_ready"] is False
+    assert "family_directional_regression" in result["blockers"]
+    assert result["directional_regressing_families"] == ["bowman chrome"]
+
+
 def test_mae_regression_blocks_release() -> None:
     rows = [_row(i, baseline=108.0, comparable=130.0, realized=110.0) for i in range(20)]
     result = evaluate_comparable_lift(rows, evaluation_date=date(2026, 3, 1))
@@ -84,7 +117,10 @@ def test_directional_regression_blocks_release() -> None:
     result = evaluate_comparable_lift(
         rows,
         evaluation_date=date(2026, 3, 1),
-        policy=ComparableLiftPolicy(min_mae_improvement_pct=-1.0),
+        policy=ComparableLiftPolicy(
+            min_mae_improvement_pct=-1.0,
+            min_family_mae_improvement_pct=-1.0,
+        ),
     )
     assert result["production_ready"] is False
     assert "directional_accuracy_regression" in result["blockers"]
@@ -118,3 +154,7 @@ def test_policy_validation_fails_closed() -> None:
         ComparableLiftPolicy(min_mature_samples=0).validate()
     with pytest.raises(ValueError, match="min_family_samples"):
         ComparableLiftPolicy(min_family_samples=0).validate()
+    with pytest.raises(ValueError, match="min_family_mae_improvement_pct"):
+        ComparableLiftPolicy(min_family_mae_improvement_pct=1.1).validate()
+    with pytest.raises(ValueError, match="min_family_directional_lift"):
+        ComparableLiftPolicy(min_family_directional_lift=-1.1).validate()
