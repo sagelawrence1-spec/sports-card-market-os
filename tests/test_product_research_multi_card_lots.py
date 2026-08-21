@@ -80,9 +80,59 @@ def test_rejects_spelled_out_multi_card_lot(tmp_path):
     assert result.metadata["rejection_reasons"]=={"multi_card_lot":1}
 
 
+def test_rejects_bare_lot_wording_when_quantity_is_one(tmp_path):
+    path=tmp_path/"sold.csv"
+    _write(path,"2025 Topps Chrome Shohei Ohtani Refractor Lot")
+
+    result=EbayProductResearchProvider().load_csv(path)
+
+    assert result.records==[]
+    assert result.metadata["rejection_reasons"]=={"multi_card_lot":1}
+
+
+def test_rejects_bare_bundle_wording_when_quantity_is_one(tmp_path):
+    path=tmp_path/"sold.csv"
+    _write(path,"2025 Topps Chrome Shohei Ohtani Rookie Bundle")
+
+    result=EbayProductResearchProvider().load_csv(path)
+
+    assert result.records==[]
+    assert result.metadata["rejection_reasons"]=={"multi_card_lot":1}
+
+
+def test_rejects_numeric_multi_card_pack(tmp_path):
+    path=tmp_path/"sold.csv"
+    _write(path,"2025 Topps Chrome Shohei Ohtani 3 Card Pack")
+
+    result=EbayProductResearchProvider().load_csv(path)
+
+    assert result.records==[]
+    assert result.metadata["rejection_reasons"]=={"multi_card_lot":1}
+
+
+def test_rejects_spelled_out_multi_card_pack(tmp_path):
+    path=tmp_path/"sold.csv"
+    _write(path,"2025 Topps Chrome Shohei Ohtani Pack of Three Cards")
+
+    result=EbayProductResearchProvider().load_csv(path)
+
+    assert result.records==[]
+    assert result.metadata["rejection_reasons"]=={"multi_card_lot":1}
+
+
 def test_card_number_does_not_trigger_multi_card_lot_filter(tmp_path):
     path=tmp_path/"sold.csv"
     _write(path,"2025 Topps Chrome Shohei Ohtani Card #2 Refractor")
+
+    result=EbayProductResearchProvider().load_csv(path)
+
+    assert len(result.records)==1
+    assert result.metadata["rejected_rows"]==0
+
+
+def test_lottery_word_does_not_trigger_bare_lot_filter(tmp_path):
+    path=tmp_path/"sold.csv"
+    _write(path,"2025 Topps Chrome Shohei Ohtani Lottery Insert Card #2")
 
     result=EbayProductResearchProvider().load_csv(path)
 
