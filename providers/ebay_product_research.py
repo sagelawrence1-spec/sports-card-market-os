@@ -9,8 +9,9 @@ Accepted input: CSV with flexible aliases for title, sold price, sold date, item
 and shipping. Rows fail closed when title, sold date, price, USD currency evidence,
 stable sold-item identity, an explicitly exported shipping amount, quantity, or duplicate
 sold evidence is ambiguous. Shipping provenance is required so authoritative comps always
-share the same landed-price basis. Explicit multi-unit sales and explicit multi-card lots
-are rejected so bundled transactions cannot masquerade as one single-card comp.
+share the same landed-price basis. Explicit multi-unit sales, explicit multi-card lots,
+and non-single-card transactions such as repacks, mystery products, and break spots are
+rejected so bundled or indirect transactions cannot masquerade as one single-card comp.
 """
 import csv, re
 from collections import Counter, defaultdict
@@ -53,6 +54,12 @@ _MULTI_CARD_TITLE_PATTERNS=(
     re.compile(r"\bx\s*(?:[2-9]|[1-9]\d+)\b"),
     re.compile(r"\b(?:qty|quantity)\s*(?:[2-9]|[1-9]\d+)\b"),
 )
+_NON_SINGLE_CARD_TRANSACTION_PATTERNS=(
+    re.compile(r"\brepack\b"),
+    re.compile(r"\bmystery (?:pack|box)\b"),
+    re.compile(r"\b(?:break spot|team break|player break|box break|case break|group break)\b"),
+    re.compile(r"\b(?:random team|pick your team|pyt)\b"),
+)
 
 def _norm(s): return re.sub(r"[^a-z0-9]+"," ",str(s).lower()).strip()
 
@@ -65,6 +72,10 @@ def _find(headers, aliases):
 def _title_indicates_multi_card_lot(title):
     normalized=_norm(title)
     return any(pattern.search(normalized) for pattern in _MULTI_CARD_TITLE_PATTERNS)
+
+def _title_indicates_non_single_card_transaction(title):
+    normalized=_norm(title)
+    return any(pattern.search(normalized) for pattern in _NON_SINGLE_CARD_TRANSACTION_PATTERNS)
 
 def _negative_money(text):
     stripped=" ".join(str(text or "").strip().split())
@@ -199,6 +210,9 @@ class EbayProductResearchProvider:
                 continue
             if _title_indicates_multi_card_lot(title):
                 rejection_reasons["multi_card_lot"]+=1
+                continue
+            if _title_indicates_non_single_card_transaction(title):
+                rejection_reasons["non_single_card_transaction"]+=1
                 continue
             if cols["quantity"]:
                 quantity=_sold_quantity(r.get(cols["quantity"]))
