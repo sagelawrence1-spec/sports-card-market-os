@@ -75,11 +75,12 @@ def build_reconstruction_delta(
     """Return an auditable explanation of how a market state changed.
 
     Valuation repricing is only considered supported when an input capable of
-    carrying market-price information changed: sold evidence, accepted comp
-    identity, latest-sale chronology, or active-supply price/count signals.
-    Evidence-grade/confidence changes, loss or corruption of comp-ledger lineage,
-    and mutation of immutable comp facts remain visible in the audit trail, but
-    cannot by themselves justify a price move.
+    carrying market-price information changed: sold evidence with trustworthy
+    lineage, accepted comp identity, latest-sale chronology with trustworthy
+    lineage, or active-supply price/count signals. Evidence-grade/confidence
+    changes, loss or corruption of comp-ledger lineage, and mutation of immutable
+    comp facts remain visible in the audit trail, but cannot by themselves justify
+    a price move.
     """
     if previous is None:
         return {
@@ -99,8 +100,6 @@ def build_reconstruction_delta(
 
     previous_sales = int(previous.get("accepted_sales_total") or 0)
     current_sales = int(current.get("accepted_sales_total") or 0)
-    if previous_sales != current_sales:
-        valuation_reasons.append("accepted_sales_changed")
 
     (
         previous_has_ledger,
@@ -114,17 +113,31 @@ def build_reconstruction_delta(
         current_comp_ids,
         current_comp_content,
     ) = _accepted_evidence_signature(current)
+
+    sold_lineage_failure = False
     if previous_has_ledger != current_has_ledger:
+        sold_lineage_failure = True
         quality_reasons.append("accepted_comp_ledger_presence_changed")
     elif previous_has_ledger and (not previous_ledger_valid or not current_ledger_valid):
+        sold_lineage_failure = True
         quality_reasons.append("accepted_comp_ledger_invalid")
     elif previous_has_ledger and previous_comp_ids != current_comp_ids:
         valuation_reasons.append("accepted_comp_set_changed")
     elif previous_has_ledger and previous_comp_content != current_comp_content:
+        sold_lineage_failure = True
         quality_reasons.append("accepted_comp_content_changed")
 
+    if previous_sales != current_sales:
+        if sold_lineage_failure:
+            quality_reasons.append("accepted_sales_changed_without_trusted_lineage")
+        else:
+            valuation_reasons.append("accepted_sales_changed")
+
     if previous.get("latest_sale_date") != current.get("latest_sale_date"):
-        valuation_reasons.append("latest_sale_changed")
+        if sold_lineage_failure:
+            quality_reasons.append("latest_sale_changed_without_trusted_lineage")
+        else:
+            valuation_reasons.append("latest_sale_changed")
 
     previous_active = int(previous.get("accepted_active_count") or 0)
     current_active = int(current.get("accepted_active_count") or 0)
