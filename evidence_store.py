@@ -213,8 +213,12 @@ class EvidenceStore:
         approvals={}
         rejections={}
         for row in rows:
+            asset_id=str(row["asset_id"] or "").strip()
+            reviewer_id=str(row["reviewer_id"] or "").strip()
+            if not asset_id or not reviewer_id:
+                raise ValueError("persisted alias adjudication identities cannot be blank")
             target=approvals if row["approved"] else rejections
-            target.setdefault(row["asset_id"],set()).add(row["reviewer_id"])
+            target.setdefault(asset_id,set()).add(reviewer_id)
 
         approved_assets=[asset_id for asset_id,reviewers in approvals.items() if reviewers]
         conflicting=len(approved_assets)>1
