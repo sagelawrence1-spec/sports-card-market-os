@@ -38,6 +38,17 @@ def _accepted_evidence_signature(
     if not isinstance(accepted, list):
         return True, False, (), ()
 
+    state_total = state.get("accepted_sales_total")
+    if state_total is not None:
+        if isinstance(state_total, bool):
+            return True, False, (), ()
+        try:
+            state_total = int(state_total)
+        except (TypeError, ValueError):
+            return True, False, (), ()
+        if state_total < 0 or state_total != len(accepted):
+            return True, False, (), ()
+
     if "accepted_total" in ledger:
         accepted_total = ledger.get("accepted_total")
         if isinstance(accepted_total, bool):
@@ -48,17 +59,6 @@ def _accepted_evidence_signature(
             return True, False, (), ()
         if accepted_total < 0 or accepted_total != len(accepted):
             return True, False, (), ()
-
-        state_total = state.get("accepted_sales_total")
-        if state_total is not None:
-            if isinstance(state_total, bool):
-                return True, False, (), ()
-            try:
-                state_total = int(state_total)
-            except (TypeError, ValueError):
-                return True, False, (), ()
-            if state_total != accepted_total:
-                return True, False, (), ()
 
     rows: list[tuple[str, ...]] = []
     seen_ids: set[str] = set()
