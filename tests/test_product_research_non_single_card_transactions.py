@@ -43,6 +43,18 @@ def test_rejects_pick_your_team_transaction(tmp_path):
     _assert_rejected(tmp_path,"2025 Topps Chrome Pick Your Team Shohei Ohtani")
 
 
+def test_rejects_you_pick_selection_listing(tmp_path):
+    _assert_rejected(tmp_path,"2025 Topps Chrome Refractor You Pick Ohtani Judge Soto")
+
+
+def test_rejects_choose_your_card_selection_listing(tmp_path):
+    _assert_rejected(tmp_path,"2025 Topps Chrome Choose Your Card Ohtani Judge Soto")
+
+
+def test_rejects_select_your_player_selection_listing(tmp_path):
+    _assert_rejected(tmp_path,"2025 Topps Chrome Refractor Select Your Player")
+
+
 def test_breakout_insert_does_not_trigger_break_filter(tmp_path):
     path=tmp_path/"sold.csv"
     _write(path,"2025 Topps Chrome Shohei Ohtani Breakout Insert Card #2")
