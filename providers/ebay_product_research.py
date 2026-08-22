@@ -145,16 +145,7 @@ def _currency_conflicts(currency, raw_amount):
 def _currency(explicit, raw_price):
     value=" ".join(str(explicit or "").strip().split()).upper()
     if value: return value
-    marker=_strong_currency_marker(raw_price)
-    if marker:
-        return marker
-    price_text=" ".join(str(raw_price or "").strip().split())
-    upper=price_text.upper()
-    if "$" not in price_text:
-        return None
-    if re.search(r"[A-Z]",upper):
-        return None
-    return "USD"
+    return _strong_currency_marker(raw_price)
 
 def _canonical_item_id(v):
     text=str(v or "").strip()
