@@ -34,6 +34,20 @@ def test_alias_requires_two_independent_approvals():
     assert registry.diagnostics(title)["active"] is True
 
 
+def test_alias_quorum_cannot_be_inflated_by_whitespace_id_variants():
+    registry = AdjudicatedAliasRegistry()
+    title = "2024 Topps Chrome Shohei Ohtani #1 PSA 10"
+
+    registry.record_approval(title, " ohtani-1 ", "reviewer-a")
+    registry.record_approval(title, "ohtani-1", " reviewer-a ")
+
+    assert registry.resolved_asset_id(title) is None
+    assert registry.diagnostics(title)["approval_counts"] == {"ohtani-1": 1}
+
+    registry.record_approval(title, "ohtani-1", "reviewer-b")
+    assert registry.resolved_asset_id(title) == "ohtani-1"
+
+
 def test_conflicting_approved_alias_fails_closed():
     registry = AdjudicatedAliasRegistry()
     title = "2024 Topps Chrome Shohei Ohtani #1 PSA 10"
@@ -55,6 +69,17 @@ def test_rejection_revokes_alias_assignment():
     assert registry.resolved_asset_id(title) == "asset-a"
 
     registry.record_rejection(title, "asset-a")
+    assert registry.resolved_asset_id(title) is None
+
+
+def test_rejection_normalizes_asset_identity():
+    registry = AdjudicatedAliasRegistry()
+    title = "2024 Topps Chrome Shohei Ohtani #1 PSA 10"
+    registry.record_approval(title, "asset-a", "reviewer-a")
+    registry.record_approval(title, "asset-a", "reviewer-b")
+    assert registry.resolved_asset_id(title) == "asset-a"
+
+    registry.record_rejection(title, " asset-a ")
     assert registry.resolved_asset_id(title) is None
 
 

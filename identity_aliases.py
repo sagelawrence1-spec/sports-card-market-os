@@ -37,8 +37,15 @@ class AdjudicatedAliasRegistry:
     def _key(title: str) -> str:
         return norm(title)
 
+    @staticmethod
+    def _identity(value: str) -> str:
+        """Canonicalize opaque adjudication IDs without changing case semantics."""
+        return str(value or "").strip()
+
     def record_approval(self, title: str, asset_id: str, reviewer_id: str) -> None:
         key = self._key(title)
+        asset_id = self._identity(asset_id)
+        reviewer_id = self._identity(reviewer_id)
         if not key or not asset_id or not reviewer_id:
             raise ValueError("title, asset_id, and reviewer_id are required")
         record = self._records.setdefault(key, AliasRecord(title_key=key))
@@ -47,6 +54,7 @@ class AdjudicatedAliasRegistry:
 
     def record_rejection(self, title: str, asset_id: str) -> None:
         key = self._key(title)
+        asset_id = self._identity(asset_id)
         if not key or not asset_id:
             raise ValueError("title and asset_id are required")
         record = self._records.setdefault(key, AliasRecord(title_key=key))
