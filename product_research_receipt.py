@@ -12,6 +12,30 @@ from providers.ebay_product_research import EbayProductResearchProvider
 SCHEMA = "product-research-receipt.v1"
 
 
+def _validate_authoritative_records(records) -> None:
+    for record in records:
+        if record.provider != "ebay_product_research":
+            raise ValueError(
+                f"Product Research receipt contains non-authoritative provider: {record.provider}"
+            )
+        if record.record_type != "sold":
+            raise ValueError(
+                f"Product Research receipt contains non-sold evidence: {record.record_type}"
+            )
+        if record.currency != "USD":
+            raise ValueError(
+                f"Product Research receipt contains non-USD evidence: {record.currency}"
+            )
+        if not record.source_item_id or not str(record.source_item_id).isdigit():
+            raise ValueError("Product Research receipt contains invalid stable item identity")
+        if not record.event_date:
+            raise ValueError("Product Research receipt contains sold evidence without an event date")
+        if record.price is None or float(record.price) <= 0:
+            raise ValueError("Product Research receipt contains non-positive landed price evidence")
+        if record.payload.get("price_basis") != "sold_price_plus_shipping":
+            raise ValueError("Product Research receipt contains inconsistent landed-price basis")
+
+
 def build_receipt(path: str | Path, *, query: str = "") -> dict[str, Any]:
     source = Path(path)
     raw = source.read_bytes()
@@ -27,12 +51,18 @@ def build_receipt(path: str | Path, *, query: str = "") -> dict[str, Any]:
         raise ValueError(
             f"Product Research row accounting mismatch: rows={rows} accounted={accounted}"
         )
+    if accepted != len(result.records):
+        raise ValueError(
+            f"Product Research accepted-row mismatch: metadata={accepted} records={len(result.records)}"
+        )
 
     columns = metadata.get("columns") or {}
     if rows and not columns.get("quantity"):
         raise ValueError(
             "Product Research authoritative receipt requires an explicit quantity column"
         )
+
+    _validate_authoritative_records(result.records)
 
     accepted_evidence_ids = [
         f"{record.provider}:{record.source_item_id}:{record.event_date}"
