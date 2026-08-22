@@ -70,7 +70,7 @@ def grade_authoritative_market_outcome(
 
     provider = EbayProductResearchProvider()
     query = build_ebay_query(dict(asset))
-    result = provider.load_csv(str(csv_path), query=query)
+    result = provider.load_csv(str(csv_path), query=query, reference_date=cutoff.date())
     matcher = SportsCardEntityMatcher()
 
     prices: list[float] = []
@@ -99,9 +99,6 @@ def grade_authoritative_market_outcome(
             continue
 
         prices.append(float(record.price))
-        # Product Research can contain distinct transactions from a single
-        # multi-quantity listing on different sold days. Keep forward-proof audit
-        # identity aligned with entry repricing and persistent evidence identity.
         evidence_ids.append(f"{record.provider}:{record.source_item_id}:{record.event_date}")
         accepted += 1
 
