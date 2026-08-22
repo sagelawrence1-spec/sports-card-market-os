@@ -63,7 +63,7 @@ def test_large_unexplained_repricing_persists_and_fails_closed(tmp_path):
     assert any("Reconstruction health failed" in blocker for blocker in persisted["blockers"])
 
 
-def test_material_evidence_change_allows_large_repricing(tmp_path):
+def test_unlineaged_sold_change_cannot_explain_large_repricing(tmp_path):
     store=EvidenceStore(tmp_path/"evidence.sqlite")
     persist(store,state("2026-08-12T12:00:00Z"))
 
@@ -80,7 +80,9 @@ def test_material_evidence_change_allows_large_repricing(tmp_path):
     persisted=store.market_history(CARD_ID)[-1]
     reconstruction=persisted["reconstruction"]
     assert reconstruction["material_input_change"] is True
-    assert "accepted_sales_changed" in reconstruction["change_reasons"]
-    assert "latest_sale_changed" in reconstruction["change_reasons"]
-    assert reconstruction["unexplained_repricing"] is False
-    assert reconstruction["reconstruction_health_failure"] is False
+    assert "accepted_sales_changed_without_trusted_lineage" in reconstruction["change_reasons"]
+    assert "latest_sale_changed_without_trusted_lineage" in reconstruction["change_reasons"]
+    assert reconstruction["valuation_input_change"] is False
+    assert reconstruction["unexplained_repricing"] is True
+    assert reconstruction["reconstruction_health_failure"] is True
+    assert persisted["engine_classification"]=="RECONSTRUCTION_HEALTH_FAILURE"
