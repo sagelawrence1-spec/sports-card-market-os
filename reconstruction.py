@@ -22,8 +22,8 @@ def _accepted_evidence_signature(
     """Return ledger presence, accepted IDs, and immutable evidence content.
 
     Evidence IDs identify the comp set. The content signature separately captures
-    immutable source facts so a price/date/source mutation under the same ID is
-    surfaced as a lineage-quality failure rather than accepted as fresh market
+    immutable source facts so a price/date/source/title mutation under the same ID
+    is surfaced as a lineage-quality failure rather than accepted as fresh market
     evidence.
     """
     if "evidence_ledger" not in state or state.get("evidence_ledger") is None:
@@ -47,6 +47,7 @@ def _accepted_evidence_signature(
         rows.append(
             (
                 evidence_id,
+                str(row.get("title") or "").strip(),
                 str(row.get("price") if row.get("price") is not None else ""),
                 str(row.get("currency") or "").strip().upper(),
                 str(row.get("event_date") or "").strip(),
