@@ -250,10 +250,10 @@ class SportsCardEntityMatcher:
             observed=observed_graders(title_tokens)
             company_present=canonical_target in observed
             grade_patterns=[
-                rf"\b{re.escape(alias)}\s*{re.escape(grade)}\b"
+                rf"\b{re.escape(alias)}\s*{re.escape(grade)}(?!\d)(?!\.\d)"
                 for alias in target_aliases
             ] + [
-                rf"\b{re.escape(alias)}\s*gem\s*mint\s*{re.escape(grade)}\b"
+                rf"\b{re.escape(alias)}\s*gem\s*mint\s*{re.escape(grade)}(?!\d)(?!\.\d)"
                 for alias in target_aliases
             ]
             exact=any(re.search(p,t) for p in grade_patterns)
