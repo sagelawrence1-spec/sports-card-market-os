@@ -63,3 +63,39 @@ def test_explicit_usd_marker_without_dollar_symbol_is_accepted(tmp_path: Path) -
     assert result.records[0].currency == "USD"
     assert result.records[0].price == 250.0
     assert result.metadata["rejection_reasons"] == {}
+
+
+def test_bare_dollar_amount_without_currency_provenance_is_rejected(tmp_path: Path) -> None:
+    path = tmp_path / "research.csv"
+    _write_csv(path, [{
+        "Item Title": "Ambiguous dollar comp",
+        "Sold Price": "$245.00",
+        "Sold Date": "2026-08-20",
+        "Item ID": "123456789015",
+        "Currency": "",
+        "Shipping": "$5.00",
+    }])
+
+    result = EbayProductResearchProvider().load_csv(str(path), "test")
+
+    assert result.records == []
+    assert result.metadata["rejection_reasons"] == {"missing_currency": 1}
+
+
+def test_explicit_currency_column_authorizes_bare_dollar_amount(tmp_path: Path) -> None:
+    path = tmp_path / "research.csv"
+    _write_csv(path, [{
+        "Item Title": "Explicit USD comp",
+        "Sold Price": "$245.00",
+        "Sold Date": "2026-08-20",
+        "Item ID": "123456789016",
+        "Currency": "USD",
+        "Shipping": "$5.00",
+    }])
+
+    result = EbayProductResearchProvider().load_csv(str(path), "test")
+
+    assert len(result.records) == 1
+    assert result.records[0].currency == "USD"
+    assert result.records[0].price == 250.0
+    assert result.metadata["rejection_reasons"] == {}
