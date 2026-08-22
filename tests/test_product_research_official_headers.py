@@ -7,7 +7,7 @@ def test_accepts_official_ebay_report_header_vocabulary(tmp_path: Path):
     export = tmp_path / "ebay-report.csv"
     export.write_text(
         "Item Number,Item Title,Quantity,Sold For,Shipping And Handling,Sale Date,Selling Format\n"
-        '123456789012,"2025 Elian Pena Bowman Chrome CPA-EP Autograph",1,$100.00,$5.00,08/19/2026,Auction\n',
+        '123456789012,"2025 Elian Pena Bowman Chrome CPA-EP Autograph",1,USD $100.00,$5.00,08/19/2026,Auction\n',
         encoding="utf-8",
     )
 
