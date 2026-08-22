@@ -86,6 +86,29 @@ def _accepted_evidence_signature(
     return True, True, ids, tuple(rows)
 
 
+def _latest_sale_date_matches_ledger(
+    state: Mapping[str, Any],
+    *,
+    has_ledger: bool,
+    ledger_valid: bool,
+    comp_content: tuple[tuple[str, ...], ...],
+) -> bool:
+    """Return whether state chronology agrees with its accepted sold ledger.
+
+    ``latest_sale_date`` is valuation-bearing metadata. When a trusted ledger is
+    present, the field must be derivable from the accepted rows rather than being
+    independently mutable. Empty accepted ledgers require an empty latest-sale
+    value; non-empty ledgers require the maximum accepted ``event_date``.
+    """
+    if not has_ledger or not ledger_valid:
+        return True
+
+    event_dates = [row[4] for row in comp_content if row[4]]
+    expected = max(event_dates) if event_dates else None
+    actual = str(state.get("latest_sale_date") or "").strip() or None
+    return actual == expected
+
+
 def _price_changed(previous: Mapping[str, Any], current: Mapping[str, Any], field: str) -> bool:
     return previous.get(field) != current.get(field)
 
@@ -136,6 +159,19 @@ def build_reconstruction_delta(
         current_comp_content,
     ) = _accepted_evidence_signature(current)
 
+    previous_latest_sale_valid = _latest_sale_date_matches_ledger(
+        previous,
+        has_ledger=previous_has_ledger,
+        ledger_valid=previous_ledger_valid,
+        comp_content=previous_comp_content,
+    )
+    current_latest_sale_valid = _latest_sale_date_matches_ledger(
+        current,
+        has_ledger=current_has_ledger,
+        ledger_valid=current_ledger_valid,
+        comp_content=current_comp_content,
+    )
+
     sold_lineage_failure = False
     if not previous_has_ledger and not current_has_ledger:
         sold_lineage_failure = True
@@ -145,6 +181,9 @@ def build_reconstruction_delta(
     elif previous_has_ledger and (not previous_ledger_valid or not current_ledger_valid):
         sold_lineage_failure = True
         quality_reasons.append("accepted_comp_ledger_invalid")
+    elif previous_has_ledger and (not previous_latest_sale_valid or not current_latest_sale_valid):
+        sold_lineage_failure = True
+        quality_reasons.append("latest_sale_date_ledger_mismatch")
     elif previous_has_ledger and previous_comp_ids != current_comp_ids:
         valuation_reasons.append("accepted_comp_set_changed")
     elif previous_has_ledger and previous_comp_content != current_comp_content:
