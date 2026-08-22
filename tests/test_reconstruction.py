@@ -91,7 +91,7 @@ def test_empty_comp_set_change_is_still_attributed_when_ledgers_exist():
         state(),
         state(fair_value=116.0,evidence_ledger={"accepted":[]}),
     )
-    assert delta["valuation_change_reasons"] == ["accepted_comp_set_changed"]
+    assert delta["valuation_change_reasons"] == ["accepted_comp_set_changed","accepted_sales_changed"]
     assert delta["valuation_input_change"] is True
     assert delta["reconstruction_health_failure"] is False
 
