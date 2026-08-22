@@ -109,8 +109,14 @@ def test_missing_currency_is_not_silently_assumed_usd():
     assert "missing_currency" in result["rejected"][0]["reasons"]
 
 
-def test_dollar_price_can_supply_usd_when_currency_column_is_absent():
+def test_bare_dollar_is_not_sufficient_usd_provenance():
     result = sanitize_product_research_rows([_row(Currency="")])
+    assert result["accepted_rows"] == 0
+    assert "missing_currency" in result["rejected"][0]["reasons"]
+
+
+def test_unambiguous_usd_amount_marker_can_supply_currency():
+    result = sanitize_product_research_rows([_row(Currency="", **{"Sold Price": "USD $125.00"})])
     assert result["accepted_rows"] == 1
     assert result["accepted"][0]["currency"] == "USD"
 
