@@ -21,10 +21,14 @@ DISTINCTIVE_SET_MARKERS={
 COLOR_PARALLEL_MARKERS={"gold","red","blue","green","orange","purple","black","pink","aqua","teal"}
 DISTINCT_PARALLEL_MARKERS={
     "silver","sepia","negative","xfractor","superfractor","wave","shimmer","sapphire","atomic",
-    "speckle","raywave","lava","variation",
+    "speckle","raywave","lava","variation","checkerboard","disco","hyper","scope","pulsar","ice",
+    "mojo","velocity","laser","flash","cracked",
 }
 PARALLEL_IDENTITY_MARKERS=COLOR_PARALLEL_MARKERS | DISTINCT_PARALLEL_MARKERS
-PARALLEL_CONTEXT_TERMS={"refractor","prizm","parallel","wave","shimmer","sapphire","atomic","speckle","raywave","lava"}
+PARALLEL_CONTEXT_TERMS={
+    "refractor","prizm","parallel","wave","shimmer","sapphire","atomic","speckle","raywave","lava",
+    "checkerboard","disco","hyper","scope","pulsar","ice","mojo","velocity","laser","flash",
+}
 
 
 def norm(s:str)->str:
