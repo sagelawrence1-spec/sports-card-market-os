@@ -268,7 +268,7 @@ class SportsCardEntityMatcher:
                     shown.extend(re.findall(rf"\b{re.escape(alias)}\s*(\d+(?:\.\d+)?)\b",t))
                 if shown and grade not in shown:
                     return MatchDecision(False,25.0,"wrong_grade",{**diag,"explicit_grades":shown})
-                score -= 12
+                return MatchDecision(False,70.0,"manual_review",{**diag,"explicit_grades":shown,"review_reason":"grade_not_confirmed"})
             else:
                 if observed:
                     return MatchDecision(False,25.0,"wrong_grading_company",{**diag,"other_grader":sorted(observed)})
