@@ -21,8 +21,8 @@ with tempfile.TemporaryDirectory() as td:
     with p.open('w',newline='',encoding='utf-8') as f:
         w=csv.DictWriter(f,fieldnames=fields)
         w.writeheader()
-        w.writerow({'Item Title':'2018 Topps Chrome Update Shohei Ohtani HMT1 Refractor PSA 10','Sold Price':'$3,250.00','Sold Date':'08/01/2026','Item ID':'991','Item URL':'https://www.ebay.com/itm/991','Shipping':'$12.50'})
-        w.writerow({'Item Title':'URL identity comp','Sold Price':'$250.00','Sold Date':'2026-08-02','Item URL':'https://www.ebay.com/itm/example-card/996?hash=abc','Shipping':'Free'})
+        w.writerow({'Item Title':'2018 Topps Chrome Update Shohei Ohtani HMT1 Refractor PSA 10','Sold Price':'$3,250.00','Sold Date':'08/01/2026','Item ID':'991','Item URL':'https://www.ebay.com/itm/991','Currency':'USD','Shipping':'$12.50'})
+        w.writerow({'Item Title':'URL identity comp','Sold Price':'$250.00','Sold Date':'2026-08-02','Item URL':'https://www.ebay.com/itm/example-card/996?hash=abc','Currency':'USD','Shipping':'Free'})
         w.writerow({'Item Title':'Bad date comp','Sold Price':'$100.00','Sold Date':'eventually','Item ID':'992','Shipping':'$0.00'})
         w.writerow({'Item Title':'No currency evidence','Sold Price':'100.00','Sold Date':'2026-08-02','Item ID':'993','Shipping':'$0.00'})
         w.writerow({'Item Title':'Canadian comp','Sold Price':'125.00','Sold Date':'2026-08-03','Item ID':'994','Currency':'CAD','Shipping':'$0.00'})
