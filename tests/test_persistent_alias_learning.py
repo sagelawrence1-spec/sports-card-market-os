@@ -1,4 +1,4 @@
-from entity_matcher import MatchDecision
+from entity_matcher import MatchDecision, norm
 from evidence_store import EvidenceStore
 from identity_aliases import AliasAwareEntityRouter, PersistentAliasRegistry
 from providers.base import EvidenceRecord
@@ -61,6 +61,29 @@ def test_duplicate_reviewer_does_not_double_count(tmp_path):
     diagnostics = store.alias_diagnostics(TITLE)
     assert diagnostics["approval_counts"] == {"ohtani-1": 1}
     assert diagnostics["active"] is False
+
+
+def test_persistent_registry_normalizes_legacy_identity_variants(tmp_path):
+    store = EvidenceStore(tmp_path / "evidence.sqlite")
+    store.conn.executemany(
+        """INSERT INTO identity_alias_adjudications(
+        title_key,title,asset_id,reviewer_id,approved,evidence_id
+        ) VALUES(?,?,?,?,?,?)""",
+        [
+            (norm(TITLE), TITLE, "ohtani-1", "reviewer-a", 1, "legacy-1"),
+            (norm(TITLE), TITLE, " ohtani-1 ", " reviewer-a ", 1, "legacy-2"),
+            (norm(TITLE), TITLE, "ohtani-1 ", "reviewer-b", 1, "legacy-3"),
+        ],
+    )
+    store.conn.commit()
+
+    registry = PersistentAliasRegistry(store)
+    diagnostics = registry.diagnostics(TITLE)
+
+    assert diagnostics["approval_counts"] == {"ohtani-1": 2}
+    assert diagnostics["conflicting"] is False
+    assert diagnostics["active"] is True
+    assert registry.resolved_asset_id(TITLE) == "ohtani-1"
 
 
 def test_any_verified_rejection_blocks_alias_activation(tmp_path):
