@@ -9,7 +9,7 @@ def state(**overrides):
         "run_id":"run-2",
         "last_updated":"2026-08-12T12:00:00Z",
         "fair_value":100.0,
-        "accepted_sales_total":10,
+        "accepted_sales_total":2,
         "latest_sale_date":"2026-08-11",
         "accepted_active_count":2,
         "lowest_ask":120.0,
@@ -24,6 +24,10 @@ def state(**overrides):
         },
     }
     base.update(overrides)
+    if "accepted_sales_total" not in overrides and "evidence_ledger" in overrides:
+        accepted=overrides["evidence_ledger"].get("accepted") if isinstance(overrides["evidence_ledger"],dict) else None
+        if isinstance(accepted,list):
+            base["accepted_sales_total"]=len(accepted)
     return base
 
 
@@ -54,7 +58,7 @@ def test_new_sale_explains_repricing():
         state(),
         state(
             fair_value=120.0,
-            accepted_sales_total=11,
+            accepted_sales_total=3,
             latest_sale_date="2026-08-12",
             evidence_ledger={"accepted":[{"evidence_id":"sale-1"},{"evidence_id":"sale-2"},{"evidence_id":"sale-3"}]},
         ),
@@ -216,7 +220,13 @@ def test_evidence_grade_change_alone_cannot_explain_large_repricing():
 
 def test_reconstruction_record_captures_stable_lineage():
     previous=state(run_id="run-1",last_updated="2026-08-11T12:00:00Z")
-    current=state(run_id="run-2",last_updated="2026-08-12T12:00:00Z",fair_value=110.0,accepted_sales_total=11)
+    current=state(
+        run_id="run-2",
+        last_updated="2026-08-12T12:00:00Z",
+        fair_value=110.0,
+        accepted_sales_total=3,
+        evidence_ledger={"accepted":[{"evidence_id":"sale-1"},{"evidence_id":"sale-2"},{"evidence_id":"sale-3"}]},
+    )
     record=build_reconstruction_record(previous,current)
     assert record["schema"] == "market-reconstruction.v1"
     assert record["record_id"] == "card-1:run-1->run-2"
