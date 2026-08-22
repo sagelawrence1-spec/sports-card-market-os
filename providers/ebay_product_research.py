@@ -10,8 +10,9 @@ and shipping. Rows fail closed when title, sold date, price, USD currency eviden
 stable sold-item identity, an explicitly exported shipping amount, quantity, or duplicate
 sold evidence is ambiguous. Shipping provenance is required so authoritative comps always
 share the same landed-price basis. Explicit multi-unit sales, explicit multi-card lots,
-and non-single-card transactions such as repacks, mystery products, and break spots are
-rejected so bundled or indirect transactions cannot masquerade as one single-card comp.
+and non-single-card transactions such as repacks, mystery products, break spots, and
+selection listings are rejected so indirect or ambiguous transactions cannot masquerade
+as one single-card comp.
 """
 import csv, re
 from collections import Counter, defaultdict
@@ -59,6 +60,8 @@ _NON_SINGLE_CARD_TRANSACTION_PATTERNS=(
     re.compile(r"\bmystery (?:pack|box)\b"),
     re.compile(r"\b(?:break spot|team break|player break|box break|case break|group break)\b"),
     re.compile(r"\b(?:random team|pick your team|pyt)\b"),
+    re.compile(r"\b(?:you pick|you choose)\b"),
+    re.compile(r"\b(?:pick|choose|select) (?:a|your) (?:card|player)\b"),
 )
 
 def _norm(s): return re.sub(r"[^a-z0-9]+"," ",str(s).lower()).strip()
