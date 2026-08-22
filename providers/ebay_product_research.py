@@ -156,15 +156,28 @@ def _item_id_from_url(v):
     match=_EBAY_ITEM_URL_RE.search(parsed.path)
     return match.group(1) if match else None
 
+def _reference_day(value):
+    if value is None:
+        return date.today()
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    try:
+        return date.fromisoformat(str(value))
+    except ValueError as exc:
+        raise ValueError("reference_date must be an ISO date") from exc
+
 class EbayProductResearchProvider:
     provider_name="ebay_product_research"
 
-    def load_csv(self,path: str, query: str="") -> ProviderResult:
+    def load_csv(self,path: str, query: str="", reference_date=None) -> ProviderResult:
         p=Path(path)
+        cutoff_day=_reference_day(reference_date)
         with p.open(newline="",encoding="utf-8-sig") as f:
             rows=list(csv.DictReader(f))
         if not rows:
-            return ProviderResult([],query,self.provider_name,{"path":str(p),"rows":0,"accepted_rows":0,"deduplicated_rows":0,"rejected_rows":0,"rejection_reasons":{}})
+            return ProviderResult([],query,self.provider_name,{"path":str(p),"rows":0,"accepted_rows":0,"deduplicated_rows":0,"rejected_rows":0,"rejection_reasons":{},"reference_date":cutoff_day.isoformat()})
         headers=list(rows[0].keys())
         cols={k:_find(headers,v) for k,v in ALIASES.items()}
         if not cols["title"] or not cols["price"] or not cols["date"] or not cols["shipping"]:
@@ -203,7 +216,7 @@ class EbayProductResearchProvider:
             if sold_date is None:
                 rejection_reasons["invalid_sold_date"]+=1
                 continue
-            if date.fromisoformat(sold_date) > date.today():
+            if date.fromisoformat(sold_date) > cutoff_day:
                 rejection_reasons["future_sold_date"]+=1
                 continue
             if currency is None:
@@ -279,7 +292,7 @@ class EbayProductResearchProvider:
         rejected_rows=sum(rejection_reasons.values())
         return ProviderResult(records,query,self.provider_name,{
             "path":str(p),"rows":len(rows),"columns":cols,
-            "price_basis":"sold_price_plus_shipping",
+            "price_basis":"sold_price_plus_shipping","reference_date":cutoff_day.isoformat(),
             "accepted_rows":len(records),"deduplicated_rows":deduplicated_rows,"rejected_rows":rejected_rows,
             "rejection_reasons":dict(sorted(rejection_reasons.items())),
         })
