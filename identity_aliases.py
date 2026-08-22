@@ -103,11 +103,53 @@ class PersistentAliasRegistry:
         self.store = store
         self.min_approvals = min_approvals
 
-    def resolved_asset_id(self, title: str) -> Optional[str]:
-        return self.store.resolved_alias_asset_id(title, min_approvals=self.min_approvals)
+    @staticmethod
+    def _identity(value: str) -> str:
+        """Normalize persisted opaque IDs, including legacy pre-normalization rows."""
+        return str(value or "").strip()
 
     def diagnostics(self, title: str) -> dict:
-        return self.store.alias_diagnostics(title, min_approvals=self.min_approvals)
+        title_key = norm(title)
+        rows = self.store.conn.execute(
+            """SELECT asset_id,reviewer_id,approved
+            FROM identity_alias_adjudications WHERE title_key=?""",
+            (title_key,),
+        ).fetchall()
+        if not rows:
+            return {"known": False, "active": False, "conflicting": False}
+
+        approvals: Dict[str, Set[str]] = {}
+        rejections: Dict[str, Set[str]] = {}
+        invalid_identity_rows = 0
+        for row in rows:
+            asset_id = self._identity(row["asset_id"])
+            reviewer_id = self._identity(row["reviewer_id"])
+            if not asset_id or not reviewer_id:
+                invalid_identity_rows += 1
+                continue
+            target = approvals if row["approved"] else rejections
+            target.setdefault(asset_id, set()).add(reviewer_id)
+
+        approved_assets = [asset_id for asset_id, reviewers in approvals.items() if reviewers]
+        conflicting = invalid_identity_rows > 0 or len(approved_assets) > 1
+        qualified = [
+            asset_id
+            for asset_id, reviewers in approvals.items()
+            if len(reviewers) >= self.min_approvals and not rejections.get(asset_id)
+        ]
+        resolved = qualified[0] if len(qualified) == 1 and not conflicting else None
+        return {
+            "known": True,
+            "active": resolved is not None,
+            "resolved_asset_id": resolved,
+            "conflicting": conflicting,
+            "approval_counts": {asset_id: len(reviewers) for asset_id, reviewers in approvals.items()},
+            "rejection_counts": {asset_id: len(reviewers) for asset_id, reviewers in rejections.items()},
+            "invalid_identity_rows": invalid_identity_rows,
+        }
+
+    def resolved_asset_id(self, title: str) -> Optional[str]:
+        return self.diagnostics(title).get("resolved_asset_id")
 
 
 class AliasAwareEntityRouter:
