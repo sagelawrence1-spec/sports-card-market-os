@@ -138,3 +138,43 @@ def test_lottery_word_does_not_trigger_bare_lot_filter(tmp_path):
 
     assert len(result.records)==1
     assert result.metadata["rejected_rows"]==0
+
+
+def test_rejects_leading_multiplicity_marker_even_when_quantity_is_one(tmp_path):
+    path=tmp_path/"sold.csv"
+    _write(path,"2x 2025 Topps Chrome Shohei Ohtani Refractor")
+
+    result=EbayProductResearchProvider().load_csv(path)
+
+    assert result.records==[]
+    assert result.metadata["rejection_reasons"]=={"multi_card_lot":1}
+
+
+def test_rejects_trailing_multiplicity_marker_even_when_quantity_is_one(tmp_path):
+    path=tmp_path/"sold.csv"
+    _write(path,"2025 Topps Chrome Shohei Ohtani Refractor x2")
+
+    result=EbayProductResearchProvider().load_csv(path)
+
+    assert result.records==[]
+    assert result.metadata["rejection_reasons"]=={"multi_card_lot":1}
+
+
+def test_rejects_title_quantity_marker_even_when_export_quantity_is_one(tmp_path):
+    path=tmp_path/"sold.csv"
+    _write(path,"2025 Topps Chrome Shohei Ohtani Refractor Qty 2")
+
+    result=EbayProductResearchProvider().load_csv(path)
+
+    assert result.records==[]
+    assert result.metadata["rejection_reasons"]=={"multi_card_lot":1}
+
+
+def test_xfractor_name_does_not_trigger_multiplicity_filter(tmp_path):
+    path=tmp_path/"sold.csv"
+    _write(path,"2025 Topps Chrome Shohei Ohtani X-Fractor Card #2")
+
+    result=EbayProductResearchProvider().load_csv(path)
+
+    assert len(result.records)==1
+    assert result.metadata["rejected_rows"]==0
