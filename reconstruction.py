@@ -24,8 +24,8 @@ def _accepted_evidence_signature(
     Evidence IDs identify the comp set. The content signature separately captures
     immutable source facts so a price/date/source/title mutation under the same ID
     is surfaced as a lineage-quality failure rather than accepted as fresh market
-    evidence. Malformed rows, blank IDs, and duplicate IDs fail closed instead of
-    being silently skipped from the lineage signature.
+    evidence. Malformed rows, blank IDs, duplicate IDs, and declared count
+    mismatches fail closed instead of being silently accepted into lineage.
     """
     if "evidence_ledger" not in state or state.get("evidence_ledger") is None:
         return False, True, (), ()
@@ -37,6 +37,28 @@ def _accepted_evidence_signature(
     accepted = ledger.get("accepted")
     if not isinstance(accepted, list):
         return True, False, (), ()
+
+    if "accepted_total" in ledger:
+        accepted_total = ledger.get("accepted_total")
+        if isinstance(accepted_total, bool):
+            return True, False, (), ()
+        try:
+            accepted_total = int(accepted_total)
+        except (TypeError, ValueError):
+            return True, False, (), ()
+        if accepted_total < 0 or accepted_total != len(accepted):
+            return True, False, (), ()
+
+        state_total = state.get("accepted_sales_total")
+        if state_total is not None:
+            if isinstance(state_total, bool):
+                return True, False, (), ()
+            try:
+                state_total = int(state_total)
+            except (TypeError, ValueError):
+                return True, False, (), ()
+            if state_total != accepted_total:
+                return True, False, (), ()
 
     rows: list[tuple[str, ...]] = []
     seen_ids: set[str] = set()
