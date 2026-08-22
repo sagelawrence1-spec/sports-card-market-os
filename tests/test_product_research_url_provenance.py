@@ -11,7 +11,7 @@ from providers.ebay_product_research import EbayProductResearchProvider
 def test_url_derived_identity_requires_ebay_host():
     with tempfile.TemporaryDirectory() as td:
         path = Path(td) / "research.csv"
-        fields = ["Item Title", "Sold Price", "Sold Date", "Item URL", "Shipping"]
+        fields = ["Item Title", "Sold Price", "Sold Date", "Item URL", "Currency", "Shipping"]
         with path.open("w", newline="", encoding="utf-8") as handle:
             writer = csv.DictWriter(handle, fieldnames=fields)
             writer.writeheader()
@@ -20,6 +20,7 @@ def test_url_derived_identity_requires_ebay_host():
                 "Sold Price": "$125.00",
                 "Sold Date": "2026-08-01",
                 "Item URL": "https://www.ebay.com/itm/example-card/123456789012?hash=abc",
+                "Currency": "USD",
                 "Shipping": "$0.00",
             })
             writer.writerow({
@@ -27,6 +28,7 @@ def test_url_derived_identity_requires_ebay_host():
                 "Sold Price": "$130.00",
                 "Sold Date": "2026-08-02",
                 "Item URL": "https://example.com/itm/example-card/999999999999",
+                "Currency": "USD",
                 "Shipping": "$0.00",
             })
             writer.writerow({
@@ -34,6 +36,7 @@ def test_url_derived_identity_requires_ebay_host():
                 "Sold Price": "$135.00",
                 "Sold Date": "2026-08-03",
                 "Item URL": "https://www.ebay.com@example.com/itm/888888888888",
+                "Currency": "USD",
                 "Shipping": "$0.00",
             })
 
@@ -48,7 +51,7 @@ def test_url_derived_identity_requires_ebay_host():
 def test_explicit_item_id_does_not_override_spoofed_url_provenance():
     with tempfile.TemporaryDirectory() as td:
         path = Path(td) / "research.csv"
-        fields = ["Item Title", "Sold Price", "Sold Date", "Item ID", "Item URL", "Shipping"]
+        fields = ["Item Title", "Sold Price", "Sold Date", "Item ID", "Item URL", "Currency", "Shipping"]
         with path.open("w", newline="", encoding="utf-8") as handle:
             writer = csv.DictWriter(handle, fieldnames=fields)
             writer.writeheader()
@@ -58,6 +61,7 @@ def test_explicit_item_id_does_not_override_spoofed_url_provenance():
                 "Sold Date": "2026-08-01",
                 "Item ID": "123456789012",
                 "Item URL": "https://www.ebay.com/itm/example-card/123456789012",
+                "Currency": "USD",
                 "Shipping": "$0.00",
             })
             writer.writerow({
@@ -66,6 +70,7 @@ def test_explicit_item_id_does_not_override_spoofed_url_provenance():
                 "Sold Date": "2026-08-02",
                 "Item ID": "999999999999",
                 "Item URL": "https://example.com/itm/example-card/999999999999",
+                "Currency": "USD",
                 "Shipping": "$0.00",
             })
             writer.writerow({
@@ -74,6 +79,7 @@ def test_explicit_item_id_does_not_override_spoofed_url_provenance():
                 "Sold Date": "2026-08-03",
                 "Item ID": "888888888888",
                 "Item URL": "https://www.ebay.com@example.com/itm/888888888888",
+                "Currency": "USD",
                 "Shipping": "$0.00",
             })
 
