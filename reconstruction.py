@@ -115,7 +115,9 @@ def build_reconstruction_delta(
     ) = _accepted_evidence_signature(current)
 
     sold_lineage_failure = False
-    if previous_has_ledger != current_has_ledger:
+    if not previous_has_ledger and not current_has_ledger:
+        sold_lineage_failure = True
+    elif previous_has_ledger != current_has_ledger:
         sold_lineage_failure = True
         quality_reasons.append("accepted_comp_ledger_presence_changed")
     elif previous_has_ledger and (not previous_ledger_valid or not current_ledger_valid):
