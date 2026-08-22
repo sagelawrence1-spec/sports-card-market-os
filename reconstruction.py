@@ -18,32 +18,35 @@ def _pct_change(previous: float | None, current: float | None) -> float | None:
 
 def _accepted_evidence_signature(
     state: Mapping[str, Any],
-) -> tuple[bool, tuple[str, ...], tuple[tuple[str, ...], ...]]:
-    """Return ledger presence, accepted IDs, and immutable evidence content.
+) -> tuple[bool, bool, tuple[str, ...], tuple[tuple[str, ...], ...]]:
+    """Return ledger presence, validity, accepted IDs, and immutable evidence content.
 
     Evidence IDs identify the comp set. The content signature separately captures
     immutable source facts so a price/date/source/title mutation under the same ID
     is surfaced as a lineage-quality failure rather than accepted as fresh market
-    evidence.
+    evidence. Malformed rows, blank IDs, and duplicate IDs fail closed instead of
+    being silently skipped from the lineage signature.
     """
     if "evidence_ledger" not in state or state.get("evidence_ledger") is None:
-        return False, (), ()
+        return False, True, (), ()
 
     ledger = state.get("evidence_ledger")
     if not isinstance(ledger, Mapping):
-        return True, (), ()
+        return True, False, (), ()
 
     accepted = ledger.get("accepted")
     if not isinstance(accepted, list):
-        return True, (), ()
+        return True, False, (), ()
 
     rows: list[tuple[str, ...]] = []
+    seen_ids: set[str] = set()
     for row in accepted:
         if not isinstance(row, Mapping):
-            continue
+            return True, False, (), ()
         evidence_id = str(row.get("evidence_id") or "").strip()
-        if not evidence_id:
-            continue
+        if not evidence_id or evidence_id in seen_ids:
+            return True, False, (), ()
+        seen_ids.add(evidence_id)
         rows.append(
             (
                 evidence_id,
@@ -58,7 +61,7 @@ def _accepted_evidence_signature(
 
     rows.sort(key=lambda row: row[0])
     ids = tuple(row[0] for row in rows)
-    return True, ids, tuple(rows)
+    return True, True, ids, tuple(rows)
 
 
 def _price_changed(previous: Mapping[str, Any], current: Mapping[str, Any], field: str) -> bool:
@@ -74,9 +77,9 @@ def build_reconstruction_delta(
     Valuation repricing is only considered supported when an input capable of
     carrying market-price information changed: sold evidence, accepted comp
     identity, latest-sale chronology, or active-supply price/count signals.
-    Evidence-grade/confidence changes, loss of comp-ledger lineage, and mutation
-    of immutable comp facts remain visible in the audit trail, but cannot by
-    themselves justify a price move.
+    Evidence-grade/confidence changes, loss or corruption of comp-ledger lineage,
+    and mutation of immutable comp facts remain visible in the audit trail, but
+    cannot by themselves justify a price move.
     """
     if previous is None:
         return {
@@ -99,10 +102,22 @@ def build_reconstruction_delta(
     if previous_sales != current_sales:
         valuation_reasons.append("accepted_sales_changed")
 
-    previous_has_ledger, previous_comp_ids, previous_comp_content = _accepted_evidence_signature(previous)
-    current_has_ledger, current_comp_ids, current_comp_content = _accepted_evidence_signature(current)
+    (
+        previous_has_ledger,
+        previous_ledger_valid,
+        previous_comp_ids,
+        previous_comp_content,
+    ) = _accepted_evidence_signature(previous)
+    (
+        current_has_ledger,
+        current_ledger_valid,
+        current_comp_ids,
+        current_comp_content,
+    ) = _accepted_evidence_signature(current)
     if previous_has_ledger != current_has_ledger:
         quality_reasons.append("accepted_comp_ledger_presence_changed")
+    elif previous_has_ledger and (not previous_ledger_valid or not current_ledger_valid):
+        quality_reasons.append("accepted_comp_ledger_invalid")
     elif previous_has_ledger and previous_comp_ids != current_comp_ids:
         valuation_reasons.append("accepted_comp_set_changed")
     elif previous_has_ledger and previous_comp_content != current_comp_content:
