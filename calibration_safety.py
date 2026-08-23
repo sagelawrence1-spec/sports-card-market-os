@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date
+from math import isfinite
 from typing import Iterable
 
 
@@ -26,6 +27,14 @@ def _segment_observations(benchmark: dict, family: str, key: str) -> int:
         return 0
 
 
+def _finite_float(value: object) -> float | None:
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    return parsed if isfinite(parsed) else None
+
+
 def assess_calibration_safety(
     benchmark: dict,
     *,
@@ -45,17 +54,25 @@ def assess_calibration_safety(
         blockers.append("benchmark_not_production_ready")
 
     lift = benchmark.get("lift") or {}
-    mae_lift = lift.get("mae_improvement_pct")
-    direction_lift = lift.get("directional_accuracy_lift")
+    mae_lift_raw = lift.get("mae_improvement_pct")
+    direction_lift_raw = lift.get("directional_accuracy_lift")
+    mae_lift = _finite_float(mae_lift_raw) if mae_lift_raw is not None else None
+    direction_lift = (
+        _finite_float(direction_lift_raw) if direction_lift_raw is not None else None
+    )
 
-    if mae_lift is None:
+    if mae_lift_raw is None:
         blockers.append("missing_net_mae_lift")
-    elif float(mae_lift) <= policy.min_mae_improvement_pct:
+    elif mae_lift is None:
+        blockers.append("invalid_net_mae_lift")
+    elif mae_lift <= policy.min_mae_improvement_pct:
         blockers.append("non_positive_net_mae_lift")
 
-    if direction_lift is None:
+    if direction_lift_raw is None:
         blockers.append("missing_directional_lift")
-    elif float(direction_lift) < policy.min_directional_accuracy_lift:
+    elif direction_lift is None:
+        blockers.append("invalid_directional_lift")
+    elif direction_lift < policy.min_directional_accuracy_lift:
         blockers.append("negative_directional_lift")
 
     for grade in policy.required_evidence_grades:
