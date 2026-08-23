@@ -23,6 +23,26 @@ def test_not_ready_blocks_review():
     assert "benchmark_not_production_ready" in result["blockers"]
 
 
+def test_missing_production_ready_blocks_review():
+    benchmark = sample()
+    benchmark.pop("production_ready")
+    result = assess_calibration_safety(benchmark)
+    assert "benchmark_not_production_ready" in result["blockers"]
+    assert result["calibration_review_allowed"] is False
+
+
+def test_truthy_string_production_ready_fails_closed():
+    result = assess_calibration_safety(sample(ready="false"))
+    assert "invalid_production_ready" in result["blockers"]
+    assert result["calibration_review_allowed"] is False
+
+
+def test_numeric_production_ready_fails_closed():
+    result = assess_calibration_safety(sample(ready=1))
+    assert "invalid_production_ready" in result["blockers"]
+    assert result["calibration_review_allowed"] is False
+
+
 def test_no_mae_lift_blocks_review():
     result = assess_calibration_safety(sample(mae=0.0))
     assert "non_positive_net_mae_lift" in result["blockers"]

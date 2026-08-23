@@ -89,8 +89,13 @@ def assess_calibration_safety(
     blockers: list[str] = []
     warnings: list[str] = []
 
-    if not benchmark.get("production_ready", False):
-        blockers.append("benchmark_not_production_ready")
+    production_ready = benchmark.get("production_ready")
+    if production_ready is not True:
+        blockers.append(
+            "benchmark_not_production_ready"
+            if production_ready is False or production_ready is None
+            else "invalid_production_ready"
+        )
 
     lift = benchmark.get("lift") or {}
     mae_lift_raw = lift.get("mae_improvement_pct")
