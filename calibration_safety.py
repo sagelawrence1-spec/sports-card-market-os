@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 from math import isfinite
 from typing import Iterable
 
@@ -115,10 +115,27 @@ def assess_calibration_safety(
 
 
 def _parse_run_date(value: object) -> date | None:
-    if not value:
+    """Parse an exact ISO date or ISO datetime without accepting trailing garbage."""
+
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    if not isinstance(value, str) or not value:
         return None
+
+    raw = value.strip()
     try:
-        return date.fromisoformat(str(value)[:10])
+        return date.fromisoformat(raw)
+    except ValueError:
+        pass
+
+    # Permit real ISO datetime timestamps from persisted/external history, but require
+    # the entire string to parse. This prevents values such as ``2026-08-01garbage``
+    # from being silently truncated to a valid checkpoint date.
+    normalized = raw[:-1] + "+00:00" if raw.endswith("Z") else raw
+    try:
+        return datetime.fromisoformat(normalized).date()
     except ValueError:
         return None
 
