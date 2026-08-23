@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import date
+from math import isfinite
 from typing import Any, Iterable, Mapping
 
 
@@ -28,6 +29,36 @@ def _nonnegative_int(value: Any) -> int | None:
     if parsed < 0:
         return None
     return parsed
+
+
+def _optional_nonnegative_float(value: Any) -> tuple[bool, float | None]:
+    """Parse optional price metadata without trusting malformed/non-finite values."""
+    if value is None or value == "":
+        return True, None
+    if isinstance(value, bool):
+        return False, None
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return False, None
+    if not isfinite(parsed) or parsed < 0:
+        return False, None
+    return True, parsed
+
+
+def _confidence_value(value: Any) -> tuple[bool, float]:
+    """Parse confidence as a finite probability while preserving legacy omission."""
+    if value is None or value == "":
+        return True, 0.0
+    if isinstance(value, bool):
+        return False, 0.0
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return False, 0.0
+    if not isfinite(parsed) or not 0.0 <= parsed <= 1.0:
+        return False, 0.0
+    return True, parsed
 
 
 def _canonical_event_date(value: Any) -> str | None:
@@ -130,10 +161,6 @@ def _latest_sale_date_matches_ledger(
     return actual == expected
 
 
-def _price_changed(previous: Mapping[str, Any], current: Mapping[str, Any], field: str) -> bool:
-    return previous.get(field) != current.get(field)
-
-
 def build_reconstruction_delta(
     previous: Mapping[str, Any] | None,
     current: Mapping[str, Any],
@@ -181,6 +208,24 @@ def build_reconstruction_delta(
     current_active = current_active_value or 0
     if active_metadata_invalid:
         quality_reasons.append("accepted_active_count_invalid")
+
+    previous_lowest_valid, previous_lowest = _optional_nonnegative_float(previous.get("lowest_ask"))
+    current_lowest_valid, current_lowest = _optional_nonnegative_float(current.get("lowest_ask"))
+    lowest_ask_invalid = not previous_lowest_valid or not current_lowest_valid
+    if lowest_ask_invalid:
+        quality_reasons.append("lowest_ask_invalid")
+
+    previous_median_valid, previous_median = _optional_nonnegative_float(previous.get("median_ask"))
+    current_median_valid, current_median = _optional_nonnegative_float(current.get("median_ask"))
+    median_ask_invalid = not previous_median_valid or not current_median_valid
+    if median_ask_invalid:
+        quality_reasons.append("median_ask_invalid")
+
+    previous_conf_valid, previous_conf = _confidence_value(previous.get("confidence"))
+    current_conf_valid, current_conf = _confidence_value(current.get("confidence"))
+    confidence_invalid = not previous_conf_valid or not current_conf_valid
+    if confidence_invalid:
+        quality_reasons.append("confidence_invalid")
 
     (
         previous_has_ledger,
@@ -246,18 +291,22 @@ def build_reconstruction_delta(
         else:
             valuation_reasons.append("active_supply_changed")
 
-    if _price_changed(previous, current, "lowest_ask"):
-        valuation_reasons.append("lowest_ask_changed")
-    if _price_changed(previous, current, "median_ask"):
-        valuation_reasons.append("median_ask_changed")
+    if previous_lowest != current_lowest:
+        if lowest_ask_invalid:
+            quality_reasons.append("lowest_ask_changed_without_trusted_metadata")
+        else:
+            valuation_reasons.append("lowest_ask_changed")
+    if previous_median != current_median:
+        if median_ask_invalid:
+            quality_reasons.append("median_ask_changed_without_trusted_metadata")
+        else:
+            valuation_reasons.append("median_ask_changed")
 
     if previous.get("evidence_grade") != current.get("evidence_grade"):
         quality_reasons.append("evidence_grade_changed")
 
-    previous_conf = float(previous.get("confidence") or 0.0)
-    current_conf = float(current.get("confidence") or 0.0)
     confidence_delta = current_conf - previous_conf
-    if abs(confidence_delta) >= CONFIDENCE_CHANGE_THRESHOLD:
+    if not confidence_invalid and abs(confidence_delta) >= CONFIDENCE_CHANGE_THRESHOLD:
         quality_reasons.append("confidence_changed")
 
     reasons = valuation_reasons + quality_reasons
