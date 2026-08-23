@@ -18,8 +18,8 @@ def state(**overrides):
         "confidence":0.8,
         "evidence_ledger":{
             "accepted":[
-                {"evidence_id":"sale-1"},
-                {"evidence_id":"sale-2"},
+                {"evidence_id":"sale-1","event_date":"2026-08-10"},
+                {"evidence_id":"sale-2","event_date":"2026-08-11"},
             ]
         },
     }
@@ -60,7 +60,11 @@ def test_new_sale_explains_repricing():
             fair_value=120.0,
             accepted_sales_total=3,
             latest_sale_date="2026-08-12",
-            evidence_ledger={"accepted":[{"evidence_id":"sale-1"},{"evidence_id":"sale-2"},{"evidence_id":"sale-3"}]},
+            evidence_ledger={"accepted":[
+                {"evidence_id":"sale-1","event_date":"2026-08-10"},
+                {"evidence_id":"sale-2","event_date":"2026-08-11"},
+                {"evidence_id":"sale-3","event_date":"2026-08-12"},
+            ]},
         ),
     )
     assert delta["material_input_change"] is True
@@ -77,7 +81,10 @@ def test_same_count_comp_replacement_explains_repricing():
         state(),
         state(
             fair_value=116.0,
-            evidence_ledger={"accepted":[{"evidence_id":"sale-1"},{"evidence_id":"sale-3"}]},
+            evidence_ledger={"accepted":[
+                {"evidence_id":"sale-1","event_date":"2026-08-10"},
+                {"evidence_id":"sale-3","event_date":"2026-08-11"},
+            ]},
         ),
     )
     assert delta["accepted_sales_delta"] == 0
@@ -89,9 +96,9 @@ def test_same_count_comp_replacement_explains_repricing():
 def test_empty_comp_set_change_is_still_attributed_when_ledgers_exist():
     delta=build_reconstruction_delta(
         state(),
-        state(fair_value=116.0,evidence_ledger={"accepted":[]}),
+        state(fair_value=116.0,latest_sale_date="",evidence_ledger={"accepted":[]}),
     )
-    assert delta["valuation_change_reasons"] == ["accepted_comp_set_changed","accepted_sales_changed"]
+    assert delta["valuation_change_reasons"] == ["accepted_comp_set_changed","accepted_sales_changed","latest_sale_changed"]
     assert delta["valuation_input_change"] is True
     assert delta["reconstruction_health_failure"] is False
 
@@ -225,7 +232,11 @@ def test_reconstruction_record_captures_stable_lineage():
         last_updated="2026-08-12T12:00:00Z",
         fair_value=110.0,
         accepted_sales_total=3,
-        evidence_ledger={"accepted":[{"evidence_id":"sale-1"},{"evidence_id":"sale-2"},{"evidence_id":"sale-3"}]},
+        evidence_ledger={"accepted":[
+            {"evidence_id":"sale-1","event_date":"2026-08-10"},
+            {"evidence_id":"sale-2","event_date":"2026-08-11"},
+            {"evidence_id":"sale-3","event_date":"2026-08-11"},
+        ]},
     )
     record=build_reconstruction_record(previous,current)
     assert record["schema"] == "market-reconstruction.v1"
