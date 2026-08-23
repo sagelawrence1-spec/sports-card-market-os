@@ -16,6 +16,36 @@ class CalibrationSafetyPolicy:
     min_history_checkpoints: int = 3
     min_new_mature_samples_per_checkpoint: int = 5
 
+    def __post_init__(self) -> None:
+        for name in ("min_mae_improvement_pct", "min_directional_accuracy_lift"):
+            value = getattr(self, name)
+            if isinstance(value, bool) or not isinstance(value, (int, float)):
+                raise ValueError(f"{name} must be a finite non-negative number")
+            parsed = float(value)
+            if not isfinite(parsed) or parsed < 0:
+                raise ValueError(f"{name} must be a finite non-negative number")
+
+        for name in (
+            "min_segment_samples",
+            "min_history_checkpoints",
+            "min_new_mature_samples_per_checkpoint",
+        ):
+            value = getattr(self, name)
+            if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+                raise ValueError(f"{name} must be an integer >= 1")
+
+        for name in ("required_evidence_grades", "required_confidence_bands"):
+            values = getattr(self, name)
+            if not isinstance(values, tuple) or not values:
+                raise ValueError(f"{name} must be a non-empty tuple")
+            normalized = []
+            for value in values:
+                if not isinstance(value, str) or not value.strip():
+                    raise ValueError(f"{name} entries must be non-blank strings")
+                normalized.append(value.strip())
+            if len(set(normalized)) != len(normalized):
+                raise ValueError(f"{name} entries must be unique")
+
 
 def _nonnegative_int(value: object) -> int | None:
     if isinstance(value, bool):
@@ -195,11 +225,6 @@ def assess_calibration_history(
     cutoff = as_of or date.today()
     blockers: list[str] = []
     rows = list(runs)
-
-    if policy.min_history_checkpoints < 1:
-        raise ValueError("min_history_checkpoints must be >= 1")
-    if policy.min_new_mature_samples_per_checkpoint < 1:
-        raise ValueError("min_new_mature_samples_per_checkpoint must be >= 1")
 
     parsed: list[tuple[date, int, dict, dict]] = []
     for index, run in enumerate(rows):
