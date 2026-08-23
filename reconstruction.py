@@ -46,6 +46,19 @@ def _optional_nonnegative_float(value: Any) -> tuple[bool, float | None]:
     return True, parsed
 
 
+def _required_positive_float(value: Any) -> tuple[bool, float | None]:
+    """Parse required valuation metadata as a finite, strictly positive number."""
+    if isinstance(value, bool):
+        return False, None
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return False, None
+    if not isfinite(parsed) or parsed <= 0:
+        return False, None
+    return True, parsed
+
+
 def _confidence_value(value: Any) -> tuple[bool, float]:
     """Parse confidence as a finite probability while preserving legacy omission."""
     if value is None or value == "":
@@ -175,7 +188,20 @@ def build_reconstruction_delta(
     comp facts remain visible in the audit trail, but cannot by themselves justify
     a price move.
     """
+    current_fair_value_valid, current_fair_value = _required_positive_float(current.get("fair_value"))
     if previous is None:
+        if not current_fair_value_valid:
+            return {
+                "has_previous": False,
+                "fair_value_change_pct": None,
+                "material_input_change": True,
+                "valuation_input_change": False,
+                "valuation_change_reasons": [],
+                "quality_change_reasons": ["fair_value_invalid"],
+                "change_reasons": ["fair_value_invalid"],
+                "unexplained_repricing": False,
+                "reconstruction_health_failure": True,
+            }
         return {
             "has_previous": False,
             "fair_value_change_pct": None,
@@ -190,6 +216,11 @@ def build_reconstruction_delta(
 
     valuation_reasons: list[str] = []
     quality_reasons: list[str] = []
+
+    previous_fair_value_valid, previous_fair_value = _required_positive_float(previous.get("fair_value"))
+    fair_value_invalid = not previous_fair_value_valid or not current_fair_value_valid
+    if fair_value_invalid:
+        quality_reasons.append("fair_value_invalid")
 
     previous_sales_value = _nonnegative_int(previous.get("accepted_sales_total"))
     current_sales_value = _nonnegative_int(current.get("accepted_sales_total"))
@@ -310,7 +341,7 @@ def build_reconstruction_delta(
         quality_reasons.append("confidence_changed")
 
     reasons = valuation_reasons + quality_reasons
-    fair_value_change = _pct_change(previous.get("fair_value"), current.get("fair_value"))
+    fair_value_change = None if fair_value_invalid else _pct_change(previous_fair_value, current_fair_value)
     material_input_change = bool(reasons)
     valuation_input_change = bool(valuation_reasons)
     unsupported_move = (
@@ -318,7 +349,7 @@ def build_reconstruction_delta(
         and abs(fair_value_change) >= UNEXPLAINED_MOVE_THRESHOLD
         and not valuation_input_change
     )
-    hard_failure = (
+    hard_failure = fair_value_invalid or (
         fair_value_change is not None
         and abs(fair_value_change) >= HARD_FAILURE_THRESHOLD
         and not valuation_input_change
