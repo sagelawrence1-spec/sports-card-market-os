@@ -25,15 +25,22 @@ def _parse_reviewed_at(value: str) -> str:
     return parsed.isoformat()
 
 
+def _required_text(value: object, *, field: str) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"{field} is required")
+    return value.strip()
+
+
 def _normalize_proposals(proposals: Iterable[dict] | None) -> list[dict]:
     normalized: list[dict] = []
     seen: set[str] = set()
     for index, proposal in enumerate(proposals or []):
         if not isinstance(proposal, dict):
             raise ValueError(f"proposal {index} must be an object")
-        threshold = str(proposal.get("threshold") or "").strip()
-        if not threshold:
+        threshold_raw = proposal.get("threshold")
+        if not isinstance(threshold_raw, str) or not threshold_raw.strip():
             raise ValueError(f"proposal {index} requires threshold")
+        threshold = threshold_raw.strip()
         if threshold in seen:
             raise ValueError(f"duplicate threshold proposal:{threshold}")
         seen.add(threshold)
@@ -81,12 +88,8 @@ def build_calibration_decision_record(
     if decision not in _ALLOWED_DECISIONS:
         raise ValueError(f"unsupported calibration decision:{decision}")
 
-    reviewer = str(reviewer or "").strip()
-    rationale = str(rationale or "").strip()
-    if not reviewer:
-        raise ValueError("reviewer is required")
-    if not rationale:
-        raise ValueError("rationale is required")
+    reviewer = _required_text(reviewer, field="reviewer")
+    rationale = _required_text(rationale, field="rationale")
 
     normalized_proposals = _normalize_proposals(proposals)
     review_allowed = history_assessment.get("calibration_review_allowed") is True
