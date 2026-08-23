@@ -143,12 +143,7 @@ def evaluate_comparable_lift(
     evaluation_date: date,
     policy: ComparableLiftPolicy | None = None,
 ) -> dict:
-    """Measure hierarchy-comparable lift without allowing immature outcomes to leak in.
-
-    Comparable intelligence cannot graduate from aggregate wins alone. Every represented
-    family must clear a mature sample floor and, once sampled, must not regress versus
-    the simple sold-comp baseline on MAE or directional accuracy beyond policy.
-    """
+    """Measure hierarchy-comparable lift without allowing immature outcomes to leak in."""
     policy = policy or ComparableLiftPolicy()
     policy.validate()
     rows = list(observations)
@@ -174,6 +169,7 @@ def evaluate_comparable_lift(
 
     mature = [row for row in rows if row.is_mature_at(evaluation_date)]
     immature = [row for row in rows if not row.is_mature_at(evaluation_date)]
+    overdue_unsettled = [row for row in immature if row.horizon_end <= evaluation_date]
 
     families: dict[str, list[ComparableBenchmarkObservation]] = {
         family: [] for family in represented_families
@@ -185,6 +181,8 @@ def evaluate_comparable_lift(
     family_metrics = {family: _metrics(families[family]) for family in sorted(families)}
 
     blockers: list[str] = []
+    if overdue_unsettled:
+        blockers.append("overdue_unsettled_outcomes")
     if len(mature) < policy.min_mature_samples:
         blockers.append("insufficient_mature_samples")
     thin_families = sorted(
@@ -226,6 +224,8 @@ def evaluate_comparable_lift(
         "total_observations": len(rows),
         "mature_observations": len(mature),
         "immature_observations": len(immature),
+        "overdue_unsettled_observations": len(overdue_unsettled),
+        "overdue_unsettled_card_ids": sorted(str(row.card_id).strip() for row in overdue_unsettled),
         "outcome_basis": "net_realized_after_exit_fees_and_liquidity_haircut",
         "policy": {
             "min_mature_samples": policy.min_mature_samples,
