@@ -65,3 +65,30 @@ def test_single_date_source_remains_backward_compatible():
     )
 
     assert result["calibration_review_allowed"] is True
+
+
+def test_trailing_garbage_cannot_be_truncated_into_valid_checkpoint_date():
+    result = assess_calibration_history(
+        [
+            _run("2026-06-01", "2026-06-01", 20),
+            _run("2026-07-01garbage", "2026-07-01garbage", 28),
+            _run("2026-08-01", "2026-08-01", 36),
+        ]
+    )
+
+    assert result["calibration_review_allowed"] is False
+    assert "invalid_evaluation_date:1" in result["blockers"]
+    assert result["checkpoints_seen"] == 2
+
+
+def test_real_iso_datetime_checkpoint_remains_supported():
+    result = assess_calibration_history(
+        [
+            _run("2026-06-01T08:30:00Z", "2026-06-01", 20),
+            _run("2026-07-01T15:45:00+00:00", "2026-07-01", 28),
+            _run("2026-08-01", "2026-08-01", 36),
+        ]
+    )
+
+    assert result["calibration_review_allowed"] is True
+    assert result["blockers"] == []
