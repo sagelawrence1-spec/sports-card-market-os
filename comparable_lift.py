@@ -128,15 +128,24 @@ def evaluate_comparable_lift(
     policy = policy or ComparableLiftPolicy()
     policy.validate()
     rows = list(observations)
+
+    represented_families: set[str] = set()
+    normalized_family: dict[int, str] = {}
+    for row in rows:
+        family = str(row.family or "").strip().lower()
+        if not family:
+            raise ValueError("family is required for comparable observations")
+        represented_families.add(family)
+        normalized_family[id(row)] = family
+
     mature = [row for row in rows if row.is_mature_at(evaluation_date)]
     immature = [row for row in rows if not row.is_mature_at(evaluation_date)]
 
-    families: dict[str, list[ComparableBenchmarkObservation]] = {}
+    families: dict[str, list[ComparableBenchmarkObservation]] = {
+        family: [] for family in represented_families
+    }
     for row in mature:
-        family = str(row.family or "").strip().lower()
-        if not family:
-            raise ValueError("family is required for mature comparable observations")
-        families.setdefault(family, []).append(row)
+        families[normalized_family[id(row)]].append(row)
 
     overall = _metrics(mature)
     family_metrics = {family: _metrics(families[family]) for family in sorted(families)}

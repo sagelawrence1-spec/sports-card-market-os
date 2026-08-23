@@ -60,6 +60,28 @@ def test_immature_future_outcomes_do_not_enter_metrics() -> None:
     assert result["overall"]["observations"] == 20
 
 
+def test_fully_immature_family_blocks_release_even_when_aggregate_sample_passes() -> None:
+    mature = [_row(i, family="topps chrome") for i in range(20)]
+    immature_family = [
+        _row(
+            100 + i,
+            family="bowman chrome",
+            as_of=date(2026, 2, 15),
+            realized_at=date(2026, 4, 1),
+        )
+        for i in range(5)
+    ]
+    result = evaluate_comparable_lift(
+        [*mature, *immature_family], evaluation_date=date(2026, 3, 1)
+    )
+    assert result["mature_observations"] == 20
+    assert result["overall"]["mae_improvement_pct"] > 0.05
+    assert result["production_ready"] is False
+    assert "insufficient_family_samples" in result["blockers"]
+    assert result["thin_families"] == ["bowman chrome"]
+    assert result["families"]["bowman chrome"]["observations"] == 0
+
+
 def test_under_sampled_family_blocks_aggregate_win() -> None:
     rows = [_row(i, family="topps chrome") for i in range(19)]
     rows.append(_row(20, family="rare family"))
@@ -148,6 +170,19 @@ def test_net_realized_price_includes_fees_and_liquidity() -> None:
 
 def test_missing_family_fails_closed_for_mature_observation() -> None:
     rows = [_row(i) for i in range(19)] + [_row(20, family="")]
+    with pytest.raises(ValueError, match="family is required"):
+        evaluate_comparable_lift(rows, evaluation_date=date(2026, 3, 1))
+
+
+def test_missing_family_fails_closed_even_when_observation_is_immature() -> None:
+    rows = [_row(i) for i in range(20)] + [
+        _row(
+            21,
+            family=" ",
+            as_of=date(2026, 2, 15),
+            realized_at=date(2026, 4, 1),
+        )
+    ]
     with pytest.raises(ValueError, match="family is required"):
         evaluate_comparable_lift(rows, evaluation_date=date(2026, 3, 1))
 
