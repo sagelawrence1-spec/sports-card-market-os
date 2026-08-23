@@ -17,6 +17,19 @@ def _pct_change(previous: float | None, current: float | None) -> float | None:
     return (float(current) - float(previous)) / float(previous)
 
 
+def _nonnegative_int(value: Any) -> int | None:
+    """Return a non-negative integer or ``None`` for malformed metadata."""
+    if isinstance(value, bool):
+        return None
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return None
+    if parsed < 0:
+        return None
+    return parsed
+
+
 def _canonical_event_date(value: Any) -> str | None:
     """Return a strict ISO calendar date or ``None`` for malformed input."""
     text = str(value or "").strip()
@@ -56,24 +69,13 @@ def _accepted_evidence_signature(
 
     state_total = state.get("accepted_sales_total")
     if state_total is not None:
-        if isinstance(state_total, bool):
-            return True, False, (), ()
-        try:
-            state_total = int(state_total)
-        except (TypeError, ValueError):
-            return True, False, (), ()
-        if state_total < 0 or state_total != len(accepted):
+        state_total = _nonnegative_int(state_total)
+        if state_total is None or state_total != len(accepted):
             return True, False, (), ()
 
     if "accepted_total" in ledger:
-        accepted_total = ledger.get("accepted_total")
-        if isinstance(accepted_total, bool):
-            return True, False, (), ()
-        try:
-            accepted_total = int(accepted_total)
-        except (TypeError, ValueError):
-            return True, False, (), ()
-        if accepted_total < 0 or accepted_total != len(accepted):
+        accepted_total = _nonnegative_int(ledger.get("accepted_total"))
+        if accepted_total is None or accepted_total != len(accepted):
             return True, False, (), ()
 
     rows: list[tuple[str, ...]] = []
@@ -162,8 +164,13 @@ def build_reconstruction_delta(
     valuation_reasons: list[str] = []
     quality_reasons: list[str] = []
 
-    previous_sales = int(previous.get("accepted_sales_total") or 0)
-    current_sales = int(current.get("accepted_sales_total") or 0)
+    previous_sales_value = _nonnegative_int(previous.get("accepted_sales_total"))
+    current_sales_value = _nonnegative_int(current.get("accepted_sales_total"))
+    sales_metadata_invalid = previous_sales_value is None or current_sales_value is None
+    previous_sales = previous_sales_value or 0
+    current_sales = current_sales_value or 0
+    if sales_metadata_invalid:
+        quality_reasons.append("accepted_sales_total_invalid")
 
     (
         previous_has_ledger,
@@ -191,8 +198,10 @@ def build_reconstruction_delta(
         comp_content=current_comp_content,
     )
 
-    sold_lineage_failure = False
-    if not previous_has_ledger and not current_has_ledger:
+    sold_lineage_failure = sales_metadata_invalid
+    if sales_metadata_invalid:
+        pass
+    elif not previous_has_ledger and not current_has_ledger:
         sold_lineage_failure = True
     elif previous_has_ledger != current_has_ledger:
         sold_lineage_failure = True
