@@ -164,10 +164,16 @@ def _run_date(run: dict) -> date | None:
 
 
 def _mature_count(run: dict) -> int | None:
-    try:
-        return int((run.get("result") or {}).get("mature_observations"))
-    except (TypeError, ValueError):
+    value = (run.get("result") or {}).get("mature_observations")
+    if isinstance(value, bool):
         return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str):
+        raw = value.strip()
+        if raw and raw.isdigit():
+            return int(raw)
+    return None
 
 
 def assess_calibration_history(
