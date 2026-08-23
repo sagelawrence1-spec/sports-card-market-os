@@ -155,8 +155,17 @@ def evaluate_comparable_lift(
 
     represented_families: set[str] = set()
     normalized_family: dict[int, str] = {}
+    seen_decision_keys: set[tuple[str, date, int]] = set()
     for row in rows:
         _validate_observation(row)
+        normalized_card_id = str(row.card_id or "").strip().casefold()
+        decision_key = (normalized_card_id, row.as_of_date, row.horizon_days)
+        if decision_key in seen_decision_keys:
+            raise ValueError(
+                "duplicate comparable benchmark decision for card_id/as_of_date/horizon_days"
+            )
+        seen_decision_keys.add(decision_key)
+
         family = str(row.family or "").strip().lower()
         if not family:
             raise ValueError("family is required for comparable observations")
