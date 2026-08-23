@@ -157,16 +157,19 @@ def assess_calibration_history(
     runs: Iterable[dict],
     *,
     policy: CalibrationSafetyPolicy | None = None,
+    as_of: date | None = None,
 ) -> dict:
     """Require repeated, newly matured out-of-sample evidence before calibration review.
 
     A single favorable benchmark snapshot is not enough. The most recent checkpoints
     must each pass the point-in-time safety gate, advance chronologically, and add a
     minimum number of newly matured observations so repeated scoring of the same
-    outcomes cannot masquerade as stability.
+    outcomes cannot masquerade as stability. Checkpoints dated after ``as_of`` are
+    rejected so future-dated packets cannot manufacture apparent history.
     """
 
     policy = policy or CalibrationSafetyPolicy()
+    cutoff = as_of or date.today()
     blockers: list[str] = []
     rows = list(runs)
 
@@ -184,6 +187,9 @@ def assess_calibration_history(
         mature = _mature_count(run)
         if evaluated_at is None:
             blockers.append(f"invalid_evaluation_date:{index}")
+            continue
+        if evaluated_at > cutoff:
+            blockers.append(f"future_evaluation_date:{index}")
             continue
         if mature is None or mature < 0:
             blockers.append(f"invalid_mature_observations:{index}")
