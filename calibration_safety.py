@@ -97,16 +97,36 @@ def assess_calibration_safety(
     }
 
 
-def _run_date(run: dict) -> date | None:
-    value = run.get("evaluated_at")
-    if not value:
-        value = (run.get("result") or {}).get("evaluation_date")
+def _parse_run_date(value: object) -> date | None:
     if not value:
         return None
     try:
         return date.fromisoformat(str(value)[:10])
     except ValueError:
         return None
+
+
+def _run_date(run: dict) -> date | None:
+    """Resolve one benchmark checkpoint date without allowing metadata disagreement.
+
+    Persisted benchmark runs carry both an outer ``evaluated_at`` field and the
+    point-in-time result's ``evaluation_date``. If both are present they must resolve
+    to the same calendar date; otherwise history ordering could be manufactured by
+    rewriting only the wrapper metadata around an older result packet.
+    """
+
+    outer_value = run.get("evaluated_at")
+    result_value = (run.get("result") or {}).get("evaluation_date")
+    outer_date = _parse_run_date(outer_value) if outer_value else None
+    result_date = _parse_run_date(result_value) if result_value else None
+
+    if outer_value and outer_date is None:
+        return None
+    if result_value and result_date is None:
+        return None
+    if outer_date is not None and result_date is not None and outer_date != result_date:
+        return None
+    return outer_date or result_date
 
 
 def _mature_count(run: dict) -> int | None:
