@@ -172,6 +172,16 @@ def build_reconstruction_delta(
     if sales_metadata_invalid:
         quality_reasons.append("accepted_sales_total_invalid")
 
+    previous_active_raw = previous.get("accepted_active_count")
+    current_active_raw = current.get("accepted_active_count")
+    previous_active_value = 0 if previous_active_raw is None else _nonnegative_int(previous_active_raw)
+    current_active_value = 0 if current_active_raw is None else _nonnegative_int(current_active_raw)
+    active_metadata_invalid = previous_active_value is None or current_active_value is None
+    previous_active = previous_active_value or 0
+    current_active = current_active_value or 0
+    if active_metadata_invalid:
+        quality_reasons.append("accepted_active_count_invalid")
+
     (
         previous_has_ledger,
         previous_ledger_valid,
@@ -230,10 +240,11 @@ def build_reconstruction_delta(
         else:
             valuation_reasons.append("latest_sale_changed")
 
-    previous_active = int(previous.get("accepted_active_count") or 0)
-    current_active = int(current.get("accepted_active_count") or 0)
     if previous_active != current_active:
-        valuation_reasons.append("active_supply_changed")
+        if active_metadata_invalid:
+            quality_reasons.append("active_supply_changed_without_trusted_metadata")
+        else:
+            valuation_reasons.append("active_supply_changed")
 
     if _price_changed(previous, current, "lowest_ask"):
         valuation_reasons.append("lowest_ask_changed")
