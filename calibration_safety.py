@@ -17,14 +17,23 @@ class CalibrationSafetyPolicy:
     min_new_mature_samples_per_checkpoint: int = 5
 
 
-def _segment_observations(benchmark: dict, family: str, key: str) -> int:
+def _nonnegative_int(value: object) -> int | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value if value >= 0 else None
+    if isinstance(value, str):
+        raw = value.strip()
+        if raw and raw.isdigit():
+            return int(raw)
+    return None
+
+
+def _segment_observations(benchmark: dict, family: str, key: str) -> int | None:
     segment = benchmark.get("segments", {}).get(family, {}).get(key)
     if not isinstance(segment, dict):
         return 0
-    try:
-        return int(segment.get("observations", 0))
-    except (TypeError, ValueError):
-        return 0
+    return _nonnegative_int(segment.get("observations", 0))
 
 
 def _finite_float(value: object) -> float | None:
@@ -77,19 +86,27 @@ def assess_calibration_safety(
 
     for grade in policy.required_evidence_grades:
         count = _segment_observations(benchmark, "evidence_grade", grade)
-        if count < policy.min_segment_samples:
+        if count is None:
+            blockers.append(f"invalid_evidence_grade_observations:{grade}")
+        elif count < policy.min_segment_samples:
             blockers.append(f"underpowered_evidence_grade:{grade}")
 
     for band in policy.required_confidence_bands:
         count = _segment_observations(benchmark, "confidence_band", band)
-        if count < policy.min_segment_samples:
+        if count is None:
+            blockers.append(f"invalid_confidence_band_observations:{band}")
+        elif count < policy.min_segment_samples:
             blockers.append(f"underpowered_confidence_band:{band}")
 
     unknown_evidence = _segment_observations(benchmark, "evidence_grade", "unknown")
     unknown_confidence = _segment_observations(benchmark, "confidence_band", "unknown")
-    if unknown_evidence:
+    if unknown_evidence is None:
+        blockers.append("invalid_evidence_grade_observations:unknown")
+    elif unknown_evidence:
         warnings.append("unknown_evidence_grade_present")
-    if unknown_confidence:
+    if unknown_confidence is None:
+        blockers.append("invalid_confidence_band_observations:unknown")
+    elif unknown_confidence:
         warnings.append("unknown_confidence_present")
 
     blockers = list(dict.fromkeys(blockers))
@@ -130,9 +147,6 @@ def _parse_run_date(value: object) -> date | None:
     except ValueError:
         pass
 
-    # Permit real ISO datetime timestamps from persisted/external history, but require
-    # the entire string to parse. This prevents values such as ``2026-08-01garbage``
-    # from being silently truncated to a valid checkpoint date.
     normalized = raw[:-1] + "+00:00" if raw.endswith("Z") else raw
     try:
         return datetime.fromisoformat(normalized).date()
@@ -141,13 +155,7 @@ def _parse_run_date(value: object) -> date | None:
 
 
 def _run_date(run: dict) -> date | None:
-    """Resolve one benchmark checkpoint date without allowing metadata disagreement.
-
-    Persisted benchmark runs carry both an outer ``evaluated_at`` field and the
-    point-in-time result's ``evaluation_date``. If both are present they must resolve
-    to the same calendar date; otherwise history ordering could be manufactured by
-    rewriting only the wrapper metadata around an older result packet.
-    """
+    """Resolve one benchmark checkpoint date without allowing metadata disagreement."""
 
     outer_value = run.get("evaluated_at")
     result_value = (run.get("result") or {}).get("evaluation_date")
@@ -165,15 +173,7 @@ def _run_date(run: dict) -> date | None:
 
 def _mature_count(run: dict) -> int | None:
     value = (run.get("result") or {}).get("mature_observations")
-    if isinstance(value, bool):
-        return None
-    if isinstance(value, int):
-        return value
-    if isinstance(value, str):
-        raw = value.strip()
-        if raw and raw.isdigit():
-            return int(raw)
-    return None
+    return _nonnegative_int(value)
 
 
 def assess_calibration_history(
@@ -214,7 +214,7 @@ def assess_calibration_history(
         if evaluated_at > cutoff:
             blockers.append(f"future_evaluation_date:{index}")
             continue
-        if mature is None or mature < 0:
+        if mature is None:
             blockers.append(f"invalid_mature_observations:{index}")
             continue
         safety = assess_calibration_safety(run["result"], policy=policy)
