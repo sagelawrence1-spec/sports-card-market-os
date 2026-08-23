@@ -187,6 +187,51 @@ def test_missing_family_fails_closed_even_when_observation_is_immature() -> None
         evaluate_comparable_lift(rows, evaluation_date=date(2026, 3, 1))
 
 
+def test_nonfinite_estimate_fails_closed() -> None:
+    rows = [_row(i) for i in range(20)]
+    rows[0] = _row(0, comparable=float("nan"))
+    with pytest.raises(ValueError, match="comparable_estimate must be finite"):
+        evaluate_comparable_lift(rows, evaluation_date=date(2026, 3, 1))
+
+
+def test_nonfinite_realized_price_fails_closed() -> None:
+    rows = [_row(i) for i in range(20)]
+    rows[0] = _row(0, realized=float("inf"))
+    with pytest.raises(ValueError, match="realized_price must be finite"):
+        evaluate_comparable_lift(rows, evaluation_date=date(2026, 3, 1))
+
+
+def test_invalid_fee_rate_fails_closed() -> None:
+    rows = [_row(i) for i in range(20)]
+    rows[0] = ComparableBenchmarkObservation(
+        **{**rows[0].__dict__, "exit_fee_rate": float("nan")}
+    )
+    with pytest.raises(ValueError, match="exit_fee_rate must be finite"):
+        evaluate_comparable_lift(rows, evaluation_date=date(2026, 3, 1))
+
+
+def test_blank_card_id_and_invalid_horizon_fail_closed() -> None:
+    row = ComparableBenchmarkObservation(
+        card_id=" ",
+        family="topps chrome",
+        as_of_date=date(2026, 1, 1),
+        horizon_days=30,
+        current_price=100.0,
+        baseline_estimate=120.0,
+        comparable_estimate=108.0,
+        realized_price=110.0,
+        realized_at=date(2026, 2, 1),
+    )
+    with pytest.raises(ValueError, match="card_id is required"):
+        evaluate_comparable_lift([row], evaluation_date=date(2026, 3, 1))
+
+    bad_horizon = ComparableBenchmarkObservation(
+        **{**row.__dict__, "card_id": "card-1", "horizon_days": 0}
+    )
+    with pytest.raises(ValueError, match="horizon_days must be >= 1"):
+        evaluate_comparable_lift([bad_horizon], evaluation_date=date(2026, 3, 1))
+
+
 def test_policy_validation_fails_closed() -> None:
     with pytest.raises(ValueError, match="min_mature_samples"):
         ComparableLiftPolicy(min_mature_samples=0).validate()
