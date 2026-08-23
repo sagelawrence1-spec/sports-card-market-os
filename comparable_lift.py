@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date, timedelta
+from math import isfinite
 from statistics import mean
 from typing import Iterable
 
@@ -113,6 +114,29 @@ def _metrics(rows: list[ComparableBenchmarkObservation]) -> dict:
     }
 
 
+def _validate_observation(row: ComparableBenchmarkObservation) -> None:
+    card_id = str(row.card_id or "").strip()
+    if not card_id:
+        raise ValueError("card_id is required for comparable observations")
+    if row.horizon_days < 1:
+        raise ValueError("horizon_days must be >= 1")
+
+    for field_name in ("current_price", "baseline_estimate", "comparable_estimate"):
+        value = float(getattr(row, field_name))
+        if not isfinite(value) or value <= 0:
+            raise ValueError(f"{field_name} must be finite and > 0")
+
+    for field_name in ("exit_fee_rate", "liquidity_haircut_rate"):
+        value = float(getattr(row, field_name))
+        if not isfinite(value) or not 0.0 <= value <= 1.0:
+            raise ValueError(f"{field_name} must be finite and between 0 and 1")
+
+    if row.realized_price is not None:
+        realized = float(row.realized_price)
+        if not isfinite(realized) or realized <= 0:
+            raise ValueError("realized_price must be finite and > 0")
+
+
 def evaluate_comparable_lift(
     observations: Iterable[ComparableBenchmarkObservation],
     *,
@@ -132,6 +156,7 @@ def evaluate_comparable_lift(
     represented_families: set[str] = set()
     normalized_family: dict[int, str] = {}
     for row in rows:
+        _validate_observation(row)
         family = str(row.family or "").strip().lower()
         if not family:
             raise ValueError("family is required for comparable observations")
