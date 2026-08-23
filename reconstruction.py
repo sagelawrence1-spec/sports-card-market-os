@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import date
 from typing import Any, Iterable, Mapping
 
 
@@ -16,6 +17,20 @@ def _pct_change(previous: float | None, current: float | None) -> float | None:
     return (float(current) - float(previous)) / float(previous)
 
 
+def _canonical_event_date(value: Any) -> str | None:
+    """Return a strict ISO calendar date or ``None`` for malformed input."""
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        parsed = date.fromisoformat(text)
+    except ValueError:
+        return None
+    if parsed.isoformat() != text:
+        return None
+    return text
+
+
 def _accepted_evidence_signature(
     state: Mapping[str, Any],
 ) -> tuple[bool, bool, tuple[str, ...], tuple[tuple[str, ...], ...]]:
@@ -24,8 +39,9 @@ def _accepted_evidence_signature(
     Evidence IDs identify the comp set. The content signature separately captures
     immutable source facts so a price/date/source/title mutation under the same ID
     is surfaced as a lineage-quality failure rather than accepted as fresh market
-    evidence. Malformed rows, blank IDs, duplicate IDs, and declared count
-    mismatches fail closed instead of being silently accepted into lineage.
+    evidence. Malformed rows, blank IDs, duplicate IDs, invalid sold dates, and
+    declared count mismatches fail closed instead of being silently accepted into
+    lineage.
     """
     if "evidence_ledger" not in state or state.get("evidence_ledger") is None:
         return False, True, (), ()
@@ -68,6 +84,9 @@ def _accepted_evidence_signature(
         evidence_id = str(row.get("evidence_id") or "").strip()
         if not evidence_id or evidence_id in seen_ids:
             return True, False, (), ()
+        event_date = _canonical_event_date(row.get("event_date"))
+        if event_date is None:
+            return True, False, (), ()
         seen_ids.add(evidence_id)
         rows.append(
             (
@@ -75,7 +94,7 @@ def _accepted_evidence_signature(
                 str(row.get("title") or "").strip(),
                 str(row.get("price") if row.get("price") is not None else ""),
                 str(row.get("currency") or "").strip().upper(),
-                str(row.get("event_date") or "").strip(),
+                event_date,
                 str(row.get("source") or "").strip(),
                 str(row.get("url") or "").strip(),
             )
@@ -103,7 +122,7 @@ def _latest_sale_date_matches_ledger(
     if not has_ledger or not ledger_valid:
         return True
 
-    event_dates = [row[4] for row in comp_content if row[4]]
+    event_dates = [row[4] for row in comp_content]
     expected = max(event_dates) if event_dates else None
     actual = str(state.get("latest_sale_date") or "").strip() or None
     return actual == expected
