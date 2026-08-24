@@ -264,3 +264,26 @@ def test_valid_mature_packet_can_remain_ready():
         "duplicate_decision_card_ids": [],
         "future_decision_card_ids": [],
     }
+
+
+def test_malformed_evaluation_cutoff_fails_closed_instead_of_raising():
+    result = evaluate_benchmark_with_integrity(
+        [row(card_id="bad-cutoff")],
+        evaluation_date=datetime(2026, 2, 15, 12, 0),
+        min_mature_samples=0,
+    )
+
+    assert result["production_ready"] is False
+    assert "invalid_benchmark_evaluation_date" in result["blockers"]
+    assert result["outcome_integrity"]["invalid_evaluation_date"] is True
+
+
+def test_valid_date_cutoff_does_not_emit_cutoff_integrity_blocker():
+    result = evaluate_benchmark_with_integrity(
+        [row(card_id="valid-cutoff")],
+        evaluation_date=date(2026, 2, 15),
+        min_mature_samples=1,
+    )
+
+    assert "invalid_benchmark_evaluation_date" not in result["blockers"]
+    assert "invalid_evaluation_date" not in result["outcome_integrity"]
