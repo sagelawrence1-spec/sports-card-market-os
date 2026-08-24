@@ -17,6 +17,10 @@ def _valid_horizon(value: object) -> bool:
     return isinstance(value, int) and not isinstance(value, bool) and value > 0
 
 
+def _valid_min_mature_samples(value: object) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and value >= 0
+
+
 def _canonical_card_id(value: object) -> str | None:
     if not isinstance(value, str):
         return None
@@ -88,11 +92,16 @@ def evaluate_benchmark_with_integrity(
     cannot score or count information that did not exist at that point in time.
     Malformed decision provenance or numeric decision-time inputs are excluded before
     outcome/scoring math so corrupt packets fail closed instead of poisoning metrics.
+    The mature-sample readiness threshold is itself validated so negative or boolean
+    policy values cannot silently weaken the production gate.
     """
 
     cutoff = evaluation_date or date.today()
     if not _valid_date(cutoff):
         raise ValueError("benchmark integrity evaluation_date must be a date")
+
+    invalid_sample_gate = not _valid_min_mature_samples(min_mature_samples)
+    effective_min_mature_samples = min_mature_samples if not invalid_sample_gate else 20
 
     rows = list(observations)
     invalid_decision_ids = sorted(
@@ -138,7 +147,7 @@ def evaluate_benchmark_with_integrity(
     result = evaluate_intelligence_vs_baseline(
         scoring_rows,
         evaluation_date=cutoff,
-        min_mature_samples=min_mature_samples,
+        min_mature_samples=effective_min_mature_samples,
     )
 
     blockers = list(result.get("blockers") or [])
@@ -153,6 +162,8 @@ def evaluate_benchmark_with_integrity(
         blockers.append("duplicate_benchmark_decision_packet")
     if future_decision_ids and "benchmark_decision_after_evaluation_cutoff" not in blockers:
         blockers.append("benchmark_decision_after_evaluation_cutoff")
+    if invalid_sample_gate and "invalid_benchmark_min_mature_samples" not in blockers:
+        blockers.append("invalid_benchmark_min_mature_samples")
 
     return {
         **result,
