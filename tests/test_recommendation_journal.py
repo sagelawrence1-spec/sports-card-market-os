@@ -3,6 +3,7 @@ from datetime import date
 from recommendation_journal import (
     RecommendationJournal,
     capture_recommendations,
+    grade_outcomes,
     outcome_summary,
     settle_outcomes,
 )
@@ -66,9 +67,71 @@ def test_outcome_settlement_requires_full_horizon_and_bounds_future_sales(tmp_pa
 
 def test_summary_scores_sell_direction_correctly(tmp_path):
     journal=RecommendationJournal(tmp_path/"market.sqlite")
-    capture_recommendations(journal,_contract("2026-01-01",action="SELL",sales=[(100,"2025-12-31","USD",True)]),horizon_days=30)
-    settle_outcomes(journal,_contract("2026-02-01",action="SELL",sales=[(80,"2026-01-31","USD",True)]))
+    capture_recommendations(
+        journal,
+        _contract("2026-01-01",action="SELL",fair_value=80,sales=[(100,"2025-12-31","USD",True)]),
+        horizon_days=30,
+    )
+    settle_outcomes(journal,_contract("2026-02-01",action="SELL",fair_value=80,sales=[(80,"2026-01-31","USD",True)]))
     summary=outcome_summary(journal)
     assert summary["settled"]==1
     assert summary["hit_rate"]==1.0
     assert summary["median_return"]==0.2
+    assert summary["thesis_correctness"]==1.0
+
+
+def test_grade_outcomes_reports_realized_return_and_thesis_correctness(tmp_path):
+    journal=RecommendationJournal(tmp_path/"market.sqlite")
+    capture_recommendations(
+        journal,
+        _contract("2026-01-01",fair_value=125,sales=[(100,"2025-12-31","USD",True)]),
+        horizon_days=30,
+    )
+    settle_outcomes(journal,_contract("2026-02-01",fair_value=125,sales=[(110,"2026-01-31","USD",True)]))
+
+    grades=grade_outcomes(journal)
+    assert grades==[{
+        "observation_id":"obs-1",
+        "card_id":"card-1",
+        "as_of_date":"2026-01-01",
+        "horizon_days":30,
+        "realized_at":"2026-01-31",
+        "entry_price":100.0,
+        "fair_value":125.0,
+        "realized_price":110.0,
+        "realized_return":0.1,
+        "signed_return":0.1,
+        "thesis_correct":True,
+    }]
+
+
+def test_thesis_grade_uses_published_fair_value_not_hindsight_text(tmp_path):
+    journal=RecommendationJournal(tmp_path/"market.sqlite")
+    capture_recommendations(
+        journal,
+        _contract("2026-01-01",fair_value=125,sales=[(100,"2025-12-31","USD",True)]),
+        horizon_days=30,
+    )
+    settle_outcomes(journal,_contract("2026-02-01",fair_value=1,sales=[(90,"2026-01-31","USD",True)]))
+
+    grades=grade_outcomes(journal)
+    assert grades[0]["fair_value"]==125.0
+    assert grades[0]["realized_return"]==-0.1
+    assert grades[0]["thesis_correct"] is False
+    assert outcome_summary(journal)["thesis_correctness"]==0.0
+
+
+def test_unsettled_calls_do_not_receive_outcome_grades(tmp_path):
+    journal=RecommendationJournal(tmp_path/"market.sqlite")
+    capture_recommendations(
+        journal,
+        _contract("2026-01-01",sales=[(100,"2025-12-31","USD",True)]),
+        horizon_days=30,
+    )
+    assert grade_outcomes(journal)==[]
+    assert outcome_summary(journal)=={
+        "settled":0,
+        "hit_rate":None,
+        "median_return":None,
+        "thesis_correctness":None,
+    }
