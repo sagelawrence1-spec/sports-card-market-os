@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 from datetime import date, datetime, timedelta
+import json
 import sqlite3
 import statistics
 from typing import Any, Mapping
@@ -39,6 +40,27 @@ def _accepted_sales(item: Mapping[str, Any]) -> list[tuple[date, float]]:
     return rows
 
 
+def _decision_snapshot(item: Mapping[str, Any]) -> str:
+    """Freeze the decision-time opportunity context as canonical JSON.
+
+    The scalar recommendation fields remain first-class columns for querying, while
+    this packet preserves the richer context required to audit the original call.
+    """
+    card_id=str(item.get("card_id") or "")
+    raw_expressions=item.get("card_expressions")
+    if raw_expressions is None:
+        raw_expressions=item.get("cards")
+    if raw_expressions is None:
+        raw_expressions=[{"card_id":card_id}] if card_id else []
+    packet={
+        "thesis_type":item.get("thesis_type"),
+        "lifecycle_stage":item.get("lifecycle_stage") or item.get("stage"),
+        "card_expressions":raw_expressions,
+        "evidence_snapshot":item.get("evidence_ledger") or {},
+    }
+    return json.dumps(packet,sort_keys=True,separators=(",",":"),ensure_ascii=False)
+
+
 @dataclass(frozen=True)
 class Recommendation:
     observation_id: str
@@ -53,6 +75,7 @@ class Recommendation:
     horizon_days: int
     realized_price: float | None=None
     realized_at: date | None=None
+    decision_snapshot: str="{}"
 
     @property
     def horizon_end(self) -> date:
@@ -77,9 +100,13 @@ class RecommendationJournal:
                     horizon_days INTEGER NOT NULL,
                     realized_price REAL,
                     realized_at TEXT,
+                    decision_snapshot TEXT NOT NULL DEFAULT '{}',
                     PRIMARY KEY(observation_id,as_of_date,horizon_days)
                 )
             """)
+            columns={row[1] for row in conn.execute("PRAGMA table_info(recommendation_journal)")}
+            if "decision_snapshot" not in columns:
+                conn.execute("ALTER TABLE recommendation_journal ADD COLUMN decision_snapshot TEXT NOT NULL DEFAULT '{}'")
 
     def _connect(self):
         conn=sqlite3.connect(self.database_path)
@@ -96,6 +123,7 @@ class RecommendationJournal:
             rec.confidence,
             rec.evidence_grade,
             rec.thesis,
+            rec.decision_snapshot,
         )
 
     @staticmethod
@@ -108,6 +136,7 @@ class RecommendationJournal:
             row["confidence"],
             row["evidence_grade"],
             row["thesis"],
+            row["decision_snapshot"],
         )
 
     def upsert(self,rec: Recommendation) -> None:
@@ -121,12 +150,17 @@ class RecommendationJournal:
             """,key).fetchone()
             if existing is None:
                 conn.execute("""
-                    INSERT INTO recommendation_journal VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+                    INSERT INTO recommendation_journal (
+                        observation_id,card_id,as_of_date,action,entry_price,fair_value,
+                        confidence,evidence_grade,thesis,horizon_days,realized_price,
+                        realized_at,decision_snapshot
+                    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
                 """,(
                     rec.observation_id,rec.card_id,rec.as_of_date.isoformat(),rec.action,
                     rec.entry_price,rec.fair_value,rec.confidence,rec.evidence_grade,
                     rec.thesis,rec.horizon_days,rec.realized_price,
                     rec.realized_at.isoformat() if rec.realized_at else None,
+                    rec.decision_snapshot,
                 ))
                 return
 
@@ -160,6 +194,7 @@ class RecommendationJournal:
             thesis=row["thesis"],horizon_days=row["horizon_days"],
             realized_price=row["realized_price"],
             realized_at=date.fromisoformat(row["realized_at"]) if row["realized_at"] else None,
+            decision_snapshot=row["decision_snapshot"],
         ) for row in rows]
 
 
@@ -193,6 +228,7 @@ def capture_recommendations(
             confidence=max(0.0,min(1.0,confidence)),
             evidence_grade=str(item.get("evidence_grade") or "F"),
             thesis=str(item.get("thesis") or ""),horizon_days=int(horizon_days),
+            decision_snapshot=_decision_snapshot(item),
         ))
         captured+=1
     return captured
