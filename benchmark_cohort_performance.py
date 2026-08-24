@@ -38,11 +38,12 @@ def _forecast_hit(row: BenchmarkObservation, field: str) -> bool:
 
 
 def _valuation_error_pct(rows: list[BenchmarkObservation], field: str) -> float | None:
-    if not rows:
+    eligible = [row for row in rows if _target_price(row) != 0]
+    if not eligible:
         return None
     return mean(
-        abs(float(getattr(row, field)) - _target_price(row)) / _target_price(row)
-        for row in rows
+        abs(float(getattr(row, field)) - _target_price(row)) / abs(_target_price(row))
+        for row in eligible
     )
 
 
@@ -103,9 +104,7 @@ def _performance_block(rows: list[BenchmarkObservation]) -> dict:
     }
 
 
-def _segment(
-    rows: list[BenchmarkObservation], key_fn
-) -> dict[str, dict]:
+def _segment(rows: list[BenchmarkObservation], key_fn) -> dict[str, dict]:
     grouped: dict[str, list[BenchmarkObservation]] = {}
     for row in rows:
         grouped.setdefault(key_fn(row), []).append(row)
