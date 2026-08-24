@@ -58,6 +58,20 @@ def test_early_outcome_blocks_ready_benchmark():
     assert "realized_outcome_before_horizon" in result["blockers"]
 
 
+def test_invalid_outcome_is_blocked_before_scoring_math():
+    result = evaluate_benchmark_with_integrity(
+        [row(card_id="invalid", realized=float("nan"))],
+        evaluation_date=date(2026, 2, 15),
+        min_mature_samples=0,
+    )
+
+    assert result["production_ready"] is False
+    assert "invalid_realized_outcome_provenance" in result["blockers"]
+    assert result["outcome_integrity"]["invalid_outcome_card_ids"] == ["invalid"]
+    assert result["mature_observations"] == 0
+    assert result["total_observations"] == 1
+
+
 def test_valid_mature_packet_can_remain_ready():
     result = evaluate_benchmark_with_integrity(
         [row(card_id="valid")],
@@ -71,4 +85,5 @@ def test_valid_mature_packet_can_remain_ready():
         "partial_outcome_card_ids": [],
         "early_outcome_card_ids": [],
         "overdue_unsettled_card_ids": [],
+        "invalid_outcome_card_ids": [],
     }

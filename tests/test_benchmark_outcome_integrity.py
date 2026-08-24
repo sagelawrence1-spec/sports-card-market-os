@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 
 import pytest
 
@@ -118,3 +118,43 @@ def test_card_identity_whitespace_is_canonicalized():
 
     assert result.blockers == ()
     assert result.production_safe is True
+
+
+@pytest.mark.parametrize("realized", [0, -1, float("nan"), float("inf"), True, "125"])
+def test_invalid_realized_price_fails_closed(realized):
+    result = assess_benchmark_outcome_integrity(
+        [row(card_id="bad-price", realized=realized)],
+        evaluation_date=date(2026, 2, 15),
+    )
+
+    assert result.invalid_outcome_card_ids == ("bad-price",)
+    assert "invalid_realized_outcome_provenance" in result.blockers
+    assert result.production_safe is False
+
+
+@pytest.mark.parametrize("realized_at", ["2026-02-01", datetime(2026, 2, 1, 12, 0), True])
+def test_invalid_realized_date_fails_closed(realized_at):
+    result = assess_benchmark_outcome_integrity(
+        [row(card_id="bad-date", realized_at=realized_at)],
+        evaluation_date=date(2026, 2, 15),
+    )
+
+    assert result.invalid_outcome_card_ids == ("bad-date",)
+    assert result.production_safe is False
+
+
+def test_invalid_horizon_metadata_fails_closed_without_crashing():
+    result = assess_benchmark_outcome_integrity(
+        [row(card_id="bad-horizon", horizon="30")],
+        evaluation_date=date(2026, 2, 15),
+    )
+
+    assert result.invalid_outcome_card_ids == ("bad-horizon",)
+    assert result.production_safe is False
+
+
+def test_invalid_evaluation_date_fails_closed():
+    with pytest.raises(ValueError, match="evaluation_date to be a date"):
+        assess_benchmark_outcome_integrity(
+            [row(card_id="valid")], evaluation_date="2026-02-15"
+        )
