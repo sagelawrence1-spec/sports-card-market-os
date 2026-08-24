@@ -1,15 +1,40 @@
 from __future__ import annotations
 
 from collections import Counter
-from datetime import date
+from datetime import date, datetime
 from typing import Iterable
 
 from benchmark_outcome_integrity import assess_benchmark_outcome_integrity
 from intelligence_benchmark import BenchmarkObservation, evaluate_intelligence_vs_baseline
 
 
+def _valid_date(value: object) -> bool:
+    return isinstance(value, date) and not isinstance(value, datetime)
+
+
+def _valid_horizon(value: object) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and value > 0
+
+
+def _canonical_card_id(value: object) -> str | None:
+    if not isinstance(value, str):
+        return None
+    card_id = value.strip()
+    return card_id or None
+
+
+def _valid_decision(row: BenchmarkObservation) -> bool:
+    return (
+        _canonical_card_id(row.card_id) is not None
+        and _valid_date(row.as_of_date)
+        and _valid_horizon(row.horizon_days)
+    )
+
+
 def _decision_key(row: BenchmarkObservation) -> tuple[str, date, int]:
-    card_id = row.card_id.strip()
+    card_id = _canonical_card_id(row.card_id)
+    if card_id is None or not _valid_date(row.as_of_date) or not _valid_horizon(row.horizon_days):
+        raise ValueError("benchmark decision key requires valid card/date/horizon provenance")
     return (card_id, row.as_of_date, row.horizon_days)
 
 
@@ -27,31 +52,32 @@ def evaluate_benchmark_with_integrity(
     otherwise double-weight one historical decision and inflate sample counts.
     Decisions made after the evaluation cutoff are excluded entirely so a replay
     cannot score or count information that did not exist at that point in time.
+    Malformed decision provenance is also excluded before outcome/scoring math so
+    corrupt identifiers, dates, or horizons fail closed instead of crashing replay.
     """
 
     cutoff = evaluation_date or date.today()
+    if not _valid_date(cutoff):
+        raise ValueError("benchmark integrity evaluation_date must be a date")
+
     rows = list(observations)
+    invalid_decision_ids = sorted(
+        {
+            _canonical_card_id(row.card_id) or "<invalid-card-id>"
+            for row in rows
+            if not _valid_decision(row)
+        }
+    )
+    provenance_valid_rows = [row for row in rows if _valid_decision(row)]
 
     future_decision_ids = sorted(
         {
-            row.card_id.strip()
-            for row in rows
-            if isinstance(row.card_id, str)
-            and row.card_id.strip()
-            and isinstance(row.as_of_date, date)
-            and row.as_of_date > cutoff
+            _canonical_card_id(row.card_id)
+            for row in provenance_valid_rows
+            if row.as_of_date > cutoff
         }
     )
-    eligible_rows = [
-        row
-        for row in rows
-        if not (
-            isinstance(row.card_id, str)
-            and row.card_id.strip() in future_decision_ids
-            and isinstance(row.as_of_date, date)
-            and row.as_of_date > cutoff
-        )
-    ]
+    eligible_rows = [row for row in provenance_valid_rows if row.as_of_date <= cutoff]
 
     integrity = assess_benchmark_outcome_integrity(eligible_rows, evaluation_date=cutoff)
 
@@ -63,13 +89,8 @@ def evaluate_benchmark_with_integrity(
     scoring_rows = [
         row
         for row in eligible_rows
-        if not (
-            isinstance(row.card_id, str)
-            and (
-                row.card_id.strip() in invalid_ids
-                or _decision_key(row) in duplicate_keys
-            )
-        )
+        if _canonical_card_id(row.card_id) not in invalid_ids
+        and _decision_key(row) not in duplicate_keys
     ]
     result = evaluate_intelligence_vs_baseline(
         scoring_rows,
@@ -81,6 +102,8 @@ def evaluate_benchmark_with_integrity(
     for blocker in integrity.blockers:
         if blocker not in blockers:
             blockers.append(blocker)
+    if invalid_decision_ids and "invalid_benchmark_decision_provenance" not in blockers:
+        blockers.append("invalid_benchmark_decision_provenance")
     if duplicate_ids and "duplicate_benchmark_decision_packet" not in blockers:
         blockers.append("duplicate_benchmark_decision_packet")
     if future_decision_ids and "benchmark_decision_after_evaluation_cutoff" not in blockers:
@@ -96,6 +119,7 @@ def evaluate_benchmark_with_integrity(
             "early_outcome_card_ids": list(integrity.early_outcome_card_ids),
             "overdue_unsettled_card_ids": list(integrity.overdue_unsettled_card_ids),
             "invalid_outcome_card_ids": list(integrity.invalid_outcome_card_ids),
+            "invalid_decision_card_ids": invalid_decision_ids,
             "duplicate_decision_card_ids": duplicate_ids,
             "future_decision_card_ids": future_decision_ids,
         },
