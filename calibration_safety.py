@@ -88,6 +88,18 @@ def _finite_float(value: object) -> float | None:
     return parsed if isfinite(parsed) else None
 
 
+def _policy_snapshot(policy: CalibrationSafetyPolicy) -> dict:
+    return {
+        "min_mae_improvement_pct": policy.min_mae_improvement_pct,
+        "min_directional_accuracy_lift": policy.min_directional_accuracy_lift,
+        "min_segment_samples": policy.min_segment_samples,
+        "required_evidence_grades": list(policy.required_evidence_grades),
+        "required_confidence_bands": list(policy.required_confidence_bands),
+        "min_history_checkpoints": policy.min_history_checkpoints,
+        "min_new_mature_samples_per_checkpoint": policy.min_new_mature_samples_per_checkpoint,
+    }
+
+
 def assess_calibration_safety(
     benchmark: dict,
     *,
@@ -102,6 +114,16 @@ def assess_calibration_safety(
     policy = policy or CalibrationSafetyPolicy()
     blockers: list[str] = []
     warnings: list[str] = []
+
+    if not isinstance(benchmark, dict):
+        return {
+            "calibration_review_allowed": False,
+            "automatic_threshold_changes_allowed": False,
+            "decision": "blocked",
+            "policy": _policy_snapshot(policy),
+            "blockers": ["invalid_benchmark_container"],
+            "warnings": [],
+        }
 
     production_ready = benchmark.get("production_ready")
     if production_ready is not True:
@@ -174,15 +196,7 @@ def assess_calibration_safety(
         "calibration_review_allowed": review_allowed,
         "automatic_threshold_changes_allowed": False,
         "decision": "human_review_allowed" if review_allowed else "blocked",
-        "policy": {
-            "min_mae_improvement_pct": policy.min_mae_improvement_pct,
-            "min_directional_accuracy_lift": policy.min_directional_accuracy_lift,
-            "min_segment_samples": policy.min_segment_samples,
-            "required_evidence_grades": list(policy.required_evidence_grades),
-            "required_confidence_bands": list(policy.required_confidence_bands),
-            "min_history_checkpoints": policy.min_history_checkpoints,
-            "min_new_mature_samples_per_checkpoint": policy.min_new_mature_samples_per_checkpoint,
-        },
+        "policy": _policy_snapshot(policy),
         "blockers": blockers,
         "warnings": warnings,
     }
