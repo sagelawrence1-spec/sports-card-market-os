@@ -58,6 +58,28 @@ def test_realized_outcome_before_horizon_fails_closed():
     assert result.production_safe is False
 
 
+def test_realized_outcome_after_evaluation_cutoff_fails_closed():
+    result = assess_benchmark_outcome_integrity(
+        [row(card_id="future-outcome", realized_at=date(2026, 2, 20))],
+        evaluation_date=date(2026, 2, 15),
+    )
+
+    assert result.future_outcome_card_ids == ("future-outcome",)
+    assert "realized_outcome_after_evaluation_cutoff" in result.blockers
+    assert result.production_safe is False
+
+
+def test_realized_outcome_on_evaluation_cutoff_is_allowed():
+    result = assess_benchmark_outcome_integrity(
+        [row(card_id="same-day", realized_at=date(2026, 2, 15))],
+        evaluation_date=date(2026, 2, 15),
+    )
+
+    assert result.future_outcome_card_ids == ()
+    assert result.blockers == ()
+    assert result.production_safe is True
+
+
 def test_overdue_unsettled_outcome_is_not_merely_immature():
     result = assess_benchmark_outcome_integrity(
         [row(card_id="overdue", realized=None, realized_at=None)],
