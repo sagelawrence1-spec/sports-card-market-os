@@ -72,6 +72,35 @@ def test_invalid_outcome_is_blocked_before_scoring_math():
     assert result["total_observations"] == 1
 
 
+def test_duplicate_decision_packets_fail_closed_and_do_not_inflate_scoring():
+    result = evaluate_benchmark_with_integrity(
+        [row(card_id="dup"), row(card_id=" dup ")],
+        evaluation_date=date(2026, 2, 15),
+        min_mature_samples=0,
+    )
+
+    assert result["production_ready"] is False
+    assert "duplicate_benchmark_decision_packet" in result["blockers"]
+    assert result["outcome_integrity"]["duplicate_decision_card_ids"] == ["dup"]
+    assert result["total_observations"] == 2
+    assert result["mature_observations"] == 0
+
+
+def test_same_card_distinct_horizons_remain_independent_decisions():
+    result = evaluate_benchmark_with_integrity(
+        [
+            row(card_id="card-1", horizon=30, realized_at=date(2026, 2, 1)),
+            row(card_id="card-1", horizon=45, realized_at=date(2026, 2, 20)),
+        ],
+        evaluation_date=date(2026, 2, 20),
+        min_mature_samples=2,
+    )
+
+    assert result["production_ready"] is True
+    assert "duplicate_benchmark_decision_packet" not in result["blockers"]
+    assert result["mature_observations"] == 2
+
+
 def test_valid_mature_packet_can_remain_ready():
     result = evaluate_benchmark_with_integrity(
         [row(card_id="valid")],
@@ -86,4 +115,5 @@ def test_valid_mature_packet_can_remain_ready():
         "early_outcome_card_ids": [],
         "overdue_unsettled_card_ids": [],
         "invalid_outcome_card_ids": [],
+        "duplicate_decision_card_ids": [],
     }
