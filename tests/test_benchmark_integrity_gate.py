@@ -86,6 +86,48 @@ def test_duplicate_decision_packets_fail_closed_and_do_not_inflate_scoring():
     assert result["mature_observations"] == 0
 
 
+def test_future_decision_is_blocked_and_excluded_from_scoring():
+    result = evaluate_benchmark_with_integrity(
+        [
+            row(
+                card_id="future-decision",
+                as_of=date(2026, 3, 1),
+                realized=None,
+                realized_at=None,
+            )
+        ],
+        evaluation_date=date(2026, 2, 15),
+        min_mature_samples=0,
+    )
+
+    assert result["production_ready"] is False
+    assert "benchmark_decision_after_evaluation_cutoff" in result["blockers"]
+    assert result["outcome_integrity"]["future_decision_card_ids"] == ["future-decision"]
+    assert result["total_observations"] == 1
+    assert result["mature_observations"] == 0
+    assert result["immature_observations"] == 0
+
+
+def test_decision_on_evaluation_cutoff_remains_eligible():
+    result = evaluate_benchmark_with_integrity(
+        [
+            row(
+                card_id="same-day",
+                as_of=date(2026, 2, 15),
+                realized=None,
+                realized_at=None,
+            )
+        ],
+        evaluation_date=date(2026, 2, 15),
+        min_mature_samples=0,
+    )
+
+    assert result["production_ready"] is True
+    assert "benchmark_decision_after_evaluation_cutoff" not in result["blockers"]
+    assert result["outcome_integrity"]["future_decision_card_ids"] == []
+    assert result["immature_observations"] == 1
+
+
 def test_same_card_distinct_horizons_remain_independent_decisions():
     result = evaluate_benchmark_with_integrity(
         [
@@ -116,4 +158,5 @@ def test_valid_mature_packet_can_remain_ready():
         "overdue_unsettled_card_ids": [],
         "invalid_outcome_card_ids": [],
         "duplicate_decision_card_ids": [],
+        "future_decision_card_ids": [],
     }
