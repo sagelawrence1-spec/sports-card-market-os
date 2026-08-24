@@ -51,6 +51,12 @@ def _valid_optional_confidence(value: object) -> bool:
     return value is None or _valid_unit_rate(value)
 
 
+def _valid_optional_evidence_grade(value: object) -> bool:
+    if value is None:
+        return True
+    return isinstance(value, str) and bool(value) and value == value.strip()
+
+
 def _valid_decision(row: BenchmarkObservation) -> bool:
     return (
         _canonical_card_id(row.card_id) is not None
@@ -108,6 +114,8 @@ def evaluate_benchmark_with_integrity(
     cannot score or count information that did not exist at that point in time.
     Malformed decision provenance or numeric decision-time inputs are excluded before
     outcome/scoring math so corrupt packets fail closed instead of poisoning metrics.
+    Evidence-grade labels are also validated before segmentation so malformed or
+    whitespace-split labels cannot crash grouping or manufacture segment coverage.
     The mature-sample readiness threshold is itself validated so negative or boolean
     policy values cannot silently weaken the production gate. The observation packet
     container and each member are also validated before attribute access so corrupt
@@ -132,14 +140,25 @@ def evaluate_benchmark_with_integrity(
     )
     provenance_valid_rows = [row for row in rows if _valid_decision(row)]
 
-    invalid_value_ids = sorted(
+    invalid_evidence_grade_ids = sorted(
         {
             _canonical_card_id(row.card_id)
             for row in provenance_valid_rows
+            if not _valid_optional_evidence_grade(row.evidence_grade)
+        }
+    )
+    metadata_valid_rows = [
+        row for row in provenance_valid_rows if _valid_optional_evidence_grade(row.evidence_grade)
+    ]
+
+    invalid_value_ids = sorted(
+        {
+            _canonical_card_id(row.card_id)
+            for row in metadata_valid_rows
             if not _valid_decision_values(row)
         }
     )
-    value_valid_rows = [row for row in provenance_valid_rows if _valid_decision_values(row)]
+    value_valid_rows = [row for row in metadata_valid_rows if _valid_decision_values(row)]
 
     future_decision_ids = sorted(
         {
@@ -179,6 +198,8 @@ def evaluate_benchmark_with_integrity(
         blockers.append("invalid_benchmark_observation_member")
     if invalid_decision_ids and "invalid_benchmark_decision_provenance" not in blockers:
         blockers.append("invalid_benchmark_decision_provenance")
+    if invalid_evidence_grade_ids and "invalid_benchmark_evidence_grade" not in blockers:
+        blockers.append("invalid_benchmark_evidence_grade")
     if invalid_value_ids and "invalid_benchmark_decision_values" not in blockers:
         blockers.append("invalid_benchmark_decision_values")
     if duplicate_ids and "duplicate_benchmark_decision_packet" not in blockers:
@@ -200,6 +221,8 @@ def evaluate_benchmark_with_integrity(
         "duplicate_decision_card_ids": duplicate_ids,
         "future_decision_card_ids": future_decision_ids,
     }
+    if invalid_evidence_grade_ids:
+        outcome_integrity["invalid_evidence_grade_card_ids"] = invalid_evidence_grade_ids
     if invalid_observation_members:
         outcome_integrity["invalid_observation_members"] = invalid_observation_members
     if invalid_evaluation_date:
