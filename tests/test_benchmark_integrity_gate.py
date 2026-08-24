@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 
 from benchmark_integrity_gate import evaluate_benchmark_with_integrity
 from intelligence_benchmark import BenchmarkObservation
@@ -108,6 +108,45 @@ def test_future_decision_is_blocked_and_excluded_from_scoring():
     assert result["immature_observations"] == 0
 
 
+def test_malformed_decision_date_fails_closed_before_date_comparison():
+    result = evaluate_benchmark_with_integrity(
+        [row(card_id="bad-date", as_of=datetime(2026, 1, 1, 12, 0))],
+        evaluation_date=date(2026, 2, 15),
+        min_mature_samples=0,
+    )
+
+    assert result["production_ready"] is False
+    assert "invalid_benchmark_decision_provenance" in result["blockers"]
+    assert result["outcome_integrity"]["invalid_decision_card_ids"] == ["bad-date"]
+    assert result["mature_observations"] == 0
+
+
+def test_non_positive_or_boolean_horizon_fails_closed_before_scoring():
+    result = evaluate_benchmark_with_integrity(
+        [row(card_id="zero", horizon=0), row(card_id="boolean", horizon=True)],
+        evaluation_date=date(2026, 2, 15),
+        min_mature_samples=0,
+    )
+
+    assert result["production_ready"] is False
+    assert "invalid_benchmark_decision_provenance" in result["blockers"]
+    assert result["outcome_integrity"]["invalid_decision_card_ids"] == ["boolean", "zero"]
+    assert result["mature_observations"] == 0
+
+
+def test_non_text_card_identity_fails_closed_before_outcome_integrity():
+    result = evaluate_benchmark_with_integrity(
+        [row(card_id=7)],
+        evaluation_date=date(2026, 2, 15),
+        min_mature_samples=0,
+    )
+
+    assert result["production_ready"] is False
+    assert "invalid_benchmark_decision_provenance" in result["blockers"]
+    assert result["outcome_integrity"]["invalid_decision_card_ids"] == ["<invalid-card-id>"]
+    assert result["mature_observations"] == 0
+
+
 def test_decision_on_evaluation_cutoff_remains_eligible():
     result = evaluate_benchmark_with_integrity(
         [
@@ -157,6 +196,7 @@ def test_valid_mature_packet_can_remain_ready():
         "early_outcome_card_ids": [],
         "overdue_unsettled_card_ids": [],
         "invalid_outcome_card_ids": [],
+        "invalid_decision_card_ids": [],
         "duplicate_decision_card_ids": [],
         "future_decision_card_ids": [],
     }
