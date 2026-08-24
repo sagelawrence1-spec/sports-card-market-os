@@ -28,7 +28,7 @@ def test_persisted_evaluation_blocks_overdue_unsettled_outcome(tmp_path):
     )
 
     assert result["production_ready"] is False
-    assert "overdue_unsettled_benchmark_outcomes" in result["blockers"]
+    assert "overdue_unsettled_forward_outcomes" in result["blockers"]
     assert result["outcome_integrity"]["overdue_unsettled_card_ids"] == ["card-1"]
 
     persisted = store.load_runs()
