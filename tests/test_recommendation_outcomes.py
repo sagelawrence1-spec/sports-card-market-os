@@ -85,6 +85,19 @@ def test_journal_packet_ignores_unsettled_and_segments_actions():
     assert len(packet["packet_sha256"]) == 64
 
 
+def test_duplicate_decision_packets_fail_closed_instead_of_double_weighting():
+    rec = _rec(action="BUY", realized=120.0)
+    with pytest.raises(ValueError, match="duplicate recommendation decision packet"):
+        grade_journal([rec, rec])
+
+
+def test_partial_outcomes_fail_closed_instead_of_disappearing_from_scorecard():
+    partial = _rec(action="BUY", realized=120.0)
+    partial = Recommendation(**{**partial.__dict__, "realized_at": None})
+    with pytest.raises(ValueError, match="partial recommendation outcome provenance"):
+        grade_journal([partial])
+
+
 def test_scorecard_hash_is_order_independent_for_same_evidence():
     buy = _rec(action="BUY", realized=120.0)
     sell = _rec(action="SELL", realized=80.0)

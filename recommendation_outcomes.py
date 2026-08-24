@@ -85,6 +85,10 @@ def _packet_sha256(packet: dict) -> str:
     return hashlib.sha256(canonical).hexdigest()
 
 
+def _decision_key(rec: Recommendation) -> tuple[str, str, int]:
+    return (str(rec.observation_id), rec.as_of_date.isoformat(), int(rec.horizon_days))
+
+
 def grade_recommendation(
     rec: Recommendation,
     *,
@@ -135,11 +139,23 @@ def grade_journal(
     """Produce an auditable, cryptographically bound outcome packet."""
     policy = policy or OutcomePolicy()
     policy.validate()
-    rows = [
-        grade_recommendation(rec, policy=policy)
-        for rec in recommendations
-        if rec.realized_price is not None and rec.realized_at is not None
-    ]
+
+    materialized = list(recommendations)
+    seen: set[tuple[str, str, int]] = set()
+    settled: list[Recommendation] = []
+    for rec in materialized:
+        key = _decision_key(rec)
+        if key in seen:
+            raise ValueError("duplicate recommendation decision packet in outcome journal")
+        seen.add(key)
+        has_price = rec.realized_price is not None
+        has_date = rec.realized_at is not None
+        if has_price != has_date:
+            raise ValueError("partial recommendation outcome provenance")
+        if has_price:
+            settled.append(rec)
+
+    rows = [grade_recommendation(rec, policy=policy) for rec in settled]
     rows.sort(key=lambda row: (row["as_of_date"], row["observation_id"]))
 
     by_grade = {grade: 0 for grade in "ABCDF"}
@@ -153,11 +169,11 @@ def grade_journal(
 
     action_summary = {}
     for action, block in sorted(by_action.items()):
-        settled = int(block["settled"])
+        settled_count = int(block["settled"])
         returns = list(block["returns"])
         action_summary[action] = {
-            "settled": settled,
-            "hit_rate": float(block["hits"]) / settled if settled else None,
+            "settled": settled_count,
+            "hit_rate": float(block["hits"]) / settled_count if settled_count else None,
             "median_action_adjusted_return": float(median(returns)) if returns else None,
         }
 
