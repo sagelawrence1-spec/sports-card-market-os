@@ -223,19 +223,57 @@ def settle_outcomes(journal: RecommendationJournal,contract: Mapping[str,Any]) -
     return settled
 
 
+def grade_outcomes(journal: RecommendationJournal) -> list[dict[str,Any]]:
+    """Grade settled calls against the immutable decision-time packet.
+
+    Thesis correctness uses the published fair value as the quantified thesis:
+    the realized move is correct when its direction from entry agrees with the
+    direction implied by fair value from entry. This avoids hindsight edits or
+    natural-language reinterpretation of the thesis text.
+    """
+    grades=[]
+    for row in journal.load():
+        if row.realized_price is None or row.realized_at is None:
+            continue
+        realized_return=(row.realized_price-row.entry_price)/row.entry_price
+        predicted_delta=row.fair_value-row.entry_price
+        realized_delta=row.realized_price-row.entry_price
+        if predicted_delta>0:
+            thesis_correct=realized_delta>0
+        elif predicted_delta<0:
+            thesis_correct=realized_delta<0
+        else:
+            thesis_correct=realized_delta==0
+        signed_return=-realized_return if row.action in {"TRIM","SELL"} else realized_return
+        grades.append({
+            "observation_id":row.observation_id,
+            "card_id":row.card_id,
+            "as_of_date":row.as_of_date.isoformat(),
+            "horizon_days":row.horizon_days,
+            "realized_at":row.realized_at.isoformat(),
+            "entry_price":row.entry_price,
+            "fair_value":row.fair_value,
+            "realized_price":row.realized_price,
+            "realized_return":realized_return,
+            "signed_return":signed_return,
+            "thesis_correct":thesis_correct,
+        })
+    return grades
+
+
 def outcome_summary(journal: RecommendationJournal) -> dict[str,Any]:
-    rows=[row for row in journal.load() if row.realized_price is not None]
-    if not rows:
-        return {"settled":0,"hit_rate":None,"median_return":None}
-    signed_returns=[]
-    hits=0
-    for row in rows:
-        change=(row.realized_price-row.entry_price)/row.entry_price
-        signed=-change if row.action in {"TRIM","SELL"} else change
-        signed_returns.append(signed)
-        hits+=int(signed>0)
+    grades=grade_outcomes(journal)
+    if not grades:
+        return {
+            "settled":0,
+            "hit_rate":None,
+            "median_return":None,
+            "thesis_correctness":None,
+        }
+    signed_returns=[row["signed_return"] for row in grades]
     return {
-        "settled":len(rows),
-        "hit_rate":hits/len(rows),
+        "settled":len(grades),
+        "hit_rate":sum(int(value>0) for value in signed_returns)/len(grades),
         "median_return":float(statistics.median(signed_returns)),
+        "thesis_correctness":sum(int(row["thesis_correct"]) for row in grades)/len(grades),
     }
