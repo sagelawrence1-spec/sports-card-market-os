@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections import Counter
 from datetime import date, datetime
+from math import isfinite
 from typing import Iterable
 
 from benchmark_outcome_integrity import assess_benchmark_outcome_integrity
@@ -23,11 +24,44 @@ def _canonical_card_id(value: object) -> str | None:
     return card_id or None
 
 
+def _valid_positive_number(value: object) -> bool:
+    return (
+        isinstance(value, (int, float))
+        and not isinstance(value, bool)
+        and isfinite(float(value))
+        and float(value) > 0
+    )
+
+
+def _valid_unit_rate(value: object) -> bool:
+    return (
+        isinstance(value, (int, float))
+        and not isinstance(value, bool)
+        and isfinite(float(value))
+        and 0.0 <= float(value) <= 1.0
+    )
+
+
+def _valid_optional_confidence(value: object) -> bool:
+    return value is None or _valid_unit_rate(value)
+
+
 def _valid_decision(row: BenchmarkObservation) -> bool:
     return (
         _canonical_card_id(row.card_id) is not None
         and _valid_date(row.as_of_date)
         and _valid_horizon(row.horizon_days)
+    )
+
+
+def _valid_decision_values(row: BenchmarkObservation) -> bool:
+    return (
+        _valid_positive_number(row.current_price)
+        and _valid_positive_number(row.baseline_estimate)
+        and _valid_positive_number(row.intelligence_estimate)
+        and _valid_unit_rate(row.exit_fee_rate)
+        and _valid_unit_rate(row.liquidity_haircut_rate)
+        and _valid_optional_confidence(row.confidence)
     )
 
 
@@ -52,8 +86,8 @@ def evaluate_benchmark_with_integrity(
     otherwise double-weight one historical decision and inflate sample counts.
     Decisions made after the evaluation cutoff are excluded entirely so a replay
     cannot score or count information that did not exist at that point in time.
-    Malformed decision provenance is also excluded before outcome/scoring math so
-    corrupt identifiers, dates, or horizons fail closed instead of crashing replay.
+    Malformed decision provenance or numeric decision-time inputs are excluded before
+    outcome/scoring math so corrupt packets fail closed instead of poisoning metrics.
     """
 
     cutoff = evaluation_date or date.today()
@@ -70,14 +104,23 @@ def evaluate_benchmark_with_integrity(
     )
     provenance_valid_rows = [row for row in rows if _valid_decision(row)]
 
-    future_decision_ids = sorted(
+    invalid_value_ids = sorted(
         {
             _canonical_card_id(row.card_id)
             for row in provenance_valid_rows
+            if not _valid_decision_values(row)
+        }
+    )
+    value_valid_rows = [row for row in provenance_valid_rows if _valid_decision_values(row)]
+
+    future_decision_ids = sorted(
+        {
+            _canonical_card_id(row.card_id)
+            for row in value_valid_rows
             if row.as_of_date > cutoff
         }
     )
-    eligible_rows = [row for row in provenance_valid_rows if row.as_of_date <= cutoff]
+    eligible_rows = [row for row in value_valid_rows if row.as_of_date <= cutoff]
 
     integrity = assess_benchmark_outcome_integrity(eligible_rows, evaluation_date=cutoff)
 
@@ -104,6 +147,8 @@ def evaluate_benchmark_with_integrity(
             blockers.append(blocker)
     if invalid_decision_ids and "invalid_benchmark_decision_provenance" not in blockers:
         blockers.append("invalid_benchmark_decision_provenance")
+    if invalid_value_ids and "invalid_benchmark_decision_values" not in blockers:
+        blockers.append("invalid_benchmark_decision_values")
     if duplicate_ids and "duplicate_benchmark_decision_packet" not in blockers:
         blockers.append("duplicate_benchmark_decision_packet")
     if future_decision_ids and "benchmark_decision_after_evaluation_cutoff" not in blockers:
@@ -120,6 +165,7 @@ def evaluate_benchmark_with_integrity(
             "overdue_unsettled_card_ids": list(integrity.overdue_unsettled_card_ids),
             "invalid_outcome_card_ids": list(integrity.invalid_outcome_card_ids),
             "invalid_decision_card_ids": invalid_decision_ids,
+            "invalid_decision_value_card_ids": invalid_value_ids,
             "duplicate_decision_card_ids": duplicate_ids,
             "future_decision_card_ids": future_decision_ids,
         },
