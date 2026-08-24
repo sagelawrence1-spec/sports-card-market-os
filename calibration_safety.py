@@ -60,9 +60,23 @@ def _nonnegative_int(value: object) -> int | None:
 
 
 def _segment_observations(benchmark: dict, family: str, key: str) -> int | None:
-    segment = benchmark.get("segments", {}).get(family, {}).get(key)
-    if not isinstance(segment, dict):
+    segments = benchmark.get("segments")
+    if segments is None:
         return 0
+    if not isinstance(segments, dict):
+        return None
+
+    family_segments = segments.get(family)
+    if family_segments is None:
+        return 0
+    if not isinstance(family_segments, dict):
+        return None
+
+    segment = family_segments.get(key)
+    if segment is None:
+        return 0
+    if not isinstance(segment, dict):
+        return None
     return _nonnegative_int(segment.get("observations", 0))
 
 
@@ -97,7 +111,15 @@ def assess_calibration_safety(
             else "invalid_production_ready"
         )
 
-    lift = benchmark.get("lift") or {}
+    lift_value = benchmark.get("lift")
+    if lift_value is None:
+        lift: dict = {}
+    elif not isinstance(lift_value, dict):
+        blockers.append("invalid_lift_container")
+        lift = {}
+    else:
+        lift = lift_value
+
     mae_lift_raw = lift.get("mae_improvement_pct")
     direction_lift_raw = lift.get("directional_accuracy_lift")
     mae_lift = _finite_float(mae_lift_raw) if mae_lift_raw is not None else None
