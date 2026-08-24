@@ -78,12 +78,7 @@ def _decision_key(row: BenchmarkObservation) -> tuple[str, date, int]:
 
 
 def _materialize_observations(value: object) -> tuple[list[BenchmarkObservation], bool, int]:
-    """Return valid observation objects plus container/member integrity metadata.
-
-    Mappings and text are technically iterable but are never valid benchmark packet
-    containers. Invalid members are excluded before attribute access so malformed
-    persisted/replay packets fail closed instead of crashing the integrity gate.
-    """
+    """Return valid observation objects plus container/member integrity metadata."""
 
     if (
         value is None
@@ -192,21 +187,23 @@ def evaluate_benchmark_with_integrity(
     if invalid_sample_gate and "invalid_benchmark_min_mature_samples" not in blockers:
         blockers.append("invalid_benchmark_min_mature_samples")
 
-    total_observations = len(rows) + invalid_observation_members
+    outcome_integrity = {
+        "partial_outcome_card_ids": list(integrity.partial_outcome_card_ids),
+        "early_outcome_card_ids": list(integrity.early_outcome_card_ids),
+        "overdue_unsettled_card_ids": list(integrity.overdue_unsettled_card_ids),
+        "invalid_outcome_card_ids": list(integrity.invalid_outcome_card_ids),
+        "invalid_decision_card_ids": invalid_decision_ids,
+        "invalid_decision_value_card_ids": invalid_value_ids,
+        "duplicate_decision_card_ids": duplicate_ids,
+        "future_decision_card_ids": future_decision_ids,
+    }
+    if invalid_observation_members:
+        outcome_integrity["invalid_observation_members"] = invalid_observation_members
+
     return {
         **result,
-        "total_observations": total_observations,
+        "total_observations": len(rows) + invalid_observation_members,
         "production_ready": not blockers,
         "blockers": blockers,
-        "outcome_integrity": {
-            "partial_outcome_card_ids": list(integrity.partial_outcome_card_ids),
-            "early_outcome_card_ids": list(integrity.early_outcome_card_ids),
-            "overdue_unsettled_card_ids": list(integrity.overdue_unsettled_card_ids),
-            "invalid_outcome_card_ids": list(integrity.invalid_outcome_card_ids),
-            "invalid_decision_card_ids": invalid_decision_ids,
-            "invalid_decision_value_card_ids": invalid_value_ids,
-            "duplicate_decision_card_ids": duplicate_ids,
-            "future_decision_card_ids": future_decision_ids,
-            "invalid_observation_members": invalid_observation_members,
-        },
+        "outcome_integrity": outcome_integrity,
     }
