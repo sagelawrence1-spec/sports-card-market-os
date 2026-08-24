@@ -217,11 +217,12 @@ def evaluate_benchmark_with_integrity(
         "overdue_unsettled_card_ids": list(integrity.overdue_unsettled_card_ids),
         "invalid_outcome_card_ids": list(integrity.invalid_outcome_card_ids),
         "invalid_decision_card_ids": invalid_decision_ids,
-        "invalid_evidence_grade_card_ids": invalid_evidence_grade_ids,
         "invalid_decision_value_card_ids": invalid_value_ids,
         "duplicate_decision_card_ids": duplicate_ids,
         "future_decision_card_ids": future_decision_ids,
     }
+    if invalid_evidence_grade_ids:
+        outcome_integrity["invalid_evidence_grade_card_ids"] = invalid_evidence_grade_ids
     if invalid_observation_members:
         outcome_integrity["invalid_observation_members"] = invalid_observation_members
     if invalid_evaluation_date:
