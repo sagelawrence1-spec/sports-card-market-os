@@ -111,12 +111,13 @@ def evaluate_benchmark_with_integrity(
     The mature-sample readiness threshold is itself validated so negative or boolean
     policy values cannot silently weaken the production gate. The observation packet
     container and each member are also validated before attribute access so corrupt
-    replay inputs cannot crash or masquerade as empty/valid benchmark evidence.
+    replay inputs cannot crash or masquerade as empty/valid benchmark evidence. The
+    evaluation cutoff itself is treated as audited policy input: malformed cutoffs
+    block readiness instead of raising before the integrity result can be recorded.
     """
 
-    cutoff = evaluation_date or date.today()
-    if not _valid_date(cutoff):
-        raise ValueError("benchmark integrity evaluation_date must be a date")
+    invalid_evaluation_date = evaluation_date is not None and not _valid_date(evaluation_date)
+    cutoff = evaluation_date if not invalid_evaluation_date and evaluation_date is not None else date.today()
 
     invalid_sample_gate = not _valid_min_mature_samples(min_mature_samples)
     effective_min_mature_samples = min_mature_samples if not invalid_sample_gate else 20
@@ -186,6 +187,8 @@ def evaluate_benchmark_with_integrity(
         blockers.append("benchmark_decision_after_evaluation_cutoff")
     if invalid_sample_gate and "invalid_benchmark_min_mature_samples" not in blockers:
         blockers.append("invalid_benchmark_min_mature_samples")
+    if invalid_evaluation_date and "invalid_benchmark_evaluation_date" not in blockers:
+        blockers.append("invalid_benchmark_evaluation_date")
 
     outcome_integrity = {
         "partial_outcome_card_ids": list(integrity.partial_outcome_card_ids),
@@ -199,6 +202,8 @@ def evaluate_benchmark_with_integrity(
     }
     if invalid_observation_members:
         outcome_integrity["invalid_observation_members"] = invalid_observation_members
+    if invalid_evaluation_date:
+        outcome_integrity["invalid_evaluation_date"] = True
 
     return {
         **result,
