@@ -101,3 +101,20 @@ def test_blank_card_identity_fails_closed():
         assess_benchmark_outcome_integrity(
             [row(card_id="   ")], evaluation_date=date(2026, 2, 15)
         )
+
+
+@pytest.mark.parametrize("card_id", [None, True, 7, 3.14])
+def test_non_text_card_identity_fails_closed(card_id):
+    with pytest.raises(ValueError, match="card_id to be text"):
+        assess_benchmark_outcome_integrity(
+            [row(card_id=card_id)], evaluation_date=date(2026, 2, 15)
+        )
+
+
+def test_card_identity_whitespace_is_canonicalized():
+    result = assess_benchmark_outcome_integrity(
+        [row(card_id="  valid-card  ")], evaluation_date=date(2026, 2, 15)
+    )
+
+    assert result.blockers == ()
+    assert result.production_safe is True
