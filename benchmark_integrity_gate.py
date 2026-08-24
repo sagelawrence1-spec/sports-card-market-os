@@ -6,6 +6,7 @@ from datetime import date, datetime
 from math import isfinite
 from typing import Iterable
 
+from benchmark_cohort_performance import benchmark_cohort_performance
 from benchmark_outcome_integrity import assess_benchmark_outcome_integrity
 from intelligence_benchmark import BenchmarkObservation, evaluate_intelligence_vs_baseline
 
@@ -187,6 +188,10 @@ def evaluate_benchmark_with_integrity(
         evaluation_date=cutoff,
         min_mature_samples=effective_min_mature_samples,
     )
+    cohort_performance = benchmark_cohort_performance(
+        scoring_rows,
+        evaluation_date=cutoff,
+    )
 
     blockers = list(result.get("blockers") or [])
     for blocker in integrity.blockers:
@@ -231,6 +236,7 @@ def evaluate_benchmark_with_integrity(
     return {
         **result,
         "total_observations": len(rows) + invalid_observation_members,
+        "cohort_performance": cohort_performance,
         "production_ready": not blockers,
         "blockers": blockers,
         "outcome_integrity": outcome_integrity,
