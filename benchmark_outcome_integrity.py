@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
+from math import isfinite
 from typing import Iterable, Protocol
 
 
@@ -19,6 +20,7 @@ class BenchmarkOutcomeIntegrity:
     partial_outcome_card_ids: tuple[str, ...]
     early_outcome_card_ids: tuple[str, ...]
     overdue_unsettled_card_ids: tuple[str, ...]
+    invalid_outcome_card_ids: tuple[str, ...] = ()
 
     @property
     def blockers(self) -> tuple[str, ...]:
@@ -29,6 +31,8 @@ class BenchmarkOutcomeIntegrity:
             blockers.append("realized_outcome_before_horizon")
         if self.overdue_unsettled_card_ids:
             blockers.append("overdue_unsettled_forward_outcomes")
+        if self.invalid_outcome_card_ids:
+            blockers.append("invalid_realized_outcome_provenance")
         return tuple(blockers)
 
     @property
@@ -45,6 +49,17 @@ def _canonical_card_id(value: object) -> str:
     return card_id
 
 
+def _valid_realized_price(value: object) -> bool:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return False
+    numeric = float(value)
+    return isfinite(numeric) and numeric > 0
+
+
+def _valid_date(value: object) -> bool:
+    return isinstance(value, date) and not isinstance(value, datetime)
+
+
 def assess_benchmark_outcome_integrity(
     observations: Iterable[BenchmarkOutcomeLike], *, evaluation_date: date
 ) -> BenchmarkOutcomeIntegrity:
@@ -56,9 +71,13 @@ def assess_benchmark_outcome_integrity(
     Future-horizon rows with no outcome remain legitimately immature.
     """
 
+    if not _valid_date(evaluation_date):
+        raise ValueError("benchmark outcome integrity requires evaluation_date to be a date")
+
     partial: set[str] = set()
     early: set[str] = set()
     overdue: set[str] = set()
+    invalid: set[str] = set()
 
     for row in observations:
         card_id = _canonical_card_id(row.card_id)
@@ -70,17 +89,34 @@ def assess_benchmark_outcome_integrity(
             partial.add(card_id)
             continue
 
+        if has_price and not _valid_realized_price(row.realized_price):
+            invalid.add(card_id)
+            continue
+        if has_date and not _valid_date(row.realized_at):
+            invalid.add(card_id)
+            continue
+
+        try:
+            horizon_end = row.horizon_end
+        except Exception:
+            invalid.add(card_id)
+            continue
+        if not _valid_date(horizon_end):
+            invalid.add(card_id)
+            continue
+
         if has_price and has_date:
-            assert row.realized_at is not None
-            if row.realized_at < row.horizon_end:
+            assert isinstance(row.realized_at, date)
+            if row.realized_at < horizon_end:
                 early.add(card_id)
             continue
 
-        if row.horizon_end <= evaluation_date:
+        if horizon_end <= evaluation_date:
             overdue.add(card_id)
 
     return BenchmarkOutcomeIntegrity(
         partial_outcome_card_ids=tuple(sorted(partial)),
         early_outcome_card_ids=tuple(sorted(early)),
         overdue_unsettled_card_ids=tuple(sorted(overdue)),
+        invalid_outcome_card_ids=tuple(sorted(invalid)),
     )
