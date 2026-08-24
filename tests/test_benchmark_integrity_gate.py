@@ -9,18 +9,27 @@ def row(
     card_id="card-1",
     as_of=date(2026, 1, 1),
     horizon=30,
+    current_price=100.0,
+    baseline_estimate=110.0,
+    intelligence_estimate=120.0,
     realized=125.0,
     realized_at=date(2026, 2, 1),
+    confidence=None,
+    exit_fee_rate=0.0,
+    liquidity_haircut_rate=0.0,
 ):
     return BenchmarkObservation(
         card_id=card_id,
         as_of_date=as_of,
         horizon_days=horizon,
-        current_price=100.0,
-        baseline_estimate=110.0,
-        intelligence_estimate=120.0,
+        current_price=current_price,
+        baseline_estimate=baseline_estimate,
+        intelligence_estimate=intelligence_estimate,
         realized_price=realized,
         realized_at=realized_at,
+        confidence=confidence,
+        exit_fee_rate=exit_fee_rate,
+        liquidity_haircut_rate=liquidity_haircut_rate,
     )
 
 
@@ -147,6 +156,60 @@ def test_non_text_card_identity_fails_closed_before_outcome_integrity():
     assert result["mature_observations"] == 0
 
 
+def test_non_finite_or_non_positive_decision_prices_fail_closed_before_scoring():
+    result = evaluate_benchmark_with_integrity(
+        [
+            row(card_id="nan-current", current_price=float("nan")),
+            row(card_id="inf-baseline", baseline_estimate=float("inf")),
+            row(card_id="zero-intelligence", intelligence_estimate=0.0),
+        ],
+        evaluation_date=date(2026, 2, 15),
+        min_mature_samples=0,
+    )
+
+    assert result["production_ready"] is False
+    assert "invalid_benchmark_decision_values" in result["blockers"]
+    assert result["outcome_integrity"]["invalid_decision_value_card_ids"] == [
+        "inf-baseline",
+        "nan-current",
+        "zero-intelligence",
+    ]
+    assert result["mature_observations"] == 0
+
+
+def test_invalid_confidence_and_cost_rates_fail_closed_before_scoring():
+    result = evaluate_benchmark_with_integrity(
+        [
+            row(card_id="bad-confidence", confidence=1.1),
+            row(card_id="bad-fee", exit_fee_rate=-0.01),
+            row(card_id="bad-haircut", liquidity_haircut_rate=float("nan")),
+        ],
+        evaluation_date=date(2026, 2, 15),
+        min_mature_samples=0,
+    )
+
+    assert result["production_ready"] is False
+    assert "invalid_benchmark_decision_values" in result["blockers"]
+    assert result["outcome_integrity"]["invalid_decision_value_card_ids"] == [
+        "bad-confidence",
+        "bad-fee",
+        "bad-haircut",
+    ]
+    assert result["mature_observations"] == 0
+
+
+def test_valid_boundary_confidence_and_cost_rates_remain_eligible():
+    result = evaluate_benchmark_with_integrity(
+        [row(card_id="valid-boundaries", confidence=1.0, exit_fee_rate=0.0, liquidity_haircut_rate=1.0)],
+        evaluation_date=date(2026, 2, 15),
+        min_mature_samples=1,
+    )
+
+    assert result["production_ready"] is True
+    assert "invalid_benchmark_decision_values" not in result["blockers"]
+    assert result["mature_observations"] == 1
+
+
 def test_decision_on_evaluation_cutoff_remains_eligible():
     result = evaluate_benchmark_with_integrity(
         [
@@ -197,6 +260,7 @@ def test_valid_mature_packet_can_remain_ready():
         "overdue_unsettled_card_ids": [],
         "invalid_outcome_card_ids": [],
         "invalid_decision_card_ids": [],
+        "invalid_decision_value_card_ids": [],
         "duplicate_decision_card_ids": [],
         "future_decision_card_ids": [],
     }
