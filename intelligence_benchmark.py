@@ -353,7 +353,9 @@ class IntelligenceBenchmarkStore:
         min_mature_samples: int = 20,
     ) -> dict:
         evaluation_date = evaluation_date or date.today()
-        result = evaluate_intelligence_vs_baseline(
+        from benchmark_integrity_gate import evaluate_benchmark_with_integrity
+
+        result = evaluate_benchmark_with_integrity(
             self.load_observations(),
             evaluation_date=evaluation_date,
             min_mature_samples=min_mature_samples,
