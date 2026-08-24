@@ -25,20 +25,44 @@ def evaluate_benchmark_with_integrity(
     underlying benchmark packet is safe to score for production-readiness purposes.
     A card/as-of/horizon decision may appear only once; duplicate packets would
     otherwise double-weight one historical decision and inflate sample counts.
+    Decisions made after the evaluation cutoff are excluded entirely so a replay
+    cannot score or count information that did not exist at that point in time.
     """
 
     cutoff = evaluation_date or date.today()
     rows = list(observations)
-    integrity = assess_benchmark_outcome_integrity(rows, evaluation_date=cutoff)
 
-    decision_counts = Counter(_decision_key(row) for row in rows)
+    future_decision_ids = sorted(
+        {
+            row.card_id.strip()
+            for row in rows
+            if isinstance(row.card_id, str)
+            and row.card_id.strip()
+            and isinstance(row.as_of_date, date)
+            and row.as_of_date > cutoff
+        }
+    )
+    eligible_rows = [
+        row
+        for row in rows
+        if not (
+            isinstance(row.card_id, str)
+            and row.card_id.strip() in future_decision_ids
+            and isinstance(row.as_of_date, date)
+            and row.as_of_date > cutoff
+        )
+    ]
+
+    integrity = assess_benchmark_outcome_integrity(eligible_rows, evaluation_date=cutoff)
+
+    decision_counts = Counter(_decision_key(row) for row in eligible_rows)
     duplicate_keys = {key for key, count in decision_counts.items() if count > 1}
     duplicate_ids = sorted({key[0] for key in duplicate_keys})
 
     invalid_ids = set(integrity.invalid_outcome_card_ids)
     scoring_rows = [
         row
-        for row in rows
+        for row in eligible_rows
         if not (
             isinstance(row.card_id, str)
             and (
@@ -59,6 +83,8 @@ def evaluate_benchmark_with_integrity(
             blockers.append(blocker)
     if duplicate_ids and "duplicate_benchmark_decision_packet" not in blockers:
         blockers.append("duplicate_benchmark_decision_packet")
+    if future_decision_ids and "benchmark_decision_after_evaluation_cutoff" not in blockers:
+        blockers.append("benchmark_decision_after_evaluation_cutoff")
 
     return {
         **result,
@@ -71,5 +97,6 @@ def evaluate_benchmark_with_integrity(
             "overdue_unsettled_card_ids": list(integrity.overdue_unsettled_card_ids),
             "invalid_outcome_card_ids": list(integrity.invalid_outcome_card_ids),
             "duplicate_decision_card_ids": duplicate_ids,
+            "future_decision_card_ids": future_decision_ids,
         },
     }
