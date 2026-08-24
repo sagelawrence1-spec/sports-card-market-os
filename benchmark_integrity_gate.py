@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import Counter
+from collections.abc import Iterable as IterableABC, Mapping
 from datetime import date, datetime
 from math import isfinite
 from typing import Iterable
@@ -76,6 +77,26 @@ def _decision_key(row: BenchmarkObservation) -> tuple[str, date, int]:
     return (card_id, row.as_of_date, row.horizon_days)
 
 
+def _materialize_observations(value: object) -> tuple[list[BenchmarkObservation], bool, int]:
+    """Return valid observation objects plus container/member integrity metadata.
+
+    Mappings and text are technically iterable but are never valid benchmark packet
+    containers. Invalid members are excluded before attribute access so malformed
+    persisted/replay packets fail closed instead of crashing the integrity gate.
+    """
+
+    if (
+        value is None
+        or isinstance(value, (str, bytes, bytearray, Mapping))
+        or not isinstance(value, IterableABC)
+    ):
+        return [], True, 0
+
+    raw_rows = list(value)
+    rows = [row for row in raw_rows if isinstance(row, BenchmarkObservation)]
+    return rows, False, len(raw_rows) - len(rows)
+
+
 def evaluate_benchmark_with_integrity(
     observations: Iterable[BenchmarkObservation],
     *,
@@ -93,7 +114,9 @@ def evaluate_benchmark_with_integrity(
     Malformed decision provenance or numeric decision-time inputs are excluded before
     outcome/scoring math so corrupt packets fail closed instead of poisoning metrics.
     The mature-sample readiness threshold is itself validated so negative or boolean
-    policy values cannot silently weaken the production gate.
+    policy values cannot silently weaken the production gate. The observation packet
+    container and each member are also validated before attribute access so corrupt
+    replay inputs cannot crash or masquerade as empty/valid benchmark evidence.
     """
 
     cutoff = evaluation_date or date.today()
@@ -103,7 +126,7 @@ def evaluate_benchmark_with_integrity(
     invalid_sample_gate = not _valid_min_mature_samples(min_mature_samples)
     effective_min_mature_samples = min_mature_samples if not invalid_sample_gate else 20
 
-    rows = list(observations)
+    rows, invalid_observation_container, invalid_observation_members = _materialize_observations(observations)
     invalid_decision_ids = sorted(
         {
             _canonical_card_id(row.card_id) or "<invalid-card-id>"
@@ -154,6 +177,10 @@ def evaluate_benchmark_with_integrity(
     for blocker in integrity.blockers:
         if blocker not in blockers:
             blockers.append(blocker)
+    if invalid_observation_container and "invalid_benchmark_observation_container" not in blockers:
+        blockers.append("invalid_benchmark_observation_container")
+    if invalid_observation_members and "invalid_benchmark_observation_member" not in blockers:
+        blockers.append("invalid_benchmark_observation_member")
     if invalid_decision_ids and "invalid_benchmark_decision_provenance" not in blockers:
         blockers.append("invalid_benchmark_decision_provenance")
     if invalid_value_ids and "invalid_benchmark_decision_values" not in blockers:
@@ -165,9 +192,10 @@ def evaluate_benchmark_with_integrity(
     if invalid_sample_gate and "invalid_benchmark_min_mature_samples" not in blockers:
         blockers.append("invalid_benchmark_min_mature_samples")
 
+    total_observations = len(rows) + invalid_observation_members
     return {
         **result,
-        "total_observations": len(rows),
+        "total_observations": total_observations,
         "production_ready": not blockers,
         "blockers": blockers,
         "outcome_integrity": {
@@ -179,5 +207,6 @@ def evaluate_benchmark_with_integrity(
             "invalid_decision_value_card_ids": invalid_value_ids,
             "duplicate_decision_card_ids": duplicate_ids,
             "future_decision_card_ids": future_decision_ids,
+            "invalid_observation_members": invalid_observation_members,
         },
     }
