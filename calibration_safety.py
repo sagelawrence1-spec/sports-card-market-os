@@ -247,6 +247,24 @@ def _mature_count(run: dict) -> int | None:
     return _nonnegative_int(value)
 
 
+def _blocked_history_result(
+    policy: CalibrationSafetyPolicy,
+    blocker: str,
+) -> dict:
+    return {
+        "schema": "calibration-history.v1",
+        "calibration_review_allowed": False,
+        "automatic_threshold_changes_allowed": False,
+        "decision": "blocked",
+        "checkpoints_seen": 0,
+        "required_checkpoints": policy.min_history_checkpoints,
+        "min_new_mature_samples_per_checkpoint": policy.min_new_mature_samples_per_checkpoint,
+        "latest_evaluation_date": None,
+        "latest_mature_observations": None,
+        "blockers": [blocker],
+    }
+
+
 def assess_calibration_history(
     runs: Iterable[dict],
     *,
@@ -263,9 +281,24 @@ def assess_calibration_history(
     """
 
     policy = policy or CalibrationSafetyPolicy()
-    cutoff = as_of or date.today()
+
+    if as_of is None:
+        cutoff = date.today()
+    elif isinstance(as_of, datetime):
+        cutoff = as_of.date()
+    elif isinstance(as_of, date):
+        cutoff = as_of
+    else:
+        return _blocked_history_result(policy, "invalid_as_of_date")
+
+    if runs is None or isinstance(runs, (dict, str, bytes)):
+        return _blocked_history_result(policy, "invalid_calibration_history_container")
+    try:
+        rows = list(runs)
+    except TypeError:
+        return _blocked_history_result(policy, "invalid_calibration_history_container")
+
     blockers: list[str] = []
-    rows = list(runs)
 
     parsed: list[tuple[date, int, dict, dict]] = []
     for index, run in enumerate(rows):
