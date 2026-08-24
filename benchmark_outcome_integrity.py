@@ -36,6 +36,15 @@ class BenchmarkOutcomeIntegrity:
         return not self.blockers
 
 
+def _canonical_card_id(value: object) -> str:
+    if not isinstance(value, str):
+        raise ValueError("benchmark outcome integrity requires card_id to be text")
+    card_id = value.strip()
+    if not card_id:
+        raise ValueError("benchmark outcome integrity requires a non-blank card_id")
+    return card_id
+
+
 def assess_benchmark_outcome_integrity(
     observations: Iterable[BenchmarkOutcomeLike], *, evaluation_date: date
 ) -> BenchmarkOutcomeIntegrity:
@@ -52,9 +61,7 @@ def assess_benchmark_outcome_integrity(
     overdue: set[str] = set()
 
     for row in observations:
-        card_id = str(row.card_id).strip()
-        if not card_id:
-            raise ValueError("benchmark outcome integrity requires a non-blank card_id")
+        card_id = _canonical_card_id(row.card_id)
 
         has_price = row.realized_price is not None
         has_date = row.realized_at is not None
