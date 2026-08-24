@@ -21,6 +21,7 @@ class BenchmarkOutcomeIntegrity:
     early_outcome_card_ids: tuple[str, ...]
     overdue_unsettled_card_ids: tuple[str, ...]
     invalid_outcome_card_ids: tuple[str, ...] = ()
+    future_outcome_card_ids: tuple[str, ...] = ()
 
     @property
     def blockers(self) -> tuple[str, ...]:
@@ -33,6 +34,8 @@ class BenchmarkOutcomeIntegrity:
             blockers.append("overdue_unsettled_forward_outcomes")
         if self.invalid_outcome_card_ids:
             blockers.append("invalid_realized_outcome_provenance")
+        if self.future_outcome_card_ids:
+            blockers.append("realized_outcome_after_evaluation_cutoff")
         return tuple(blockers)
 
     @property
@@ -66,9 +69,10 @@ def assess_benchmark_outcome_integrity(
     """Classify outcome provenance before benchmark rows enter maturity scoring.
 
     A completed forward outcome needs both price and observation date, and its
-    observation date cannot precede the benchmark horizon. Once the horizon has
-    expired, a row with no outcome at all is overdue rather than merely immature.
-    Future-horizon rows with no outcome remain legitimately immature.
+    observation date cannot precede the benchmark horizon or exceed the
+    evaluation cutoff. Once the horizon has expired, a row with no outcome at
+    all is overdue rather than merely immature. Future-horizon rows with no
+    outcome remain legitimately immature.
     """
 
     if not _valid_date(evaluation_date):
@@ -78,6 +82,7 @@ def assess_benchmark_outcome_integrity(
     early: set[str] = set()
     overdue: set[str] = set()
     invalid: set[str] = set()
+    future: set[str] = set()
 
     for row in observations:
         card_id = _canonical_card_id(row.card_id)
@@ -107,6 +112,9 @@ def assess_benchmark_outcome_integrity(
 
         if has_price and has_date:
             assert isinstance(row.realized_at, date)
+            if row.realized_at > evaluation_date:
+                future.add(card_id)
+                continue
             if row.realized_at < horizon_end:
                 early.add(card_id)
             continue
@@ -119,4 +127,5 @@ def assess_benchmark_outcome_integrity(
         early_outcome_card_ids=tuple(sorted(early)),
         overdue_unsettled_card_ids=tuple(sorted(overdue)),
         invalid_outcome_card_ids=tuple(sorted(invalid)),
+        future_outcome_card_ids=tuple(sorted(future)),
     )
