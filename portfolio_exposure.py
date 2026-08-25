@@ -11,6 +11,8 @@ class ExposurePolicy:
     max_player_pct: float = 0.15
     max_sport_pct: float = 0.35
     max_set_family_pct: float = 0.20
+    max_card_family_pct: float = 0.15
+    max_catalyst_pct: float = 0.20
     max_single_thesis_pct: float = 0.20
     max_correlated_bucket_pct: float = 0.25
 
@@ -19,6 +21,8 @@ class ExposurePolicy:
             "max_player_pct",
             "max_sport_pct",
             "max_set_family_pct",
+            "max_card_family_pct",
+            "max_catalyst_pct",
             "max_single_thesis_pct",
             "max_correlated_bucket_pct",
         ):
@@ -36,10 +40,18 @@ class PositionExposure:
     set_family: str
     thesis_id: str
     correlated_bucket: str
+    card_family: str = ""
+    catalyst: str = ""
 
     def __post_init__(self) -> None:
         if self.market_value < 0:
             raise ValueError("market_value cannot be negative.")
+        # Backward-compatible fallback for legacy holdings created before these
+        # dimensions were explicit. New callers should provide both fields.
+        if not self.card_family.strip():
+            object.__setattr__(self, "card_family", self.set_family)
+        if not self.catalyst.strip():
+            object.__setattr__(self, "catalyst", self.thesis_id)
 
 
 @dataclass(frozen=True)
@@ -50,6 +62,16 @@ class CandidateExposure:
     set_family: str
     thesis_id: str
     correlated_bucket: str
+    card_family: str = ""
+    catalyst: str = ""
+
+    def __post_init__(self) -> None:
+        # Preserve legacy callers while making card-family and catalyst first-
+        # class concentration dimensions for all newly enriched candidates.
+        if not self.card_family.strip():
+            object.__setattr__(self, "card_family", self.set_family)
+        if not self.catalyst.strip():
+            object.__setattr__(self, "catalyst", self.thesis_id)
 
 
 def _group_total(positions: list[PositionExposure], *, field: str, value: str) -> float:
@@ -65,6 +87,8 @@ def exposure_headroom(*, portfolio_value: float, positions: list[PositionExposur
         "player": ("player_id", candidate.player_id, policy.max_player_pct),
         "sport": ("sport", candidate.sport, policy.max_sport_pct),
         "set_family": ("set_family", candidate.set_family, policy.max_set_family_pct),
+        "card_family": ("card_family", candidate.card_family, policy.max_card_family_pct),
+        "catalyst": ("catalyst", candidate.catalyst, policy.max_catalyst_pct),
         "thesis": ("thesis_id", candidate.thesis_id, policy.max_single_thesis_pct),
         "correlated_bucket": ("correlated_bucket", candidate.correlated_bucket, policy.max_correlated_bucket_pct),
     }
@@ -117,6 +141,16 @@ def apply_exposure_caps(allocations: list[Mapping[str, Any]], exposure_by_card: 
         results.append(row)
 
         if adjusted > 0:
-            positions.append(PositionExposure(card_id=card_id, market_value=adjusted, player_id=exposure.player_id, sport=exposure.sport, set_family=exposure.set_family, thesis_id=exposure.thesis_id, correlated_bucket=exposure.correlated_bucket))
+            positions.append(PositionExposure(
+                card_id=card_id,
+                market_value=adjusted,
+                player_id=exposure.player_id,
+                sport=exposure.sport,
+                set_family=exposure.set_family,
+                thesis_id=exposure.thesis_id,
+                correlated_bucket=exposure.correlated_bucket,
+                card_family=exposure.card_family,
+                catalyst=exposure.catalyst,
+            ))
 
     return results
