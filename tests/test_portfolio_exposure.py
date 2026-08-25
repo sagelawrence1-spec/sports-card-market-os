@@ -14,6 +14,8 @@ def _candidate(card_id="c1", **overrides):
         "player_id": "shohei-ohtani",
         "sport": "MLB",
         "set_family": "Topps Chrome",
+        "card_family": "Topps Chrome Refractor",
+        "catalyst": "ohtani-mvp-cycle",
         "thesis_id": "ohtani-long-term",
         "correlated_bucket": "modern-mlb-superstar",
     }
@@ -29,6 +31,8 @@ def _position(value, **overrides):
         player_id=candidate.player_id,
         sport=candidate.sport,
         set_family=candidate.set_family,
+        card_family=candidate.card_family,
+        catalyst=candidate.catalyst,
         thesis_id=candidate.thesis_id,
         correlated_bucket=candidate.correlated_bucket,
     )
@@ -49,6 +53,8 @@ def test_player_cap_reduces_allocation_to_remaining_headroom():
         max_player_pct=0.15,
         max_sport_pct=1.0,
         max_set_family_pct=1.0,
+        max_card_family_pct=1.0,
+        max_catalyst_pct=1.0,
         max_single_thesis_pct=1.0,
         max_correlated_bucket_pct=1.0,
     )
@@ -67,6 +73,8 @@ def test_correlated_bucket_can_bind_before_player_cap():
         max_player_pct=0.50,
         max_sport_pct=0.50,
         max_set_family_pct=0.50,
+        max_card_family_pct=0.50,
+        max_catalyst_pct=0.50,
         max_single_thesis_pct=0.50,
         max_correlated_bucket_pct=0.20,
     )
@@ -81,11 +89,85 @@ def test_correlated_bucket_can_bind_before_player_cap():
     assert rows[0]["exposure_adjusted_allocation"] == 150
 
 
+def test_card_family_cap_tracks_across_sets():
+    policy = ExposurePolicy(
+        max_player_pct=1.0,
+        max_sport_pct=1.0,
+        max_set_family_pct=1.0,
+        max_card_family_pct=0.10,
+        max_catalyst_pct=1.0,
+        max_single_thesis_pct=1.0,
+        max_correlated_bucket_pct=1.0,
+    )
+    held = _position(
+        850,
+        player_id="aaron-judge",
+        set_family="Bowman Chrome",
+        card_family="Topps Chrome Refractor",
+        thesis_id="judge-long-term",
+        catalyst="judge-hof-cycle",
+        correlated_bucket="judge",
+    )
+    rows = apply_exposure_caps(
+        [{"card_id": "c1", "allocation": 500, "ready": True, "blockers": []}],
+        {"c1": _candidate()},
+        portfolio_value=10_000,
+        positions=[held],
+        policy=policy,
+    )
+    assert rows[0]["exposure_adjusted_allocation"] == 150
+    assert rows[0]["exposure_headroom"]["card_family"]["headroom"] == 150
+
+
+def test_catalyst_cap_tracks_cross_player_shared_event_risk():
+    policy = ExposurePolicy(
+        max_player_pct=1.0,
+        max_sport_pct=1.0,
+        max_set_family_pct=1.0,
+        max_card_family_pct=1.0,
+        max_catalyst_pct=0.12,
+        max_single_thesis_pct=1.0,
+        max_correlated_bucket_pct=1.0,
+    )
+    held = _position(
+        1_050,
+        player_id="mike-trout",
+        card_family="Topps Update Rookie",
+        thesis_id="trout-long-term",
+        catalyst="ohtani-mvp-cycle",
+        correlated_bucket="trout",
+    )
+    rows = apply_exposure_caps(
+        [{"card_id": "c1", "allocation": 500, "ready": True, "blockers": []}],
+        {"c1": _candidate()},
+        portfolio_value=10_000,
+        positions=[held],
+        policy=policy,
+    )
+    assert rows[0]["exposure_adjusted_allocation"] == 150
+    assert rows[0]["exposure_headroom"]["catalyst"]["headroom"] == 150
+
+
+def test_legacy_exposure_metadata_falls_back_without_losing_caps():
+    candidate = CandidateExposure(
+        card_id="legacy",
+        player_id="player",
+        sport="MLB",
+        set_family="Topps Chrome",
+        thesis_id="legacy-thesis",
+        correlated_bucket="legacy-bucket",
+    )
+    assert candidate.card_family == "Topps Chrome"
+    assert candidate.catalyst == "legacy-thesis"
+
+
 def test_sequential_allocations_consume_shared_headroom():
     policy = ExposurePolicy(
         max_player_pct=0.20,
         max_sport_pct=0.30,
         max_set_family_pct=1.0,
+        max_card_family_pct=1.0,
+        max_catalyst_pct=1.0,
         max_single_thesis_pct=1.0,
         max_correlated_bucket_pct=1.0,
     )
@@ -94,8 +176,8 @@ def test_sequential_allocations_consume_shared_headroom():
         {"card_id": "b", "allocation": 2_000, "ready": True, "blockers": []},
     ]
     exposure = {
-        "a": _candidate("a", player_id="player-a", thesis_id="a"),
-        "b": _candidate("b", player_id="player-b", thesis_id="b"),
+        "a": _candidate("a", player_id="player-a", thesis_id="a", catalyst="a"),
+        "b": _candidate("b", player_id="player-b", thesis_id="b", catalyst="b"),
     }
     rows = apply_exposure_caps(
         allocations,
@@ -125,3 +207,7 @@ def test_upstream_rejected_candidate_never_gets_restored():
 def test_policy_rejects_invalid_caps():
     with pytest.raises(ValueError):
         ExposurePolicy(max_player_pct=0)
+    with pytest.raises(ValueError):
+        ExposurePolicy(max_card_family_pct=0)
+    with pytest.raises(ValueError):
+        ExposurePolicy(max_catalyst_pct=1.01)
