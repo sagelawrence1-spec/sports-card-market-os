@@ -2,13 +2,7 @@ name: KFC PSA POP Watchdog
 
 on:
   workflow_dispatch:
-  push:
-    paths:
-      - "scripts/gemrate_pop_watchdog.py"
-      - ".github/workflows/kfc-pop-watchdog.yml"
-  schedule:
-    # 12:17pm Phoenix / 3:17pm US Eastern, after GemRate's usual update
-    - cron: "17 19 * * *"
+  # Manual diagnostic only: the public source returned HTTP 403 to Actions.
 
 permissions:
   contents: write
