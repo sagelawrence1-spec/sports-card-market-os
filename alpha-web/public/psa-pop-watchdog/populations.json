@@ -1,6 +1,6 @@
 {
   "set": "1998 KFC Pokemon Card Game",
-  "checked_at": "2026-10-13",
+  "checked_at": "2026-10-14",
   "source_baseline": "https://www.gemrate.com/item-details-advanced?category=non-sport-cards&grader=psa&set_name=Kfc+Pokemon+Card+Game&year=1998",
   "automatic_refresh_enabled": false,
   "cards": [
@@ -43,10 +43,16 @@
       "name": "Pikachu",
       "number": "25",
       "latest_psa10": 128,
-      "latest_as_of": "2026-10-13",
-      "source": "PSA certification page (checked 2026-10-13)",
+      "latest_as_of": "2026-10-14",
+      "source": "Card Ladder screenshot supplied 2026-10-14",
       "psa_url": "https://www.psacard.com/cert/160011159/psa",
       "history": [
+        {
+          "date": "2026-04",
+          "psa10": 97,
+          "source": "User-provided screenshot of PSA card insights (April date user-attributed; exact day unknown)",
+          "psa_cert": "144276473"
+        },
         {
           "date": "2026-10-02",
           "psa10": 127,
@@ -56,6 +62,16 @@
           "date": "2026-10-13",
           "psa10": 128,
           "source": "PSA certification page"
+        },
+        {
+          "date": "2026-10-14",
+          "psa10": 128,
+          "source": "User-provided Card Ladder screenshot",
+          "psa9": 72,
+          "psa8": 27,
+          "psa7": 11,
+          "psa6": 16,
+          "psa5": 11
         }
       ]
     },
