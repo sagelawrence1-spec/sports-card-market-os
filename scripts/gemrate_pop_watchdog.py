@@ -51,12 +51,12 @@ def extract_counts(rows: list[str]) -> dict[str, int]:
     for name, cardnum in EXPECTED.items():
         num = int(cardnum)
         pattern = re.compile(
-            rf"\\b{re.escape(name)}\\s+(?:Base\\s+)?0*{num}\\b\\s+([0-9]{{1,6}})\\b",
+            rf"\b{re.escape(name)}\s+(?:Base\s+)?0*{num}\b\s+([0-9]{{1,6}})\b",
             re.I,
         )
         matches = []
         for row in rows:
-            if re.search(r"\\b(?:Total|Average|All Time)\\b", row, re.I) and "Base" not in row:
+            if re.search(r"\b(?:Total|Average|All Time)\b", row, re.I) and "Base" not in row:
                 continue
             found = pattern.search(row)
             if found:
@@ -87,7 +87,7 @@ def pull_gemrate() -> tuple[dict[str, int], str]:
             print("Body excerpt:", page.locator("body").inner_text()[:950], file=sys.stderr)
             raise RuntimeError("Public report data did not load") from None
         body = page.locator("body").inner_text()
-        date_match = re.search(r"Updated:\\s*(20\\d{2}-\\d{2}-\\d{2})", body)
+        date_match = re.search(r"Updated:\s*(20\d{2}-\d{2}-\d{2})", body)
         if not date_match:
             raise RuntimeError("Could not verify GemRate report date; refusing undated data")
         report_date = date_match.group(1)
