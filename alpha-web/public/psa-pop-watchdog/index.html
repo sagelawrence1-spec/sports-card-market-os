@@ -77,11 +77,11 @@ async function loadFeed(){
     if(!Array.isArray(feed.cards))throw new Error('Invalid data file');
     let changes=0;
     for(const item of feed.cards){
-      const c=db.cards.find(x=>x.id===item.id || (x.name.toLowerCase()===String(item.name||'').toLowerCase() && Number(x.number.replace(/\\D/g,''))===Number(item.number)));
+      const c=db.cards.find(x=>x.id===item.id || (x.name.toLowerCase()===String(item.name||'').toLowerCase() && Number(x.number.replace(/\D/g,''))===Number(item.number)));
       if(!c)continue;
       const incoming=Array.isArray(item.history)?item.history:[{date:item.date,psa10:item.psa10,source:item.source}];
       for(const obs of incoming){
-        if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(String(obs.date))||!Number.isSafeInteger(obs.psa10)||obs.psa10<0)continue;
+        if(!/^\d{4}-\d{2}-\d{2}$/.test(String(obs.date))||!Number.isSafeInteger(obs.psa10)||obs.psa10<0)continue;
         const old=c.snapshots.find(x=>x.date===obs.date);
         // The published verified source wins on dates it supplies; otherwise
         // locally logged readings and any personal cards are preserved.
