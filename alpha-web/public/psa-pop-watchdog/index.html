@@ -20,7 +20,7 @@ button,input,select{font:inherit}button{cursor:pointer}a{color:var(--accent)}.wr
 <div class="hero"><div><div class="eyebrow">Your collection, monitored</div><h2>Population overview</h2><div class="muted">All seven 1998 KFC Pokémon cards — dated PSA 10 population snapshots.</div></div><span class="badge">● Personal dashboard</span></div>
 <div class="summary"><div class="panel stat"><div class="k">Tracked cards</div><div class="v" id="cardsTotal">0</div><div class="u">In your watchlist</div></div><div class="panel stat"><div class="k">Cards with data</div><div class="v" id="withData">0</div><div class="u">Verified or logged snapshots</div></div><div class="panel stat"><div class="k">Recent changes</div><div class="v" id="recentChanges">—</div><div class="u">Since prior snapshots</div></div></div>
 <div class="sectionhead"><h3>Watchlist</h3><span class="count" id="countLabel"></span></div><div id="cards" class="cards"></div>
-<div class="note">DATA STATUS: Complete 7-card 1998 KFC Pokémon set included. Baselines from GemRate (Oct 2, 2026); selected cards cross-checked against PSA cert pages on Oct 13. Each card's latest snapshot date is shown. These are saved snapshots, NOT continuously live counts; unattended daily monitoring is not configured.</div>
+<div class="note" id="feedStatus">DATA STATUS: Complete 7-card 1998 KFC Pokémon set included. Baselines from GemRate (Oct 2, 2026); selected cards cross-checked against PSA cert pages on Oct 13. Each card's latest snapshot date is shown. These are saved snapshots, NOT continuously live counts; unattended daily monitoring is not configured.</div>
 </section>
 <section id="details" class="hidden">
 <button id="backBtn" class="btn ghost back">← All cards</button>
@@ -67,9 +67,44 @@ $('addBtn').onclick=()=>openCardForm();$('backBtn').onclick=viewHome;$('editCard
 $('exportBtn').onclick=()=>{const blob=new Blob([JSON.stringify({version:1,exportedAt:new Date().toISOString(),cards:db.cards},null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='pop-watchdog-backup-'+today()+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),3000)};
 $('importBtn').onclick=()=>$('importFile').click();$('importFile').onchange=async e=>{const f=e.target.files?.[0];if(!f)return;try{const obj=JSON.parse(await f.text());if(!Array.isArray(obj.cards)||obj.cards.length>500)throw Error('Invalid watchlist format');const cards=obj.cards.map(c=>{if(typeof c.name!=='string'||typeof c.set!=='string'||!Array.isArray(c.snapshots)||c.snapshots.length>10000)throw Error('Invalid card entry');return{id:String(c.id||uid()),name:c.name.slice(0,90),set:c.set.slice(0,120),year:String(c.year||'').slice(0,12),number:String(c.number||'').slice(0,30),variant:String(c.variant||'').slice(0,120),image:safeUrl(c.image),psa:safeUrl(c.psa),snapshots:c.snapshots.filter(s=>/^\d{4}-\d{2}-\d{2}$/.test(s.date)&&Number.isSafeInteger(s.count)&&s.count>=0).map(s=>({date:s.date,count:s.count,source:String(s.source||'Imported').slice(0,50)}))}});if(confirm('Import '+cards.length+' cards? This will replace the current dashboard watchlist. Export a backup first if needed.')){db={cards};save();viewHome()}}catch(err){alert('Could not import: '+err.message)}e.target.value=''};
 window.addEventListener('hashchange',()=>{const id=decodeURIComponent(location.hash.slice(1));if(id&&db.cards.some(x=>x.id===id))viewDetail(id);else if(!id&&active)viewHome()});
-// Optional future automated feed: data served from /populations.json (not included in MVP).
-// Example schema: {"cards": [{"id":"kfc-1998-charizard-06","date":"2026-10-14","psa10":143,"source":"Verified external data source"}]}
-async function loadFeed(){try{const response=await fetch('./populations.json',{cache:'no-store'});if(!response.ok)return;const feed=await response.json();if(!Array.isArray(feed.cards))return;let newEntries=0;for(const item of feed.cards){const c=db.cards.find(x=>x.id===item.id);if(!c||!/^\d{4}-\d{2}-\d{2}$/.test(item.date)||!Number.isSafeInteger(item.psa10)||item.psa10<0)continue;const old=c.snapshots.find(x=>x.date===item.date);if(old&&old.count===item.psa10)continue;c.snapshots=c.snapshots.filter(x=>x.date!==item.date);c.snapshots.push({date:item.date,count:item.psa10,source:'Verified automated feed'});newEntries++}if(newEntries){save();if(active)viewDetail(active);else render()}}catch{ /* no feed configured */ }}
+// On load, merge dated snapshots from the published shared history.
+// No manual entry is required for scheduled observations when the source works.
+async function loadFeed(){
+  try{
+    const response=await fetch('./populations.json',{cache:'no-store'});
+    if(!response.ok)throw new Error('Source data not reachable');
+    const feed=await response.json();
+    if(!Array.isArray(feed.cards))throw new Error('Invalid data file');
+    let changes=0;
+    for(const item of feed.cards){
+      const c=db.cards.find(x=>x.id===item.id || (x.name.toLowerCase()===String(item.name||'').toLowerCase() && Number(x.number.replace(/\\D/g,''))===Number(item.number)));
+      if(!c)continue;
+      const incoming=Array.isArray(item.history)?item.history:[{date:item.date,psa10:item.psa10,source:item.source}];
+      for(const obs of incoming){
+        if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(String(obs.date))||!Number.isSafeInteger(obs.psa10)||obs.psa10<0)continue;
+        const old=c.snapshots.find(x=>x.date===obs.date);
+        // The published verified source wins on dates it supplies; otherwise
+        // locally logged readings and any personal cards are preserved.
+        if(!old || old.count!==obs.psa10 || old.source!==obs.source){
+          c.snapshots=c.snapshots.filter(x=>x.date!==obs.date);
+          c.snapshots.push({date:obs.date,count:obs.psa10,source:String(obs.source||'External record').slice(0,55)});
+          changes++;
+        }
+      }
+    }
+    if(changes)save();
+    const note=$('feedStatus');
+    if(note){
+      const scan=feed.last_scan_at?feed.last_scan_at.slice(0,10):'Not yet completed';
+      const sourceDate=feed.last_scan_source_updated||'Oct 2, 2026 baselines';
+      note.textContent='DATA STATUS: Seven KFC cards loaded from stored observations. Last automatic check: '+scan+'. GemRate report date: '+sourceDate+'. Counts are as of each recorded source date; a daily check is not a guarantee of a daily source update.';
+    }
+    if(active)viewDetail(active);else render();
+  }catch(err){
+    const note=$('feedStatus');
+    if(note)note.textContent='DATA STATUS: Could not load the shared population history. Showing previously saved readings. '+err.message;
+  }
+}
 const hash=decodeURIComponent(location.hash.slice(1));if(hash&&db.cards.some(x=>x.id===hash))viewDetail(hash);else render();loadFeed();
 })();
 </script>
