@@ -56,7 +56,7 @@ button,input,select{font:inherit}button{cursor:pointer}a{color:var(--accent)}.wr
 (()=>{'use strict';
 const STORE='pop-watchdog-v2';
 const $=id=>document.getElementById(id);
-const today=()=>new Date().toLocaleDateString('en-CA',{year:'numeric',month:'2-digit',day:'2-digit'});
+const today=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'America/Phoenix',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 const num=x=>Number(x).toLocaleString('en-US');
 const uid=()=>crypto.randomUUID?crypto.randomUUID():String(Date.now())+'-'+Math.random().toString(16).slice(2);
 const safeUrl=x=>{try{let u=new URL(x);return ['https:','http:'].includes(u.protocol)?u.href:''}catch{return ''}};
@@ -74,11 +74,55 @@ function subs(card){return [card.year,card.set,card.number,card.variant].filter(
 function snaps(card){return [...card.snapshots].filter(s=>Number.isInteger(s.count)&&s.count>=0&&/^\d{4}-\d{2}-\d{2}$/.test(s.date)).sort((a,b)=>a.date.localeCompare(b.date))}
 function last(card){const s=snaps(card);return s[s.length-1]||null}
 function prior(card){const s=snaps(card);return s[s.length-2]||null}
+const validStatus=new Set(['VERIFIED_COUNT','STALE_SOURCE','UNAVAILABLE','AMBIGUOUS']);
+const statusStyle=s=>({VERIFIED_COUNT:'verified',STALE_SOURCE:'stale',UNAVAILABLE:'unavailable',AMBIGUOUS:'ambiguous'}[s]||'unknown');
+const statusName=s=>({VERIFIED_COUNT:'Verified count',STALE_SOURCE:'Stale source',UNAVAILABLE:'Unavailable',AMBIGUOUS:'Ambiguous'}[s]||'Not checked');
+function allChecks(card){return [...(Array.isArray(card.daily_checks)?card.daily_checks:[])].filter(c=>c&&validStatus.has(c.status)&&typeof c.checked_at==='string').sort((a,b)=>a.checked_at.localeCompare(b.checked_at))}
+function latestCheck(card){const c=allChecks(card);return c[c.length-1]||null}
+function checkChip(c){const chip=document.createElement('span');chip.className='checkchip '+statusStyle(c?.status);chip.textContent=statusName(c?.status);return chip}
+function appendAuditMeta(parent,card){
+ const check=latestCheck(card);const audit=document.createElement('div');audit.className='tile-audit';audit.append(checkChip(check));parent.append(audit);
+ const meta=document.createElement('div');meta.className='audit-meta';
+ const observed=last(card);
+ meta.textContent='Checked '+(check?.checked_at?.slice(0,10)||'—')+' · Pop observation '+(observed?.date||'—');
+ parent.append(meta);
+}
+function syncAuditSummary(){
+ const checks=db.cards.map(c=>latestCheck(c)).filter(Boolean);
+ const auditDate=checks.map(c=>c.checked_at.slice(0,10)).sort().at(-1)||null;
+ const rows=auditDate?checks.filter(c=>c.checked_at.slice(0,10)===auditDate):[];
+ const verified=rows.filter(c=>c.status==='VERIFIED_COUNT').length;
+ const stale=rows.filter(c=>c.status==='STALE_SOURCE').length;
+ const failed=rows.filter(c=>c.status==='UNAVAILABLE'||c.status==='AMBIGUOUS').length;
+ text('checkedCount',auditDate?rows.length+'/'+db.cards.length:'—');
+ text('checkedCountSub',auditDate?'Audit '+auditDate:'No check log available');
+ const breakdown=$('auditBreakdown');breakdown.replaceChildren();
+ for(const [name,n] of [['Verified',verified],['Stale',stale],['Unavailable / ambiguous',failed]]){const stat=document.createElement('span');stat.textContent=name+': '+n;breakdown.append(stat)}
+ text('auditSummaryText',auditDate?'Last recorded audit: '+auditDate+' · '+(rows.length===db.cards.length?'complete check coverage':'incomplete check coverage')+'. A check does not guarantee a freshly updated source.':'No daily attempts recorded yet.');
+}
 function d(x){if(x===null||x===undefined)return '—';return x>0?'+'+num(x):num(x)}
 function delta(card,days){const s=snaps(card);if(s.length<2)return null;const end=s[s.length-1],limit=Date.parse(end.date+'T12:00:00Z')-days*86400000;let earlier=null;for(const item of s.slice(0,-1)){if(Date.parse(item.date+'T12:00:00Z')<=limit)earlier=item}return earlier?end.count-earlier.count:null}
 function viewHome(){active=null;$('home').classList.remove('hidden');$('details').classList.add('hidden');location.hash='';render()}
 function viewDetail(id){const c=db.cards.find(c=>c.id===id);if(!c)return viewHome();active=id;$('home').classList.add('hidden');$('details').classList.remove('hidden');history.replaceState(null,'','#'+encodeURIComponent(id));renderDetail(c);window.scrollTo(0,0)}
-function render(){text('cardsTotal',db.cards.length);const n=db.cards.filter(c=>!!last(c)).length;text('withData',n);let changed=0;for(const c of db.cards){const p=prior(c),l=last(c);if(p&&l&&p.count!==l.count)changed++}text('recentChanges',changed);text('countLabel',db.cards.length+' cards');const grid=$('cards');grid.replaceChildren();if(!db.cards.length){const div=document.createElement('div');div.className='empty';div.textContent='No cards yet. Select “Add card” to create your first tracking tile.';grid.append(div)}for(const c of db.cards){const tile=document.createElement('button');tile.className='tile';tile.type='button';tile.onclick=()=>viewDetail(c.id);tile.append(pic(c));const body=document.createElement('div');body.className='tilebody';const name=document.createElement('div');name.className='name';name.textContent=c.name;const detail=document.createElement('div');detail.className='details';detail.textContent=subs(c);const pop=document.createElement('div');pop.className='pop';pop.textContent=last(c)?num(last(c).count):'—';const label=document.createElement('div');label.className='poplabel';label.textContent='PSA 10 population';const changes=document.createElement('div');changes.className='change';const p=prior(c);const l=last(c);changes.textContent=p?d(l.count-p.count)+' vs previous snapshot':(l?'Baseline: '+l.date:'No reading yet');if(p&&l.count<p.count)changes.classList.add('down');if(!p)changes.classList.add('nochange');const audit=document.createElement('div');audit.className='change nochange';audit.textContent=checkSummary(c);body.append(name,detail,pop,label,changes,audit);tile.append(body);grid.append(tile)}}
+function render(){
+ text('cardsTotal',db.cards.length);text('withData',db.cards.filter(c=>!!last(c)).length);
+ let changed=0;for(const c of db.cards){const p=prior(c),l=last(c);if(p&&l&&p.count!==l.count)changed++}
+ text('recentChanges',changed);text('countLabel',db.cards.length+' cards');syncAuditSummary();
+ const grid=$('cards');grid.replaceChildren();
+ if(!db.cards.length){const div=document.createElement('div');div.className='empty';div.textContent='No cards yet. Select “Add card” to create your first tracking tile.';grid.append(div)}
+ for(const c of db.cards){
+  const tile=document.createElement('button');tile.className='tile';tile.type='button';tile.onclick=()=>viewDetail(c.id);
+  tile.append(pic(c));const body=document.createElement('div');body.className='tilebody';
+  const name=document.createElement('div');name.className='name';name.textContent=c.name;
+  const detail=document.createElement('div');detail.className='details';detail.textContent=subs(c);
+  const pop=document.createElement('div');pop.className='pop';pop.textContent=last(c)?num(last(c).count):'—';
+  const label=document.createElement('div');label.className='poplabel';label.textContent='PSA 10 population';
+  const changes=document.createElement('div');changes.className='change';const p=prior(c),l=last(c);
+  changes.textContent=p?d(l.count-p.count)+' vs previous dated population':(l?'Baseline: '+l.date:'No reading yet');
+  if(p&&l.count<p.count)changes.classList.add('down');if(!p)changes.classList.add('nochange');
+  body.append(name,detail,pop,label,changes);appendAuditMeta(body,c);tile.append(body);grid.append(tile);
+ }
+}
 function renderDetail(c){text('detailName',c.name);text('detailSubtitle',subs(c));$('detailPic').replaceWith((()=>{const p=pic(c);p.id='detailPic';return p})());const link=$('psaLink');if(safeUrl(c.psa)){link.href=safeUrl(c.psa);link.classList.remove('hidden')}else{link.classList.add('hidden');link.removeAttribute('href')}const ebay=$('ebayLink'),alt=$('crosscheckLink');if(safeUrl(c.ebay)){ebay.href=safeUrl(c.ebay);ebay.classList.remove('hidden')}else{ebay.classList.add('hidden');ebay.removeAttribute('href')}if(safeUrl(c.crosscheck)){alt.href=safeUrl(c.crosscheck);alt.classList.remove('hidden')}else{alt.classList.add('hidden');alt.removeAttribute('href')}const l=last(c),p=prior(c);text('current',l?num(l.count):'—');text('asof',l?'As of '+l.date:'No snapshot entered');text('previous',p?num(p.count):'—');text('previousSub',p?'As of '+p.date:'Need two dated snapshots');text('week',d(delta(c,7)));text('month',d(delta(c,30)));text('detailAudit',checkSummary(c));drawChart(c);const body=$('logRows');body.replaceChildren();const s=snaps(c);if(!s.length){const tr=document.createElement('tr');const td=document.createElement('td');td.colSpan=4;td.textContent='No snapshots yet. Log the first PSA 10 population.';td.style.color='#91a4be';tr.append(td);body.append(tr)}else{s.slice().reverse().forEach((snap,i)=>{const prior=s[s.length-i-2];const tr=document.createElement('tr');for(const v of [snap.date,snap.source||'Manual',num(snap.count),prior?d(snap.count-prior.count):'—']){const td=document.createElement('td');td.textContent=v;tr.append(td)}body.append(tr)})}}
 function drawChart(c){const el=$('chartContainer');el.replaceChildren();const s=snaps(c);if(s.length<2){const msg=document.createElement('div');msg.className='chart-empty';msg.textContent='Log at least two snapshots on different dates to see the historical trend.';el.append(msg);return}const W=920,H=260,m={l:55,r:20,t:18,b:34},x0=m.l,x1=W-m.r,y0=m.t,y1=H-m.b;let min=Math.min(...s.map(x=>x.count)),max=Math.max(...s.map(x=>x.count));const pad=Math.max(2,Math.round((max-min)*.15));min=Math.max(0,min-pad);max+=pad;const dates=s.map(x=>Date.parse(x.date+'T12:00:00Z'));const start=Math.min(...dates),end=Math.max(...dates);const x=t=>x0+(x1-x0)*(end===start?.5:(t-start)/(end-start)),y=v=>y1-(y1-y0)*(v-min)/(max-min||1);const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox',`0 0 ${W} ${H}`);svg.classList.add('chart');svg.setAttribute('role','img');svg.setAttribute('aria-label','PSA 10 population over time');const mk=(tag,attrs)=>{const e=document.createElementNS('http://www.w3.org/2000/svg',tag);for(const [a,b] of Object.entries(attrs))e.setAttribute(a,b);svg.append(e);return e};for(let i=0;i<5;i++){let v=min+(max-min)*i/4,yy=y(v);mk('line',{class:'gridline',x1:x0,x2:x1,y1:yy,y2:yy});let t=mk('text',{class:'axis',x:6,y:yy+4});t.textContent=Math.round(v).toLocaleString()}const coords=s.map(z=>[x(Date.parse(z.date+'T12:00:00Z')),y(z.count)]);let path=coords.map((xy,i)=>(i?'L':'M')+xy[0].toFixed(1)+','+xy[1].toFixed(1)).join(' ');mk('path',{d:path,stroke:'#88d9ee','stroke-width':'3',fill:'none','stroke-linecap':'round','stroke-linejoin':'round'});for(const [i,xy] of coords.entries()){const circ=mk('circle',{cx:xy[0],cy:xy[1],r:i===coords.length-1?5:3,fill:'#8fe7d2',stroke:'#183a47','stroke-width':'2'});const title=document.createElementNS('http://www.w3.org/2000/svg','title');title.textContent=s[i].date+': '+num(s[i].count);circ.append(title)}for(const n of [0,Math.floor((s.length-1)/2),s.length-1]){const t=mk('text',{class:'axis',x:coords[n][0],y:H-7,'text-anchor':n===0?'start':n===s.length-1?'end':'middle'});t.textContent=s[n].date}el.append(svg)}
 function openCardForm(c){$('cardForm').reset();$('editingId').value=c?.id||'';text('cardDialogTitle',c?'Edit card':'Add a card');for(const [id,k] of Object.entries({cardName:'name',cardYear:'year',cardSet:'set',cardNumber:'number',cardVariant:'variant',cardImage:'image',cardPsa:'psa'}))$(id).value=c?.[k]||'';$('cardDialog').showModal()}
