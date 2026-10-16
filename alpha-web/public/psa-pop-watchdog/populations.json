@@ -22,7 +22,10 @@
           "psa10": 142,
           "source": "PSA certification page"
         }
-      ]
+      ],
+      "daily_checks": [],
+      "last_check_status": "NOT_YET_LOGGED",
+      "last_checked_at": null
     },
     {
       "name": "Ivysaur",
@@ -37,7 +40,10 @@
           "psa10": 69,
           "source": "GemRate"
         }
-      ]
+      ],
+      "daily_checks": [],
+      "last_check_status": "NOT_YET_LOGGED",
+      "last_checked_at": null
     },
     {
       "name": "Pikachu",
@@ -73,7 +79,10 @@
           "psa6": 16,
           "psa5": 11
         }
-      ]
+      ],
+      "daily_checks": [],
+      "last_check_status": "NOT_YET_LOGGED",
+      "last_checked_at": null
     },
     {
       "name": "Onix",
@@ -93,7 +102,10 @@
           "psa10": 113,
           "source": "PSA certification page"
         }
-      ]
+      ],
+      "daily_checks": [],
+      "last_check_status": "NOT_YET_LOGGED",
+      "last_checked_at": null
     },
     {
       "name": "Scyther",
@@ -113,7 +125,10 @@
           "psa10": 116,
           "source": "PSA certification page"
         }
-      ]
+      ],
+      "daily_checks": [],
+      "last_check_status": "NOT_YET_LOGGED",
+      "last_checked_at": null
     },
     {
       "name": "Snorlax",
@@ -128,7 +143,10 @@
           "psa10": 129,
           "source": "GemRate"
         }
-      ]
+      ],
+      "daily_checks": [],
+      "last_check_status": "NOT_YET_LOGGED",
+      "last_checked_at": null
     },
     {
       "name": "Dragonite",
@@ -143,7 +161,25 @@
           "psa10": 88,
           "source": "GemRate"
         }
-      ]
+      ],
+      "daily_checks": [],
+      "last_check_status": "NOT_YET_LOGGED",
+      "last_checked_at": null
     }
-  ]
+  ],
+  "monitoring": {
+    "scheduler": "ChatGPT scheduled task",
+    "scheduled": "Daily, approximately 9:00 AM America/Phoenix",
+    "scope": "All seven distinct 1998 KFC Pokemon Card Game cards",
+    "per_card_check_required": true,
+    "checks_logged": "Only after actual evidence retrieval at runtime",
+    "source_as_of_separate_from_check_timestamp": true,
+    "statuses": [
+      "VERIFIED_COUNT",
+      "STALE_SOURCE",
+      "UNAVAILABLE",
+      "AMBIGUOUS"
+    ],
+    "dashboard_sync": "Attempt on each completed scheduled run; not yet demonstrated consistently"
+  }
 }
