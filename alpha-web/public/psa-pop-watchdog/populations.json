@@ -1,6 +1,6 @@
 {
   "set": "1998 KFC Pokemon Card Game",
-  "checked_at": "2026-10-26",
+  "checked_at": "2026-10-27",
   "source_baseline": "https://www.gemrate.com/item-details-advanced?category=non-sport-cards&grader=psa&set_name=Kfc+Pokemon+Card+Game&year=1998",
   "automatic_refresh_enabled": false,
   "cards": [
@@ -8,8 +8,8 @@
       "name": "Charizard",
       "number": "06",
       "latest_psa10": 142,
-      "latest_as_of": "2026-10-25",
-      "source": "GemRate advanced set report (Updated 2026-10-25)",
+      "latest_as_of": "2026-10-26",
+      "source": "GemRate advanced set report (Updated 2026-10-26)",
       "psa_url": "https://www.psacard.com/cert/103314381",
       "history": [
         {
@@ -52,6 +52,14 @@
           "url": "https://www.gemrate.com/item-details-advanced?category=non-sport-cards&grader=psa&set_name=Kfc+Pokemon+Card+Game&year=1998",
           "source_as_of": "2026-10-25",
           "checked_at": "2026-10-26T16:52:30.314Z"
+        },
+        {
+          "date": "2026-10-26",
+          "psa10": 142,
+          "source": "GemRate advanced seven-card set report",
+          "url": "https://www.gemrate.com/item-details-advanced?category=non-sport-cards&grader=psa&set_name=Kfc+Pokemon+Card+Game&year=1998",
+          "source_as_of": "2026-10-26",
+          "checked_at": "2026-10-27T17:16:39.802Z"
         }
       ],
       "daily_checks": [
@@ -99,10 +107,19 @@
           "source_as_of": "2026-10-25",
           "observed_psa10": 142,
           "explanation": "Fresh GemRate advanced seven-card report updated 2026-10-25 identifies Charizard #06 with 142 PSA 10s. Unchanged from last source-dated 142 (2026-10-23). PSA pages independently corroborate Charizard/Pikachu/Dragonite where accessible, but do not disclose census as-of date."
+        },
+        {
+          "date": "2026-10-27",
+          "checked_at": "2026-10-27T17:16:39.802Z",
+          "status": "VERIFIED_COUNT",
+          "source": "https://www.gemrate.com/item-details-advanced?category=non-sport-cards&grader=psa&set_name=Kfc+Pokemon+Card+Game&year=1998",
+          "source_as_of": "2026-10-26",
+          "explanation": "Fresh 2026-10-27 retrieval of GemRate advanced report, explicitly updated 2026-10-26, individually identifies Charizard #06 in the seven-card set and shows 142 PSA 10s. Previous valid source-dated observation: 142 as-of 2026-10-25; unchanged.",
+          "observed_psa10": 142
         }
       ],
       "last_check_status": "VERIFIED_COUNT",
-      "last_checked_at": "2026-10-26T16:52:30.314Z",
+      "last_checked_at": "2026-10-27T17:16:39.802Z",
       "last_check_source": "https://www.gemrate.com/item-details-advanced?category=non-sport-cards&grader=psa&set_name=Kfc+Pokemon+Card+Game&year=1998"
     },
     {
@@ -160,18 +177,26 @@
           "source": "https://www.gemrate.com/item-details-advanced?category=non-sport-cards&grader=psa&set_name=Kfc+Pokemon+Card+Game&year=1998",
           "source_as_of": null,
           "explanation": "Fresh GemRate advanced and standard reports updated 2026-10-25 omit Ivysaur #02 from individually identifiable all-time PSA 10 counts. Direct PSA cert 106172937 inaccessible; fresh public search/eBay results did not establish an exact-card source-dated census. Historical 69 (2026-10-02) retained, not presented as current."
+        },
+        {
+          "date": "2026-10-27",
+          "checked_at": "2026-10-27T17:16:39.802Z",
+          "status": "UNAVAILABLE",
+          "source": "https://www.gemrate.com/item-details-advanced?category=non-sport-cards&grader=psa&set_name=Kfc+Pokemon+Card+Game&year=1998",
+          "source_as_of": null,
+          "explanation": "Fresh GemRate advanced and standard seven-card reports both updated 2026-10-26, but Ivysaur #02 is absent from individually identified all-time PSA 10 counts. Direct PSA cert 106172937 was inaccessible; fresh public/eBay search and listing checks did not supply a valid exact-card, dated PSA 10 census. Last historical 69 (2026-10-02) preserved and NOT counted as today's observation."
         }
       ],
       "last_check_status": "UNAVAILABLE",
-      "last_checked_at": "2026-10-26T16:52:30.314Z",
+      "last_checked_at": "2026-10-27T17:16:39.802Z",
       "last_check_source": "https://www.gemrate.com/item-details-advanced?category=non-sport-cards&grader=psa&set_name=Kfc+Pokemon+Card+Game&year=1998"
     },
     {
       "name": "Pikachu",
       "number": "25",
       "latest_psa10": 128,
-      "latest_as_of": "2026-10-25",
-      "source": "GemRate advanced set report (Updated 2026-10-25)",
+      "latest_as_of": "2026-10-26",
+      "source": "GemRate advanced set report (Updated 2026-10-26)",
       "psa_url": "https://www.psacard.com/cert/160011159/psa",
       "history": [
         {
@@ -230,6 +255,14 @@
           "url": "https://www.gemrate.com/item-details-advanced?category=non-sport-cards&grader=psa&set_name=Kfc+Pokemon+Card+Game&year=1998",
           "source_as_of": "2026-10-25",
           "checked_at": "2026-10-26T16:52:30.314Z"
+        },
+        {
+          "date": "2026-10-26",
+          "psa10": 128,
+          "source": "GemRate advanced seven-card set report",
+          "url": "https://www.gemrate.com/item-details-advanced?category=non-sport-cards&grader=psa&set_name=Kfc+Pokemon+Card+Game&year=1998",
+          "source_as_of": "2026-10-26",
+          "checked_at": "2026-10-27T17:16:39.802Z"
         }
       ],
       "daily_checks": [
@@ -277,10 +310,19 @@
           "source_as_of": "2026-10-25",
           "observed_psa10": 128,
           "explanation": "Fresh GemRate advanced seven-card report updated 2026-10-25 identifies Pikachu #25 with 128 PSA 10s. Unchanged from last source-dated 128 (2026-10-23). PSA pages independently corroborate Charizard/Pikachu/Dragonite where accessible, but do not disclose census as-of date."
+        },
+        {
+          "date": "2026-10-27",
+          "checked_at": "2026-10-27T17:16:39.802Z",
+          "status": "VERIFIED_COUNT",
+          "source": "https://www.gemrate.com/item-details-advanced?category=non-sport-cards&grader=psa&set_name=Kfc+Pokemon+Card+Game&year=1998",
+          "source_as_of": "2026-10-26",
+          "explanation": "Fresh 2026-10-27 retrieval of GemRate advanced report, explicitly updated 2026-10-26, individually identifies Pikachu #25 in the seven-card set and shows 128 PSA 10s. Previous valid source-dated observation: 128 as-of 2026-10-25; unchanged.",
+          "observed_psa10": 128
         }
       ],
       "last_check_status": "VERIFIED_COUNT",
-      "last_checked_at": "2026-10-26T16:52:30.314Z",
+      "last_checked_at": "2026-10-27T17:16:39.802Z",
       "last_check_source": "https://www.gemrate.com/item-details-advanced?category=non-sport-cards&grader=psa&set_name=Kfc+Pokemon+Card+Game&year=1998"
     },
     {
@@ -343,18 +385,26 @@
           "source": "https://www.ebay.com/itm/406837776675",
           "source_as_of": null,
           "explanation": "Fresh GemRate advanced and standard reports updated 2026-10-25 omit Onix #95 individually. Direct PSA certs 142583516 and 128242085 inaccessible. Fresh retrieval of eBay item 298163278880 displays 110 (listing last updated May 27); item 406837776675 displays 113 (sold Oct 8, listing last updated July 26). Neither gives a reliable population-as-of date and their displayed counts conflict. Historical 113 (2026-10-13) retained."
+        },
+        {
+          "date": "2026-10-27",
+          "checked_at": "2026-10-27T17:16:39.802Z",
+          "status": "AMBIGUOUS",
+          "source": "https://www.ebay.com/itm/406837776675",
+          "source_as_of": null,
+          "explanation": "Fresh GemRate advanced/standard reports updated 2026-10-26 omit Onix #95 individually. PSA cert 142583516, 128242085 and 127299489 inaccessible. Freshly opened exact-card eBay listing 406837776675 shows PSA 10 pop 114, while listing 298163278880 shows 110; these listings have no census-as-of date, and an older indexed view of 406837776675 showed 113. The 114 display is a candidate, NOT a verified source-dated count. Preserve historical 113 (2026-10-13), do not infer a population change."
         }
       ],
       "last_check_status": "AMBIGUOUS",
-      "last_checked_at": "2026-10-26T16:52:30.314Z",
+      "last_checked_at": "2026-10-27T17:16:39.802Z",
       "last_check_source": "https://www.ebay.com/itm/406837776675"
     },
     {
       "name": "Scyther",
       "number": "123",
       "latest_psa10": 120,
-      "latest_as_of": "2026-10-25",
-      "source": "GemRate advanced set report (Updated 2026-10-25)",
+      "latest_as_of": "2026-10-26",
+      "source": "GemRate advanced set report (Updated 2026-10-26)",
       "psa_url": "https://www.psacard.com/cert/105810268/psa",
       "history": [
         {
@@ -398,6 +448,14 @@
           "url": "https://www.gemrate.com/item-details-advanced?category=non-sport-cards&grader=psa&set_name=Kfc+Pokemon+Card+Game&year=1998",
           "source_as_of": "2026-10-25",
           "checked_at": "2026-10-26T16:52:30.314Z"
+        },
+        {
+          "date": "2026-10-26",
+          "psa10": 120,
+          "source": "GemRate advanced seven-card set report",
+          "url": "https://www.gemrate.com/item-details-advanced?category=non-sport-cards&grader=psa&set_name=Kfc+Pokemon+Card+Game&year=1998",
+          "source_as_of": "2026-10-26",
+          "checked_at": "2026-10-27T17:16:39.802Z"
         }
       ],
       "daily_checks": [
@@ -445,18 +503,27 @@
           "source_as_of": "2026-10-25",
           "observed_psa10": 120,
           "explanation": "Fresh GemRate advanced seven-card report updated 2026-10-25 identifies Scyther #123 with 120 PSA 10s. Unchanged from last source-dated 120 (2026-10-23). PSA pages independently corroborate Charizard/Pikachu/Dragonite where accessible, but do not disclose census as-of date."
+        },
+        {
+          "date": "2026-10-27",
+          "checked_at": "2026-10-27T17:16:39.802Z",
+          "status": "VERIFIED_COUNT",
+          "source": "https://www.gemrate.com/item-details-advanced?category=non-sport-cards&grader=psa&set_name=Kfc+Pokemon+Card+Game&year=1998",
+          "source_as_of": "2026-10-26",
+          "explanation": "Fresh 2026-10-27 retrieval of GemRate advanced report, explicitly updated 2026-10-26, individually identifies Scyther #123 in the seven-card set and shows 120 PSA 10s. Previous valid source-dated observation: 120 as-of 2026-10-25; unchanged.",
+          "observed_psa10": 120
         }
       ],
       "last_check_status": "VERIFIED_COUNT",
-      "last_checked_at": "2026-10-26T16:52:30.314Z",
+      "last_checked_at": "2026-10-27T17:16:39.802Z",
       "last_check_source": "https://www.gemrate.com/item-details-advanced?category=non-sport-cards&grader=psa&set_name=Kfc+Pokemon+Card+Game&year=1998"
     },
     {
       "name": "Snorlax",
       "number": "143",
       "latest_psa10": 131,
-      "latest_as_of": "2026-10-25",
-      "source": "GemRate advanced set report (Updated 2026-10-25)",
+      "latest_as_of": "2026-10-26",
+      "source": "GemRate advanced set report (Updated 2026-10-26)",
       "psa_url": "https://www.psacard.com/cert/122517932/psa",
       "history": [
         {
@@ -495,6 +562,14 @@
           "url": "https://www.gemrate.com/item-details-advanced?category=non-sport-cards&grader=psa&set_name=Kfc+Pokemon+Card+Game&year=1998",
           "source_as_of": "2026-10-25",
           "checked_at": "2026-10-26T16:52:30.314Z"
+        },
+        {
+          "date": "2026-10-26",
+          "psa10": 131,
+          "source": "GemRate advanced seven-card set report",
+          "url": "https://www.gemrate.com/item-details-advanced?category=non-sport-cards&grader=psa&set_name=Kfc+Pokemon+Card+Game&year=1998",
+          "source_as_of": "2026-10-26",
+          "checked_at": "2026-10-27T17:16:39.802Z"
         }
       ],
       "daily_checks": [
@@ -542,18 +617,27 @@
           "source_as_of": "2026-10-25",
           "observed_psa10": 131,
           "explanation": "Fresh GemRate advanced seven-card report updated 2026-10-25 identifies Snorlax #143 with 131 PSA 10s. Unchanged from last source-dated 131 (2026-10-23). PSA pages independently corroborate Charizard/Pikachu/Dragonite where accessible, but do not disclose census as-of date."
+        },
+        {
+          "date": "2026-10-27",
+          "checked_at": "2026-10-27T17:16:39.802Z",
+          "status": "VERIFIED_COUNT",
+          "source": "https://www.gemrate.com/item-details-advanced?category=non-sport-cards&grader=psa&set_name=Kfc+Pokemon+Card+Game&year=1998",
+          "source_as_of": "2026-10-26",
+          "explanation": "Fresh 2026-10-27 retrieval of GemRate advanced report, explicitly updated 2026-10-26, individually identifies Snorlax #143 in the seven-card set and shows 131 PSA 10s. Previous valid source-dated observation: 131 as-of 2026-10-25; unchanged.",
+          "observed_psa10": 131
         }
       ],
       "last_check_status": "VERIFIED_COUNT",
-      "last_checked_at": "2026-10-26T16:52:30.314Z",
+      "last_checked_at": "2026-10-27T17:16:39.802Z",
       "last_check_source": "https://www.gemrate.com/item-details-advanced?category=non-sport-cards&grader=psa&set_name=Kfc+Pokemon+Card+Game&year=1998"
     },
     {
       "name": "Dragonite",
       "number": "149",
       "latest_psa10": 90,
-      "latest_as_of": "2026-10-25",
-      "source": "GemRate advanced set report (Updated 2026-10-25)",
+      "latest_as_of": "2026-10-26",
+      "source": "GemRate advanced set report (Updated 2026-10-26)",
       "psa_url": "https://www.psacard.com/cert/142583501/psa",
       "history": [
         {
@@ -591,6 +675,14 @@
           "url": "https://www.gemrate.com/item-details-advanced?category=non-sport-cards&grader=psa&set_name=Kfc+Pokemon+Card+Game&year=1998",
           "source_as_of": "2026-10-25",
           "checked_at": "2026-10-26T16:52:30.314Z"
+        },
+        {
+          "date": "2026-10-26",
+          "psa10": 90,
+          "source": "GemRate advanced seven-card set report",
+          "url": "https://www.gemrate.com/item-details-advanced?category=non-sport-cards&grader=psa&set_name=Kfc+Pokemon+Card+Game&year=1998",
+          "source_as_of": "2026-10-26",
+          "checked_at": "2026-10-27T17:16:39.802Z"
         }
       ],
       "daily_checks": [
@@ -638,10 +730,19 @@
           "source_as_of": "2026-10-25",
           "observed_psa10": 90,
           "explanation": "Fresh GemRate advanced seven-card report updated 2026-10-25 identifies Dragonite #149 with 90 PSA 10s. Unchanged from last source-dated 90 (2026-10-23). PSA pages independently corroborate Charizard/Pikachu/Dragonite where accessible, but do not disclose census as-of date."
+        },
+        {
+          "date": "2026-10-27",
+          "checked_at": "2026-10-27T17:16:39.802Z",
+          "status": "VERIFIED_COUNT",
+          "source": "https://www.gemrate.com/item-details-advanced?category=non-sport-cards&grader=psa&set_name=Kfc+Pokemon+Card+Game&year=1998",
+          "source_as_of": "2026-10-26",
+          "explanation": "Fresh 2026-10-27 retrieval of GemRate advanced report, explicitly updated 2026-10-26, individually identifies Dragonite #149 in the seven-card set and shows 90 PSA 10s. Previous valid source-dated observation: 90 as-of 2026-10-25; unchanged.",
+          "observed_psa10": 90
         }
       ],
       "last_check_status": "VERIFIED_COUNT",
-      "last_checked_at": "2026-10-26T16:52:30.314Z",
+      "last_checked_at": "2026-10-27T17:16:39.802Z",
       "last_check_source": "https://www.gemrate.com/item-details-advanced?category=non-sport-cards&grader=psa&set_name=Kfc+Pokemon+Card+Game&year=1998"
     }
   ],
@@ -658,9 +759,9 @@
       "UNAVAILABLE",
       "AMBIGUOUS"
     ],
-    "dashboard_sync": "Seven dated 2026-10-26 checks submitted to GitHub; Pages deployment to be verified separately."
+    "dashboard_sync": "2026-10-27 seven-card checks submitted to GitHub; deployment verification pending."
   },
-  "last_scan_at": "2026-10-26T16:52:30.314Z",
+  "last_scan_at": "2026-10-27T17:16:39.802Z",
   "last_scan_type": "seven-card dated public-source population audit",
   "last_scan_results": {
     "total": 7,
@@ -668,17 +769,17 @@
     "stale_source": 0,
     "unavailable": 1,
     "ambiguous": 1,
-    "source_updated": "2026-10-25",
+    "source_updated": "2026-10-26",
     "gemrate_total_psa10": 795,
     "dated_history_changes": [],
     "no_verified_day_over_day_change": true,
     "unverified_combined_psa10": 184,
-    "unverified_combined_note": "795 set PSA 10s minus 611 individually verified across five cards leaves 184 combined for Ivysaur+Onix; cannot assign either card a count. Last historical individual totals 69+113=182, gap 2; this does NOT establish which card changed.",
-    "coverage_note": "Seven distinct cards freshly attempted 2026-10-26; five individually source-dated GemRate readings as-of 2026-10-25, Ivysaur unavailable, Onix ambiguous. No verified increase in the five readable cards; seven-card comparison incomplete.",
+    "unverified_combined_note": "795 total GemRate PSA 10s minus 611 independently identifiable among five cards = 184 combined for Ivysaur and Onix. Older source-dated counts 69 and 113 total 182, leaving 2 unexplained relative to those older observations; no per-card assignment can be made. Undated eBay Onix 114 is not treated as verified.",
+    "coverage_note": "Fresh 2026-10-27 attempt for all seven cards; five individually verified as-of 2026-10-26; Ivysaur unavailable, Onix ambiguous. No verified change in the five readable cards; complete seven-card comparison remains impossible.",
     "cards": {
       "Charizard": {
         "status": "VERIFIED_COUNT",
-        "source_as_of": "2026-10-25",
+        "source_as_of": "2026-10-26",
         "observed_psa10": 142
       },
       "Ivysaur": {
@@ -688,7 +789,7 @@
       },
       "Pikachu": {
         "status": "VERIFIED_COUNT",
-        "source_as_of": "2026-10-25",
+        "source_as_of": "2026-10-26",
         "observed_psa10": 128
       },
       "Onix": {
@@ -698,17 +799,17 @@
       },
       "Scyther": {
         "status": "VERIFIED_COUNT",
-        "source_as_of": "2026-10-25",
+        "source_as_of": "2026-10-26",
         "observed_psa10": 120
       },
       "Snorlax": {
         "status": "VERIFIED_COUNT",
-        "source_as_of": "2026-10-25",
+        "source_as_of": "2026-10-26",
         "observed_psa10": 131
       },
       "Dragonite": {
         "status": "VERIFIED_COUNT",
-        "source_as_of": "2026-10-25",
+        "source_as_of": "2026-10-26",
         "observed_psa10": 90
       }
     }
@@ -807,6 +908,60 @@
           "Dragonite": {
             "status": "VERIFIED_COUNT",
             "source_as_of": "2026-10-25",
+            "observed_psa10": 90
+          }
+        }
+      }
+    },
+    {
+      "last_scan_at": "2026-10-27T17:16:39.802Z",
+      "last_scan_results": {
+        "total": 7,
+        "verified_count": 5,
+        "stale_source": 0,
+        "unavailable": 1,
+        "ambiguous": 1,
+        "source_updated": "2026-10-26",
+        "gemrate_total_psa10": 795,
+        "dated_history_changes": [],
+        "no_verified_day_over_day_change": true,
+        "unverified_combined_psa10": 184,
+        "unverified_combined_note": "795 total GemRate PSA 10s minus 611 independently identifiable among five cards = 184 combined for Ivysaur and Onix. Older source-dated counts 69 and 113 total 182, leaving 2 unexplained relative to those older observations; no per-card assignment can be made. Undated eBay Onix 114 is not treated as verified.",
+        "coverage_note": "Fresh 2026-10-27 attempt for all seven cards; five individually verified as-of 2026-10-26; Ivysaur unavailable, Onix ambiguous. No verified change in the five readable cards; complete seven-card comparison remains impossible.",
+        "cards": {
+          "Charizard": {
+            "status": "VERIFIED_COUNT",
+            "source_as_of": "2026-10-26",
+            "observed_psa10": 142
+          },
+          "Ivysaur": {
+            "status": "UNAVAILABLE",
+            "source_as_of": null,
+            "observed_psa10": null
+          },
+          "Pikachu": {
+            "status": "VERIFIED_COUNT",
+            "source_as_of": "2026-10-26",
+            "observed_psa10": 128
+          },
+          "Onix": {
+            "status": "AMBIGUOUS",
+            "source_as_of": null,
+            "observed_psa10": null
+          },
+          "Scyther": {
+            "status": "VERIFIED_COUNT",
+            "source_as_of": "2026-10-26",
+            "observed_psa10": 120
+          },
+          "Snorlax": {
+            "status": "VERIFIED_COUNT",
+            "source_as_of": "2026-10-26",
+            "observed_psa10": 131
+          },
+          "Dragonite": {
+            "status": "VERIFIED_COUNT",
+            "source_as_of": "2026-10-26",
             "observed_psa10": 90
           }
         }
